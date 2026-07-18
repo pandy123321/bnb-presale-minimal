@@ -1,0 +1,145 @@
+name: WP-01 Import Bundle and Revalidate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bnb-presale-minimal-wp01.bundle'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wp01-import-and-revalidate
+  cancel-in-progress: false
+
+jobs:
+  import-and-revalidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: wp01
+          POSTGRES_PASSWORD: wp01_password
+          POSTGRES_DB: wp01
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U wp01 -d wp01"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - name: Checkout upload commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify uploaded bundle
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -f bnb-presale-minimal-wp01.bundle
+          echo '85a71018a3857f7fa708e130641824cf9039da3460e306b87a5a953314d26af3  bnb-presale-minimal-wp01.bundle' | sha256sum -c -
+          git bundle list-heads bnb-presale-minimal-wp01.bundle | tee /tmp/wp01-bundle-heads.txt
+          grep -q '^9e36ba27da07fee49da244551804dc9603aa71fa refs/heads/main$' /tmp/wp01-bundle-heads.txt
+
+      - name: Import frozen WP-01 baseline
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git fetch bnb-presale-minimal-wp01.bundle refs/heads/main:refs/remotes/wp01/main
+          test "$(git rev-parse refs/remotes/wp01/main)" = '9e36ba27da07fee49da244551804dc9603aa71fa'
+          git push origin refs/remotes/wp01/main:refs/heads/main --force
+          git reset --hard refs/remotes/wp01/main
+          test ! -d backend
+          test -d contracts
+          test -d docs/current
+          test -d docs/baseline
+
+      - name: Set up PHP 8.4 and Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: bcmath, pdo_pgsql, redis
+          coverage: none
+          tools: composer:v2
+
+      - name: Set up Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: contracts/package-lock.json
+
+      - name: Install PostgreSQL and Redis clients
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client redis-tools jq
+
+      - name: Run WP-01 revalidation
+        id: revalidate
+        continue-on-error: true
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: wp01
+          PGPASSWORD: wp01_password
+          PGDATABASE: wp01
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: '6379'
+        run: bash tools/wp01-revalidate.sh
+
+      - name: Commit WP-01 evidence
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add reports
+          if ! git diff --cached --quiet; then
+            git commit -m 'docs: record WP-01 revalidation evidence'
+            git push origin HEAD:main
+          fi
+
+      - name: Upload WP-01 evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp01-baseline-revalidation-evidence
+          path: |
+            reports/WP01_*.txt
+            reports/WP01_*.md
+            reports/generated/BNBPresale.abi.json
+            contracts/reports/remediation-build/**
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Enforce WP-01 gate result
+        if: always()
+        shell: bash
+        run: |
+          if [[ '${{ steps.revalidate.outcome }}' != 'success' ]]; then
+            echo 'WP-01 revalidation failed. Laravel feature development remains prohibited.' >&2
+            exit 1
+          fi
