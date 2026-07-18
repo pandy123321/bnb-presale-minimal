@@ -49,7 +49,7 @@ jobs:
           echo "Imported bundle head: ${imported_sha}"
           test "${imported_sha}" = '9e36ba27da07fee49da244551804dc9603aa71fa'
 
-      - name: Import frozen baseline tree
+      - name: Import approved frozen baseline paths
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -59,9 +59,24 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git checkout -B wp01-bootstrap "$GITHUB_SHA"
 
-          # Import the exact frozen tree without merging unrelated histories.
-          # This avoids add/add conflicts in README and workflow bootstrap files.
-          git checkout refs/remotes/wp01/main -- .
+          # GitHub App tokens without the workflows permission cannot push
+          # commits that create or modify .github/workflows files. Import only
+          # approved source, documentation, evidence, and helper-script paths.
+          git checkout refs/remotes/wp01/main -- \
+            README.md \
+            SCOPE_LOCK.md \
+            DEVELOPMENT_HANDOFF.md \
+            contracts \
+            docs/current \
+            docs/baseline \
+            reports \
+            tools
+
+          # Fail closed if the staged import contains any workflow file.
+          if git diff --cached --name-only | grep -q '^\.github/workflows/'; then
+            echo 'Workflow file unexpectedly staged by bootstrap import.' >&2
+            exit 1
+          fi
 
           test -d contracts
           test -d docs/current
@@ -73,7 +88,7 @@ jobs:
           WP-01 bundle import: PASS
           Bundle SHA256: 85a71018a3857f7fa708e130641824cf9039da3460e306b87a5a953314d26af3
           Imported baseline commit: 9e36ba27da07fee49da244551804dc9603aa71fa
-          Import method: exact tree checkout from verified bundle
+          Import method: approved paths from verified bundle; workflow paths excluded
           Required directories: contracts, docs/current, docs/baseline
           Laravel feature development: NOT_STARTED
           EOF
