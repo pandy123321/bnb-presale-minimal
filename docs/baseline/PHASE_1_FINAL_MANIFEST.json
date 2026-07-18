@@ -1,0 +1,93 @@
+{
+  "version": "1.1.1-FINAL",
+  "phase": "Phase 1",
+  "gate": "APPROVED_FOR_PHASE_2_SMART_CONTRACT_ONLY",
+  "documents": [
+    {
+      "path": "README.md",
+      "size": 440,
+      "sha256": "ea44b9bf4753765c52754e74e60427336d4197854c73a4949e1046f8dcdd4fab"
+    },
+    {
+      "path": "docs/00_STAGE_1_DELIVERABLE_SUMMARY_CN.md",
+      "size": 4470,
+      "sha256": "b63b48c5d898fec1f605f1308a8db9076d2347899cc3b65d0f48238315bece4d"
+    },
+    {
+      "path": "docs/01_PRODUCT_SPEC.md",
+      "size": 16380,
+      "sha256": "9b1fbbde3e82ae70bf666a9a375b2c3232e067ed32d21ef03b238f10cf55e7ca"
+    },
+    {
+      "path": "docs/02_CONTRACT_SPEC.md",
+      "size": 13881,
+      "sha256": "d41b9f73064106740e74db5ec05bf6379bc6a37f020962a74a2c6cb0c5d7d34a"
+    },
+    {
+      "path": "docs/03_DATABASE_SCHEMA.md",
+      "size": 20523,
+      "sha256": "8d3213319df9f201f0070bf65247194363ab556847dd4ceff10fb42f714594b0"
+    },
+    {
+      "path": "docs/04_API_SPEC.md",
+      "size": 12114,
+      "sha256": "5d414027bcaebc8dd038ede8172bb5a72c2f3dd586577e8424b54bb2073e7478"
+    },
+    {
+      "path": "docs/05_ADMIN_PAGE_SPEC.md",
+      "size": 11252,
+      "sha256": "6260acfedfd69a53f020b0c44fd9786e1f8b265912714b96f5d1c91d0f429be9"
+    },
+    {
+      "path": "docs/06_ACCEPTANCE_CRITERIA.md",
+      "size": 12611,
+      "sha256": "5e883a211ea231528a9a33fcef63b46c59c164144ac3a212ce8f7f1cd9de5bb7"
+    },
+    {
+      "path": "docs/07_DEVELOPMENT_RULES.md",
+      "size": 9412,
+      "sha256": "dc9579fa69c2a4893f16306d9b15eb7fe7789ff9d1616e519cafe4e22e4ea990"
+    },
+    {
+      "path": "docs/08_TRACEABILITY_MATRIX.md",
+      "size": 4011,
+      "sha256": "05f35760d4f289925a890a86799972958725a6392d86a1026b78346ceec00592"
+    },
+    {
+      "path": "docs/09_ROLE_PERMISSION_MATRIX.md",
+      "size": 2323,
+      "sha256": "65a8d1ee8a97f88db903613eef740a6e4fa2800232eb32d8caf9826031bb3cb1"
+    },
+    {
+      "path": "docs/10_STATE_MACHINES.md",
+      "size": 2738,
+      "sha256": "467664b7e0b95d5741e60dab92adeefc811275b3cb0371b64aa3f612c3dca800"
+    },
+    {
+      "path": "docs/11_AMOUNT_PRECISION_MATRIX.md",
+      "size": 3631,
+      "sha256": "64ae686c1346583b7dfbbb15fcd14f29e0d16d3af545734a26374f32b3332585"
+    },
+    {
+      "path": "docs/PHASE_1_AUDIT_REPORT_SUPERSEDED.md",
+      "size": 5798,
+      "sha256": "cc8e942bbd1cc2ef67d96d31b764f63d7de9161530804a15f1778341b795b09e"
+    },
+    {
+      "path": "docs/PHASE_1_RC1_AUDIT_REPORT.md",
+      "size": 3585,
+      "sha256": "ce96082e14590251f742e31160c7a74e9900e0bf7a5fdf444971641d8770a42c"
+    },
+    {
+      "path": "docs/PHASE_1_RC1_AUTOMATED_CHECKS.json",
+      "size": 1038,
+      "sha256": "f93a6a2ad2b9f2a37d1d0837f16f6b523cf6acc80285ccf1a7a751b70dec3fa7"
+    }
+  ],
+  "checks": {
+    "blocker_open": 0,
+    "p0_open": 0,
+    "p1_open": 0,
+    "result": "PASS"
+  }
+}

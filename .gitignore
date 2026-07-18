@@ -1,0 +1,22 @@
+# Foundry / Solidity generated output
+contracts/cache/
+contracts/out/
+contracts/broadcast/
+contracts/reports/remediation-build/
+contracts/coverage/
+contracts/lcov.info
+
+# Node dependencies
+contracts/node_modules/
+
+# Local secrets and transient logs
+.env
+.env.*
+!.env.example
+*.log
+.tmp/
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/

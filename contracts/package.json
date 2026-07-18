@@ -1,0 +1,20 @@
+{
+  "name": "bnb-presale-contracts",
+  "version": "2.0.0-phase2",
+  "private": true,
+  "description": "BNB Presale Foundry contracts",
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test",
+    "fmt:check": "forge fmt --check",
+    "solc:check": "node tools/compile-all-solcjs.js",
+    "coverage:gate": "bash tools/run-coverage-gate.sh",
+    "integration:anvil": "bash tools/run-anvil-integration.sh"
+  },
+  "devDependencies": {
+    "solc": "0.8.24"
+  },
+  "overrides": {
+    "tmp": "0.2.7"
+  }
+}

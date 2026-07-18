@@ -1,0 +1,16 @@
+timestamp_utc=2026-07-18T01:17:04Z
+host_os=Debian GNU/Linux 13 (trixie)
+php=8.4.16
+composer=MISSING
+psql=MISSING
+redis-server=MISSING
+redis-cli=MISSING
+forge=MISSING
+anvil=MISSING
+cast=MISSING
+docker=MISSING
+php_bcmath=MISSING
+php_pdo_pgsql=MISSING
+php_redis=MISSING
+package_install_attempt=FAILED_DNS_RESOLUTION
+note=This local preflight is not the final GitHub Actions WP-01 gate.
