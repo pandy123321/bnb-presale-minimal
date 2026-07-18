@@ -1,61 +1,88 @@
 name: WP-01 Bootstrap Import
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
       - '.github/workflows/wp01-bootstrap-import.yml'
       - 'bnb-presale-minimal-wp01.bundle'
-  workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: wp01-bootstrap-import
+  cancel-in-progress: false
 
 jobs:
   import:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
     steps:
       - name: Checkout upload branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Verify and import frozen bundle
+      - name: Verify frozen bundle
         shell: bash
         run: |
           set -Eeuo pipefail
+          trap 'echo "FAILED at line ${LINENO}: ${BASH_COMMAND}" >&2' ERR
+
           test -f bnb-presale-minimal-wp01.bundle
-          echo '85a71018a3857f7fa708e130641824cf9039da3460e306b87a5a953314d26af3  bnb-presale-minimal-wp01.bundle' | sha256sum -c -
+
+          actual_sha256="$(sha256sum bnb-presale-minimal-wp01.bundle | awk '{print $1}')"
+          echo "Bundle SHA256: ${actual_sha256}"
+          test "${actual_sha256}" = '85a71018a3857f7fa708e130641824cf9039da3460e306b87a5a953314d26af3'
+
           git bundle verify bnb-presale-minimal-wp01.bundle
           git bundle list-heads bnb-presale-minimal-wp01.bundle | tee /tmp/wp01-bundle-heads.txt
           grep -q '^9e36ba27da07fee49da244551804dc9603aa71fa refs/heads/main$' /tmp/wp01-bundle-heads.txt
-          git fetch bnb-presale-minimal-wp01.bundle refs/heads/main:refs/remotes/wp01/main
-          test "$(git rev-parse refs/remotes/wp01/main)" = '9e36ba27da07fee49da244551804dc9603aa71fa'
+
+          git fetch bnb-presale-minimal-wp01.bundle \
+            refs/heads/main:refs/remotes/wp01/main
+
+          imported_sha="$(git rev-parse refs/remotes/wp01/main)"
+          echo "Imported bundle head: ${imported_sha}"
+          test "${imported_sha}" = '9e36ba27da07fee49da244551804dc9603aa71fa'
+
+      - name: Import frozen baseline tree
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          trap 'echo "FAILED at line ${LINENO}: ${BASH_COMMAND}" >&2' ERR
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git checkout -B wp01-bootstrap "$GITHUB_SHA"
-          git merge --allow-unrelated-histories --no-edit refs/remotes/wp01/main -m 'chore: import frozen WP-01 baseline'
+
+          # Import the exact frozen tree without merging unrelated histories.
+          # This avoids add/add conflicts in README and workflow bootstrap files.
+          git checkout refs/remotes/wp01/main -- .
 
           test -d contracts
           test -d docs/current
           test -d docs/baseline
           test ! -d backend
 
-      - name: Record import evidence
-        shell: bash
-        run: |
-          set -Eeuo pipefail
           mkdir -p reports
           cat > reports/WP01_BUNDLE_IMPORT_REPORT.txt <<'EOF'
           WP-01 bundle import: PASS
           Bundle SHA256: 85a71018a3857f7fa708e130641824cf9039da3460e306b87a5a953314d26af3
           Imported baseline commit: 9e36ba27da07fee49da244551804dc9603aa71fa
-          Import method: merge --allow-unrelated-histories (non-force)
+          Import method: exact tree checkout from verified bundle
           Required directories: contracts, docs/current, docs/baseline
           Laravel feature development: NOT_STARTED
           EOF
-          git add reports/WP01_BUNDLE_IMPORT_REPORT.txt
-          git commit -m 'chore: record frozen WP-01 bundle import'
+
+          # The bundle remains recoverable in Git history but is removed from
+          # the resulting project tree after successful verification/import.
+          git rm -f --ignore-unmatch bnb-presale-minimal-wp01.bundle
+          git add -A
+          git status --short
+          git diff --cached --stat
+          git commit -m 'chore: import frozen WP-01 baseline'
           git push origin HEAD:main
