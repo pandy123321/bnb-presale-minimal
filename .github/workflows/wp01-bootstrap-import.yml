@@ -59,18 +59,26 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git checkout -B wp01-bootstrap "$GITHUB_SHA"
 
-          # GitHub App tokens without the workflows permission cannot push
-          # commits that create or modify .github/workflows files. Import only
-          # approved source, documentation, evidence, and helper-script paths.
-          git checkout refs/remotes/wp01/main -- \
-            README.md \
-            SCOPE_LOCK.md \
-            DEVELOPMENT_HANDOFF.md \
-            contracts \
-            docs/current \
-            docs/baseline \
-            reports \
-            tools
+          # The verified bundle contains README_MIGRATION_SOURCE.md rather than
+          # DEVELOPMENT_HANDOFF.md. Import only paths proven to exist in the
+          # frozen bundle and exclude all workflow paths.
+          approved_paths=(
+            '.gitignore'
+            'README.md'
+            'README_MIGRATION_SOURCE.md'
+            'SCOPE_LOCK.md'
+            'contracts'
+            'docs/current'
+            'docs/baseline'
+            'reports'
+            'tools'
+          )
+
+          for path in "${approved_paths[@]}"; do
+            git cat-file -e "refs/remotes/wp01/main:${path}"
+          done
+
+          git checkout refs/remotes/wp01/main -- "${approved_paths[@]}"
 
           # Fail closed if the staged import contains any workflow file.
           if git diff --cached --name-only | grep -q '^\.github/workflows/'; then
@@ -88,9 +96,10 @@ jobs:
           WP-01 bundle import: PASS
           Bundle SHA256: 85a71018a3857f7fa708e130641824cf9039da3460e306b87a5a953314d26af3
           Imported baseline commit: 9e36ba27da07fee49da244551804dc9603aa71fa
-          Import method: approved paths from verified bundle; workflow paths excluded
+          Import method: approved existing paths from verified bundle; workflow paths excluded
           Required directories: contracts, docs/current, docs/baseline
           Laravel feature development: NOT_STARTED
+          Go feature development: NOT_STARTED
           EOF
 
           # The bundle remains recoverable in Git history but is removed from
