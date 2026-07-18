@@ -32,8 +32,12 @@ jobs:
           grep -q '^9e36ba27da07fee49da244551804dc9603aa71fa refs/heads/main$' /tmp/wp01-bundle-heads.txt
           git fetch bnb-presale-minimal-wp01.bundle refs/heads/main:refs/remotes/wp01/main
           test "$(git rev-parse refs/remotes/wp01/main)" = '9e36ba27da07fee49da244551804dc9603aa71fa'
-          git push origin refs/remotes/wp01/main:refs/heads/main --force
-          git reset --hard refs/remotes/wp01/main
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -B wp01-bootstrap "$GITHUB_SHA"
+          git merge --allow-unrelated-histories --no-edit refs/remotes/wp01/main -m 'chore: import frozen WP-01 baseline'
+
           test -d contracts
           test -d docs/current
           test -d docs/baseline
@@ -48,11 +52,10 @@ jobs:
           WP-01 bundle import: PASS
           Bundle SHA256: 85a71018a3857f7fa708e130641824cf9039da3460e306b87a5a953314d26af3
           Imported baseline commit: 9e36ba27da07fee49da244551804dc9603aa71fa
+          Import method: merge --allow-unrelated-histories (non-force)
           Required directories: contracts, docs/current, docs/baseline
           Laravel feature development: NOT_STARTED
           EOF
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add reports/WP01_BUNDLE_IMPORT_REPORT.txt
           git commit -m 'chore: record frozen WP-01 bundle import'
           git push origin HEAD:main
