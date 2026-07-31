@@ -1,13 +1,13 @@
 # Foundry / Solidity generated output
-contracts/cache/
-contracts/out/
-contracts/broadcast/
-contracts/reports/remediation-build/
-contracts/coverage/
-contracts/lcov.info
+hub/pixiu1/contracts/cache/
+hub/pixiu1/contracts/out/
+hub/pixiu1/contracts/broadcast/
+hub/pixiu1/contracts/reports/remediation-build/
+hub/pixiu1/contracts/coverage/
+hub/pixiu1/contracts/lcov.info
 
 # Node dependencies
-contracts/node_modules/
+hub/pixiu1/contracts/node_modules/
 
 # Local secrets and transient logs
 .env

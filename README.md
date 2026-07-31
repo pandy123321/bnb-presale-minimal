@@ -1,14 +1,27 @@
-# BNB Presale Minimal
+# PGBNB
 
-WP-01 baseline revalidation repository for the BNB Presale Minimal project.
+Web3 项目 hub 仓库。
 
-## Scope
+## 结构
 
-This repository currently contains only:
+```text
+.
+├── AGENTS.md                 # 三 Agent 云端治理入口
+├── .agent-rules/             # 角色规则规范副本
+├── .cursor/rules/            # Cursor 可执行规则
+├── docs/governance/          # 仓库级治理文档
+└── hub/                      # 所有 Web3 相关项目
+    ├── README.md
+    └── pixiu1/               # 已归档：原 BNB Presale Minimal（WP-01）
+```
 
-- `contracts/`: frozen Stage 2 BNBPresale contract project;
-- `docs/current/`: current minimal visual admin implementation specification;
-- `docs/baseline/`: approved Stage 1 baseline documents;
-- `reports/`: WP-01 environment, checksum, command, contract test, Anvil, and ABI evidence.
+## 约定
 
-No Laravel feature development is included in WP-01. Business rules and the frozen `PurchaseCompleted` event are not modified.
+- **以后所有与 Web3 相关的项目，都放在 `hub/` 目录下。**
+- 每个项目使用独立子目录，例如 `hub/pixiu1/`、`hub/<new-project>/`。
+- 仓库根目录不直接放业务合约/前端/后台代码。
+- 治理与 Agent 规则保留在仓库根，适用于整个 hub。
+
+## 已归档项目
+
+- [`hub/pixiu1/`](./hub/pixiu1/ARCHIVE.md)：原 BNB Presale Minimal WP-01 基线与合约工程。

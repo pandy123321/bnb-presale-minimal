@@ -6,6 +6,8 @@
 - `.cursor/rules/*.mdc`：Cursor 可加载规则（含 frontmatter）
 - `.agent-rules/*.md`：与 README 推荐布局一致的规范副本
 
+业务与 Web3 项目代码统一放在 `hub/`；本治理目录属于仓库根，不随具体项目归档。
+
 | 角色 | Cursor Rule | 规范副本 |
 |---|---|---|
 | 项目协调 Agent | `.cursor/rules/project-coordinator.mdc` | `.agent-rules/project-coordinator.md` |

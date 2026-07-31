@@ -3,6 +3,8 @@
 > 架构：GITHUB_REVIEW_ONLY  
 > 版本：V3.0
 
+本仓库为 PGBNB Web3 hub：业务项目位于 `hub/`（已归档项目见 `hub/pixiu1/`）。治理规则位于仓库根，适用于整个 hub。
+
 本仓库 Agent 必须按角色规则执行。可执行规则位于：
 
 | 文件 | 使用角色 | 用途 |
