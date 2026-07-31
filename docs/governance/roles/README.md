@@ -15,3 +15,6 @@
 | 审核 Agent | `.cursor/rules/review-agent.mdc` | `.agent-rules/review-agent.md` |
 | 人工项目负责人 | `.cursor/rules/human-project-owner.mdc` | `.agent-rules/human-project-owner.md` |
 | 治理总规则 | `.cursor/rules/github-review-only-governance.mdc` | （见 `AGENTS.md`） |
+| pixiu1 基线核心 | `.cursor/rules/pixiu1-baseline-core.mdc` | `hub/pixiu1/docs/baseline/` |
+| pixiu1 开发验收 | `.cursor/rules/pixiu1-baseline-development.mdc` | `hub/pixiu1/docs/baseline/06`/`07` |
+| pixiu1 规范矩阵 | `.cursor/rules/pixiu1-baseline-matrices.mdc` | `hub/pixiu1/docs/baseline/08`–`11` |

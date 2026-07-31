@@ -14,6 +14,11 @@
 | `.cursor/rules/review-agent.mdc` / `.agent-rules/review-agent.md` | 审核 Agent | 只读审核 PR、Finding、返修和 Closeout |
 | `.cursor/rules/human-project-owner.mdc` / `.agent-rules/human-project-owner.md` | 人工项目负责人 | 重大决策、合并、发布、权限和豁免 |
 | `.cursor/rules/github-review-only-governance.mdc` | 全体 | 架构边界与交接顺序（默认生效） |
+| `.cursor/rules/pixiu1-baseline-core.mdc` | 全体 | pixiu1 Phase 1 基线核心（范围/权威源/禁止项，默认生效） |
+| `.cursor/rules/pixiu1-baseline-development.mdc` | 全体 | pixiu1 开发与验收规则（默认生效） |
+| `.cursor/rules/pixiu1-baseline-matrices.mdc` | 全体 | pixiu1 状态/权限/精度规范矩阵（默认生效） |
+
+基线原文：`hub/pixiu1/docs/baseline/`（GitHub `pgbnb`）。当前极简实施范围以 `hub/pixiu1/SCOPE_LOCK.md` 与 `hub/pixiu1/docs/current/` 为准。
 
 ## 整体执行顺序
 

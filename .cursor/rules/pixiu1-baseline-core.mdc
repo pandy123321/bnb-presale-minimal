@@ -1,0 +1,70 @@
+---
+description: pixiu1 Phase 1 基线核心规则（范围、权威源、禁止项）。源自 GitHub hub/pixiu1/docs/baseline，本对话默认生效。
+alwaysApply: true
+---
+
+# pixiu1 Phase 1 基线核心规则
+
+来源（GitHub `pgbnb` / 本地路径，版本 `1.1.1-FINAL`）：
+
+- `hub/pixiu1/docs/baseline/01_PRODUCT_SPEC.md`
+- `hub/pixiu1/docs/baseline/02_CONTRACT_SPEC.md`
+- `hub/pixiu1/docs/baseline/07_DEVELOPMENT_RULES.md`
+- `hub/pixiu1/SCOPE_LOCK.md`
+- 规范矩阵：`08`/`09`/`10`/`11`
+
+冲突时按本规则「优先级」处理；细则以基线原文为准。
+
+## 优先级
+
+1. `hub/pixiu1/docs/current/` 当前实施规格（极简后台当前范围）
+2. `hub/pixiu1/SCOPE_LOCK.md` 当前项目范围锁定
+3. `hub/pixiu1/docs/baseline/` Phase 1 冻结基线（合约、精度、安全、状态、权限）
+4. `hub/pixiu1/contracts/` 阶段二冻结合约工程
+
+说明：当前极简后台范围（Session 登录、事件扫描、购买记录、游标/RPC、补扫、审计、Anvil E2E）窄于完整 Phase 1 内部系统。未批准前，不得把基线中的 Vue/账本/Pancake/自动归集检测等扩进当前实施。
+
+## 产品硬约束
+
+- 只接受原生 BNB；买家自管非托管钱包直转合约，无用户端、无登录、无钱包连接、无 KYC。
+- 购买只在合约内同笔完成：校验 → 计价 → 发币 → 发射 `PurchaseCompleted`；失败整笔回滚。
+- 购买订单只能来自链上 `PurchaseCompleted`；禁止手工建单；失败/回滚交易不是订单。
+- 链上状态与确认回执是资产真相；后台是索引与运维视图。
+- 禁止自动改价；禁止自动扫 BNB；归集必须超管确认执行。
+- `FINALIZED` 不可逆；未售 TOKEN 只能在 `FINALIZED` 后提取。
+
+## 明确排除（不得擅自加入）
+
+USDT、买家前端、钱包连接、买家账号、KYC、退款、claim、vesting、锁仓、推荐、多项目、多币种、多地址分发、多签、复杂审批、Pancake V3、自动价格更新、可升级代理、交易所归因、营销功能。
+
+范围外需求必须先文档化并经人工确认，不得直接实现。
+
+## 合约硬约束
+
+- Solidity `0.8.24` + Foundry + OpenZeppelin 5.x
+- `Ownable2Step` + `Pausable` + `ReentrancyGuard` + `SafeERC20` + `Math.mulDiv`
+- `saleToken` immutable；禁止 `tx.origin` / `delegatecall` / upgrade proxy
+- 禁止 `renounceOwnership`；部署即 `PAUSED`
+- 购买入口：`receive()` / `buy()` → 内部 `_purchase`；`whenNotPaused` + `nonReentrant`
+- 计价：`tokenAmount = Math.mulDiv(bnbAmount, tokenPerBNB, 1 ether)`（向下取整）
+- BNB 归集仅到单一 `treasuryAddress`；`sweepBNB` owner-only
+- 不得修改冻结的 `PurchaseCompleted` 事件语义
+
+## 所有权与写链安全
+
+- `CHAIN_OPERATOR_ADDRESS` 必须等于签名密钥派生地址，且等于 `BNBPresale.owner()`
+- Treasury ≠ Owner；Phase 1 后台不暴露 ownership transfer / renounce
+- 任一身份不匹配：禁用全部写链，并记 Blocker 异常
+- 写链前必须：期望 chain ID、operator/owner 匹配、主网需 `ALLOW_MAINNET_WRITES=true`
+- 禁止持久化/日志输出私钥、助记词、已签名生产 raw tx
+
+## 精度硬约束
+
+- 链上值：十进制整数字符串；Solidity `uint256`；PG `numeric(78,0)`
+- PHP：string + BCMath；禁止 float
+- TS/JS：string / BigInt；禁止用 `number` 做资产计算
+- 禁止科学计数法；raw 与展示值分离；存储/API raw 字段不含小数点
+
+## 本对话执行要求
+
+做任何 pixiu1 / hub 相关改动前，先对照上述基线与 `SCOPE_LOCK`。越界、改事件、改精度、改权限或引入排除项时必须停止并上报，不得默默实现。

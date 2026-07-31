@@ -1,0 +1,93 @@
+---
+description: pixiu1 Phase 1 规范矩阵（状态机、权限、精度、可追溯）。实现与评审不得与这些枚举/单位冲突。
+alwaysApply: true
+---
+
+# pixiu1 Phase 1 规范矩阵规则
+
+来源（均为 Normative / `1.1.1-FINAL`）：
+
+- `hub/pixiu1/docs/baseline/08_TRACEABILITY_MATRIX.md`
+- `hub/pixiu1/docs/baseline/09_ROLE_PERMISSION_MATRIX.md`
+- `hub/pixiu1/docs/baseline/10_STATE_MACHINES.md`
+- `hub/pixiu1/docs/baseline/11_AMOUNT_PRECISION_MATRIX.md`
+
+代码、迁移、API、页面或测试与矩阵冲突时，实现与评审必须失败并修正。
+
+## 销售生命周期
+
+```text
+DEPLOY → PAUSED ⇄ ACTIVE
+PAUSED → FINALIZED（仅 pause 后 finalizeSale）
+```
+
+- `FINALIZED` 终态；禁止再 `unpause`
+- 未售 TOKEN 提取仅允许 `FINALIZED`
+
+## 购买订单状态（仅此三种）
+
+```text
+PENDING_CONFIRMATION → CONFIRMED → REORGED
+PENDING_CONFIRMATION → REORGED
+```
+
+系统/RPC 失败进任务日志或异常，不进购买状态。回滚交易不建单。
+
+## 归集状态
+
+```text
+READY → CANCELLED | SUBMITTED
+SUBMITTED → CONFIRMED | FAILED | REORGED
+CONFIRMED → REORGED
+```
+
+同时仅一个 `READY` 或 `SUBMITTED`。执行前重算金额。
+
+## 交易 Attempt 状态
+
+```text
+CREATED → SIGNED → BROADCAST → CONFIRMED | FAILED | DROPPED | REPLACED
+CONFIRMED → REORGED
+```
+
+`REPLACED` 不新建业务操作；业务可在替换链上保持 pending。
+
+## 事件来源分类
+
+- `BACKEND_OPERATION`
+- `EXTERNAL_OPERATION`
+
+## 权限硬规则
+
+| 能力 | ADMIN | SUPER_ADMIN |
+|---|---|---|
+| 只读查看/导出 | 允许 | 允许 |
+| 改价/限额/规则/封顶、暂停/恢复/finalize、改 Treasury、执行归集、提未售 TOKEN、配 Pancake | 禁止 | 仅可授权（链上由 Operator/Owner 签名执行） |
+| 自动改价 / 自动扫币 | 全体禁止 | 全体禁止 |
+| 经后台做 ownership transfer / renounce | 禁止 | 禁止 |
+
+- Buyer 只能作为钱包向合约支付；无买家 API。
+- Scheduler 可自动检测并创建 `READY` 归集，但不得未经批准自行签名。
+- `SUPER_ADMIN` 授权写操作，但本人不是链上签名者。
+
+## 精度矩阵（摘要）
+
+| 值 | 单位 |
+|---|---|
+| BNB 支付/余额/限额/归集 | wei |
+| TOKEN 数量/库存/已售/封顶 | token 最小单位 |
+| `tokenPerBNB` | 每 `1 ether` wei 对应的 token 最小单位 |
+| 购买产出 | `mulDiv(bnb, tokenPerBNB, 1e18)` 向下取整 |
+| 价格偏差 | basis points（10000 = 100%） |
+
+PHP 资产运算 BCMath scale `0`。展示格式化不得改写交易输入或存储 raw。
+
+## 合约↔证据映射（摘要）
+
+- `PurchaseCompleted` + token `Transfer` → 购买订单与购买账本
+- `BNBSwept` → 归集确认与 BNB 出账
+- `UnsoldTokensWithdrawn` + Transfer → 未售提取账本
+- 管理类事件 → 确认配置写交易或 `EXTERNAL_OPERATION`
+- `renounceOwnership` → 必须 revert；无成功 API
+
+完整表以 `08_TRACEABILITY_MATRIX.md` 为准。

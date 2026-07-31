@@ -1,0 +1,77 @@
+---
+description: pixiu1 Phase 1 开发与验收规则。源自 06/07 基线文档，覆盖栈、幂等、重组、测试、严重级别与评审清单。
+alwaysApply: true
+---
+
+# pixiu1 Phase 1 开发与验收规则
+
+来源：`hub/pixiu1/docs/baseline/06_ACCEPTANCE_CRITERIA.md`、`07_DEVELOPMENT_RULES.md`（`1.1.1-FINAL`）。
+
+## 固定技术栈（不得静默替换）
+
+Solidity 0.8.24、Foundry、OpenZeppelin 5.x、PHP 8.4、Laravel 13、PostgreSQL、Redis、Queue、Scheduler、BCMath、Vue 3、TypeScript、Vite、Element Plus、Pinia、Vue Router、Axios、ECharts、Docker Compose、Nginx。
+
+当前极简实施若未启用某组件（如 Vue），不得借机引入范围外功能；替换组件须人工批准。
+
+## 幂等
+
+- 事件唯一键：`chain_id + transaction_hash + log_index`
+- 写请求使用 Idempotency-Key
+- 同时仅一个活跃归集（`READY`/`SUBMITTED`）
+- nonce 分配用分布式锁；任务重试必须安全；同步重启不得重复记账
+
+## 链重组
+
+- 保存 block hash；未达确认数保持 pending；确认前校验事件仍存在
+- pending 丢失 → `REORGED`（无已确认账本/钱包汇总）
+- 已确认再重组 → 原子标记 `REORGED`，追加 1 笔 BNB + 1 笔 TOKEN 冲正，重建钱包汇总，记 P0，回退游标并重扫
+- 禁止静默删除财务历史
+
+## 必备事件游标
+
+1. `PURCHASE_EVENTS`
+2. `PRESALE_ADMIN_EVENTS`
+3. `SALE_TOKEN_TRANSFERS`
+
+库存转入必须来自已确认 token `Transfer` 证据，禁止手填推断。无匹配后台交易的管理事件记为 `EXTERNAL_OPERATION`。
+
+## 交易尝试
+
+- 一个 Idempotency-Key = 一个业务操作；可有多次 attempt
+- 替换复用 nonce 并关联原 attempt；状态含 `DROPPED` / `REPLACED`
+- 默认不持久化已签名 raw tx
+
+## 安全摘要
+
+合约：无 tx.origin、无代理升级、无 delegatecall、CEI、SafeERC20、mulDiv、Ownable2Step、禁 renounce、ReentrancyGuard、Pausable、显式 cap/库存。
+
+后台：认证与角色中间件、仅超管授权写链、校验、限流、审计、脱敏、永不落盘私钥、写链必带幂等键与预检。
+
+前端（若实施）：TS strict；金额一律 string；权限 UI 不能替代后端校验；确认前不报成功；页面必有 loading/empty/error。
+
+数据库：迁移变更；财务行 append-only；禁止硬删订单/账本/交易/归集/审计；地址与 hash 小写。
+
+## 测试
+
+每项实现必须带测试。合约：unit/fuzz/边界/权限/重入。后台：unit/feature/DB/queue/RPC mock/幂等/鉴权。集成：完整 Anvil、重启防重、归集、对账、重组模拟。未实际执行不得声称测试通过。
+
+## 阶段门禁
+
+生成 → 装依赖 → 编译构建 → 测试 → 静态检查 → 对照规格 → 分级 → 修 Blocker/P0/P1 → 重跑 → 出阶段报告。当前阶段未过，不得开下一阶段。
+
+## 严重级别
+
+- Blocker：无法编译运行，或核心购买不可用，或直接资产损失
+- P0：未授权写、重复发币/归集、精度丢失、nonce 冲突、私钥暴露、账本损坏
+- P1：同步缺口、缺重组处理、错误业务映射、缺必要异常、页/API 不一致
+- P2：可维护性、UX、可观测、文档
+
+阶段通过：无 Blocker、无 P0、阶段要求的 P1 已修、相关测试通过、残留 P2 已记录。
+
+## 评审清单（合入前）
+
+范围内；单位正确；授权正确；幂等；重组安全（如适用）；无 float；无密钥；有审计；有测试；文档同步；回执确认前不报成功；无隐藏自动资产动作。
+
+## 主网安全
+
+必配：`EXPECTED_CHAIN_ID`、`CHAIN_OPERATOR_ADDRESS`、`ALLOW_MAINNET_WRITES=false`。RPC chain / 密钥地址 / Owner 任一不符，或主网未显式允许时，拒绝签名。
