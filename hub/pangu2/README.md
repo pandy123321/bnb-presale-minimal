@@ -9,9 +9,12 @@
 | `docs/specs/PB-S0/P2-G03V31.md` | 当前任务基线索引 |
 | `docs/specs/PB-S0/03_P2-G03V31_TASK_START_GATE.md` | Task Start Gate（GO） |
 | `docs/specs/PB-S0/04_P2-G03V31_TASK_SPEC.md` | Task Spec |
+| `docs/specs/PB-S0/05_REQUIRED_CHECK_MANIFEST_P2-G03V31.md` | 审核基线：Required Checks |
+| `docs/specs/PB-S0/06_EVIDENCE_MANIFEST_P2-G03V31.md` | 审核基线：Evidence Manifest |
 | `docs/specs/PB-S0/07_CURSOR_EXECUTION_PROMPT_P2-G03V31.md` | 执行提示词 |
-| `../../startup_records/`（仓库根） | 上述三份同步副本 |
-| `docs/evidence/PB-S0/P2-G03V31/` | 证据 |
+| `docs/specs/PB-S0/08_REVIEW_AGENT_PROMPT_P2-G03V31.md` | 审核基线：审核提示词 |
+| `../../startup_records/`（仓库根） | 上述同步副本 |
+| `docs/evidence/PB-S0/P2-G03V31/` | 证据与审核基线副本 |
 
 ## 其他文档
 

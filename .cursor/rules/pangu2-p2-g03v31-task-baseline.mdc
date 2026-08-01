@@ -11,11 +11,24 @@ alwaysApply: true
 hub/pangu2/docs/specs/PB-S0/P2-G03V31.md
 hub/pangu2/docs/specs/PB-S0/03_P2-G03V31_TASK_START_GATE.md
 hub/pangu2/docs/specs/PB-S0/04_P2-G03V31_TASK_SPEC.md
+hub/pangu2/docs/specs/PB-S0/05_REQUIRED_CHECK_MANIFEST_P2-G03V31.md
+hub/pangu2/docs/specs/PB-S0/06_EVIDENCE_MANIFEST_P2-G03V31.md
 hub/pangu2/docs/specs/PB-S0/07_CURSOR_EXECUTION_PROMPT_P2-G03V31.md
+hub/pangu2/docs/specs/PB-S0/08_REVIEW_AGENT_PROMPT_P2-G03V31.md
 startup_records/03_P2-G03V31_TASK_START_GATE.md
 startup_records/04_P2-G03V31_TASK_SPEC.md
+startup_records/05_REQUIRED_CHECK_MANIFEST_P2-G03V31.md
+startup_records/06_EVIDENCE_MANIFEST_P2-G03V31.md
 startup_records/07_CURSOR_EXECUTION_PROMPT_P2-G03V31.md
+startup_records/08_REVIEW_AGENT_PROMPT_P2-G03V31.md
+hub/pangu2/docs/evidence/PB-S0/P2-G03V31/
 ```
+
+审核基线（只读审核必须绑定）：
+
+- Required Check Manifest：`05_REQUIRED_CHECK_MANIFEST_P2-G03V31.md`
+- Evidence Manifest：`06_EVIDENCE_MANIFEST_P2-G03V31.md`
+- Review Agent Prompt：`08_REVIEW_AGENT_PROMPT_P2-G03V31.md`
 
 ## 固定身份
 
@@ -68,7 +81,10 @@ hub/pangu2/docs/evidence/PB-S0/P2-G03V31/**
 startup_records/**
 hub/pangu2/docs/specs/PB-S0/03_P2-G03V31_TASK_START_GATE.md
 hub/pangu2/docs/specs/PB-S0/04_P2-G03V31_TASK_SPEC.md
+hub/pangu2/docs/specs/PB-S0/05_REQUIRED_CHECK_MANIFEST_P2-G03V31.md
+hub/pangu2/docs/specs/PB-S0/06_EVIDENCE_MANIFEST_P2-G03V31.md
 hub/pangu2/docs/specs/PB-S0/07_CURSOR_EXECUTION_PROMPT_P2-G03V31.md
+hub/pangu2/docs/specs/PB-S0/08_REVIEW_AGENT_PROMPT_P2-G03V31.md
 .cursor/rules/pangu2-p2-g03v31-task-baseline.mdc
 ```
 
