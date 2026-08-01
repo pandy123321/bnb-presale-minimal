@@ -20,7 +20,9 @@
 | `.cursor/rules/pangu2-baseline-architecture.mdc` | 全体 | 盘古2 架构：环境/API/数据/阶段/测试（默认生效） |
 | `.cursor/rules/pixiu1-baseline-*.mdc` | pixiu1 | 归档项目基线（仅 `hub/pixiu1/**`） |
 
-当前活跃任务基线：`hub/pangu2/docs/specs/PB-S0/P2-G03V31.md` 与 `startup_records/`。Base Branch 固定 `pgbnb`。P2-G03V31 为纯文档/规则迁移；产品代码仍 BLOCKED。
+当前活跃任务基线：`hub/pangu2/docs/specs/PB-S0/P2-G03V31.md` 与 `startup_records/`。  
+审核基线：`05_REQUIRED_CHECK_MANIFEST`、`06_EVIDENCE_MANIFEST`、`08_REVIEW_AGENT_PROMPT`（同目录 / `startup_records/`）。  
+Base Branch 固定 `pgbnb`。P2-G03V31 为纯文档/规则迁移；产品代码仍 BLOCKED。
 
 ## 整体执行顺序
 
