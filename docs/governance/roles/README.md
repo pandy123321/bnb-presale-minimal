@@ -15,6 +15,7 @@
 | 审核 Agent | `.cursor/rules/review-agent.mdc` | `.agent-rules/review-agent.md` |
 | 人工项目负责人 | `.cursor/rules/human-project-owner.mdc` | `.agent-rules/human-project-owner.md` |
 | 治理总规则 | `.cursor/rules/github-review-only-governance.mdc` | （见 `AGENTS.md`） |
-| pixiu1 基线核心 | `.cursor/rules/pixiu1-baseline-core.mdc` | `hub/pixiu1/docs/baseline/` |
-| pixiu1 开发验收 | `.cursor/rules/pixiu1-baseline-development.mdc` | `hub/pixiu1/docs/baseline/06`/`07` |
-| pixiu1 规范矩阵 | `.cursor/rules/pixiu1-baseline-matrices.mdc` | `hub/pixiu1/docs/baseline/08`–`11` |
+| 盘古2 核心 | `.cursor/rules/pangu2-baseline-core.mdc` | `hub/pangu2/docs/baseline/` + `docs/current/` |
+| 盘古2 协议 | `.cursor/rules/pangu2-baseline-protocol.mdc` | 同上 §9–14 / V2.1 §5 |
+| 盘古2 架构交付 | `.cursor/rules/pangu2-baseline-architecture.mdc` | 同上 §15–27 / V2.1 §6–12 |
+| pixiu1 基线（归档） | `.cursor/rules/pixiu1-baseline-*.mdc` | `hub/pixiu1/docs/baseline/` |

@@ -1,6 +1,7 @@
 ---
-description: pixiu1 Phase 1 开发与验收规则。源自 06/07 基线文档，覆盖栈、幂等、重组、测试、严重级别与评审清单。
-alwaysApply: true
+description: pixiu1 Phase 1 开发与验收规则（归档项目）。仅在修改 hub/pixiu1/** 时适用。
+globs: hub/pixiu1/**
+alwaysApply: false
 ---
 
 # pixiu1 Phase 1 开发与验收规则

@@ -1,0 +1,78 @@
+---
+description: 盘古2协议规则：合约职责、买卖计税、成本、分红 Merkle、回购锁仓、治理权限。默认生效。
+alwaysApply: true
+---
+
+# 盘古2协议与合约规则
+
+来源：`PANGU2_DEVELOPMENT_BASELINE_V1.1_RC` §9–14；详细开发文档 V2.1 §5。
+
+## 合约职责
+
+| Contract | 负责 | 禁止 |
+|---|---|---|
+| Token | ERC20、供应量、受限结算、销毁 | 报价；接受伪造买卖上下文 |
+| TradeRouter | 买卖路径、deadline、minOut、preview/执行 | 单独重复扣税；信任前端税率 |
+| CostBasisManager | cost/tracked/UNKNOWN/转账迁移 | 任意管理员 setter |
+| FeeVault | Dividend/Support 隔离与受限转换 | 通用金库；用户提现 |
+| SupportPool | 持有 BNB 并受限回购 | 任意 recipient/call |
+| BuybackLocker | 回购批次与到期 | 提前释放；任意提取 |
+| DividendDistributor | funded root、proof、claim、防重领 | 计算排名；原位改已发布 root |
+| GovernanceAdapter | typed target/selector allowlist | 任意 call/delegatecall |
+
+## 交易与计税
+
+协议候选：“官方 TradeRouter + 单一 Tax Settlement Engine”。Router 编排；Token 内部结算只扣一次税。测试网默认拒绝用户直接与 Pair 交互。
+
+允许路径摘要：
+
+- 官方买：`Pair→TradeRouter→User`，买税 4% 一次；建仓用实际成本与税后净额
+- 官方卖：`User→TradeRouter→Pair`，4% 或 10% 一次；成本已在结算中消费
+- Fee 转换 / 回购：`FeeVault→Router→Pair`、`Pair→BuybackLocker`，无递归卖税/无用户买税
+- 用户转账：无税；成本按比例向下取整迁移
+- 直连 `User↔Pair`：拒绝
+
+`previewSell` 仅预览；真实 sell 必须在链上用同一内部逻辑重算成本、价格、税率，并校验 deadline/minOut/路径/Oracle。税率漂移导致 minOut 失败则整笔回滚。
+
+## 成本基础
+
+- 成本单位候选：WBNB wei；token 为最小单位
+- tracked=0 时 cost 必须=0
+- 部分卖出/转账向下取整；全部转出迁移全部余成本；自转账不改状态
+- 官方买入以实际支付成本 + 税后到账建仓；系统地址不建用户仓
+- 无法证明来源 / 移除流动性 / 历史导入 → UNKNOWN
+- UNKNOWN 只能经可验证重建、批准迁移或 Decision 解除；管理员不得任意改写
+- DR-P2-0008 未批准完整 Oracle/TWAP/抗操纵方案前，TradeRouter 与 CostBasis 不得 Closeout
+
+## 分红与 Merkle
+
+- 分红资产由 DR-P2-0010 决定；测试网候选为 PANGU2
+- Snapshot 保存 finalized block number/hash；重组使未发布 epoch 失效并重算
+- 排序：余额降序，同余额按 20-byte 地址升序；少于 100 人按实际名次
+- Root 发布前校验 Distributor 资金充足；已发布 Root 不得原位替换
+- Leaf V1 候选：`keccak256(bytes.concat(keccak256(abi.encode(chainId, distributor, epochId, rewardToken, account, amount))))`
+- Schema 独立固定 SHA 前不得称 FROZEN
+
+## 回购与 Locker
+
+- FeeVault 转换不得再产卖出税；SupportPool 输出必须直进 Locker
+- 回购失败原子回滚
+- 测试网模式：`DEPLOYMENT_FIXED_DURATION`；具体秒数由 Task Spec 给出，**不得默认 365 天**
+- 仅 SupportPool/BuybackExecutor 创建单调 batchId；禁止提前释放/任意管理员提取
+- 状态：`LOCKED→UNLOCKABLE→RELEASED` 或 `PERMANENT`
+- 不变量：`locker balance >= outstanding batches`
+
+## 治理权限
+
+| Role | 允许 | 禁止 |
+|---|---|---|
+| DEFAULT_ADMIN | grant/revoke | 资金操作 |
+| GOVERNANCE | 受限参数/registry | 超硬上限、任意 call |
+| TIMELOCK | 排队后的 allowlisted 操作 | delegatecall/任意目标 |
+| EMERGENCY | pause | unpause、资金、改参数 |
+| KEEPER | convertFees/自动任务 | 自定义金额/recipient |
+| ROOT_PUBLISHER | 发布已资金化 root | 改分配/提现 |
+| PAUSER | pause | 其他治理 |
+| UNPAUSER | Timelock unpause | Emergency 不得拥有 |
+
+DR-P2-0009 未批准前，不得把角色矩阵当主网冻结设计。GovernanceAdapter 禁止通用任意 call。

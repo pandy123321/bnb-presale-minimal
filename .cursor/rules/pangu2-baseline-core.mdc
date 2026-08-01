@@ -1,0 +1,117 @@
+---
+description: 盘古2（Pangu2）项目核心规则。仓库边界、Gate、范围、Decision、参数与交付边界。本对话默认生效。
+alwaysApply: true
+---
+
+# 盘古2项目核心规则
+
+来源：
+
+- `hub/pangu2/docs/baseline/PANGU2_DEVELOPMENT_BASELINE_V1.1_RC.md`（`PANGU2-DEV-BASELINE-V1.1-RC`）
+- `hub/pangu2/docs/current/盘古2项目详细开发文档_V2.1_PGBNB.md`
+
+文档状态：`BASELINE_CANDIDATE`（非人工最终批准、非审计结论、非主网许可）。
+
+## 仓库身份（DR-P2-0001 ACTIVE）
+
+```text
+Repository: pandy123321/bnb-presale-minimal
+Base Branch: pgbnb
+Project Root: hub/pangu2/
+Archived: hub/pixiu1/   # READ_ONLY / 默认 Forbidden
+```
+
+```text
+hub/
+├─ pixiu1/   # 归档，禁止直接扩展盘古2
+└─ pangu2/   # 盘古2唯一项目根
+   ├─ contracts/
+   ├─ apps/dapp/
+   ├─ apps/admin/
+   ├─ services/api/
+   ├─ services/chain-worker/
+   ├─ packages/
+   ├─ config/
+   ├─ infra/
+   └─ docs/
+```
+
+硬边界：
+
+- 盘古2产品代码、迁移、配置、项目文档、证据只能进 `hub/pangu2/`。
+- `hub/pixiu1/**` 默认 Forbidden；复用必须复制后重验，禁止运行时相对路径依赖归档代码。
+- 仓库根治理路径仅在 Task Spec 明确授权时可改。
+- 所有盘古2 PR 默认 Base Branch = `pgbnb`。
+
+## 规则优先级
+
+```text
+ACTIVE Human Decision Record
+→ Approved Project Baseline
+→ Approved Stage Plan
+→ Approved Task Spec
+→ Frozen ABI / Event / API / Data Schema
+→ Verified Implementation at Fixed SHA
+→ Prototype / Reference
+→ Historical Documents
+```
+
+Finding 只能证明实现不符合已批准规范；不得用 Finding 改经济模型、API、权限、事件或状态机。
+
+## 当前 Gate
+
+```text
+Repository Strategy: APPROVED
+PB-S0 Repository Initialization Gate: GO          # 可做 P2-G02 等骨架/治理
+Project Start Gate: NEEDS_CONFIRMATION
+PB-S1..PB-S6 Product Development Gate: BLOCKED
+BSC_MAINNET: NO-GO
+Automatic Merge: FORBIDDEN
+Automatic Deployment: FORBIDDEN
+```
+
+- 可做：目录初始化、治理文件、工具链、LOCAL/CI、Schema 候选。
+- 不可做：在开放 Decision / Spec SHA / Ruleset Bundle SHA 未关闭前启动产品代码任务。
+- 下一任务形态：`P2-G02` 初始化 `hub/pangu2/`、迁移基线、保存 Decision；**不得开发产品代码**。
+
+## 策略与范围
+
+策略：`PANGU2_FIRST_PLATFORM_READY` — 先完成盘古2，只保留低成本复用边界（registry、raw facts、统一交易状态、RBAC、审计、`project_id/environment/chain_id`）。
+
+候选交付：合约套件、Vue DApp/Admin、Laravel 模块化单体、PostgreSQL、Redis/Horizon、TS Chain Worker、测试网与 Staging 证据。
+
+非范围：主网/真实资金/生产 Secret；多租户、多链、插件、微服务；托管用户私钥或后台代签；管理员改用户资产/成本/分红；自动合并/部署；收益承诺。
+
+## 开放 Decision（未 ACTIVE 不得当 FROZEN）
+
+| ID | 事项 | 阻塞 |
+|---|---|---|
+| DR-P2-0002 | 分红档位 35/30/20/15 | S1 Dividend、S3 |
+| DR-P2-0003 | 额外 6% 计税基数 | S1 Trade |
+| DR-P2-0004 | UNKNOWN 按 10% | S1 Cost/Trade |
+| DR-P2-0005 | Locker 期限与到期行为 | S1 Locker、S6 |
+| DR-P2-0006 | `_burn` 或不可恢复地址 | S1 Token |
+| DR-P2-0007 | DEX/Router/Pool/Fee Tier | S1 Trade/Buyback |
+| DR-P2-0008 | 价格源与抗操纵 | S1 Trade/Cost Closeout |
+| DR-P2-0009 | Governance/Timelock/Emergency/Keeper | S1 Governance、S6 |
+| DR-P2-0010 | 分红资产与未领取资金 | S1 Distributor、S3 |
+
+参数状态只允许：`PROPOSED / TESTNET_ASSUMPTION / TBC / DERIVED / MOCK_ONLY`。无 ACTIVE Decision 不得标 `FROZEN`。Locker 期限不得默认 365 天。模拟数据必须标 `MOCK_DATA`。
+
+## 候选业务参数（摘要）
+
+- Token：`PANGU2`，供给 1B×10^decimals（PROPOSED）
+- 买入税 4% → Dividend；普通卖出 4% → Support（PROPOSED）
+- 利润卖出 10%：9% 托底 + 1% 销毁（依赖多个 Decision）
+- 分红档位测试网假设：35/30/20/15（旧 35/25/25/15 仅历史）
+- UNKNOWN 税 10%；回购候选 0.01 BNB / 60s
+- 成本单位候选：WBNB wei
+
+## 角色边界
+
+- 项目协调：Gate / 阶段衔接
+- 执行：按固定 Task Spec 实施，Draft PR
+- 审核：只读审核固定 Head SHA
+- 人工负责人：重大 Decision、合并、发布
+
+每个 Task Spec 必须固定：Repository、Project Root、Base/Spec/Ruleset SHA、Allowed/Forbidden、Tests、Checks、Dependencies、Outputs、Closure、Rollback、Open Decisions。盘古2 Forbidden 默认含 `hub/pixiu1/**`。

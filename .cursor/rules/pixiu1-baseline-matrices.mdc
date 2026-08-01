@@ -1,6 +1,7 @@
 ---
-description: pixiu1 Phase 1 规范矩阵（状态机、权限、精度、可追溯）。实现与评审不得与这些枚举/单位冲突。
-alwaysApply: true
+description: pixiu1 Phase 1 规范矩阵（归档项目）。仅在修改 hub/pixiu1/** 时适用。
+globs: hub/pixiu1/**
+alwaysApply: false
 ---
 
 # pixiu1 Phase 1 规范矩阵规则

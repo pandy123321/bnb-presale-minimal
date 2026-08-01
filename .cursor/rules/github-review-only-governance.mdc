@@ -14,13 +14,15 @@ alwaysApply: true
 - 审核：`.cursor/rules/review-agent.mdc`
 - 人工负责人指引：`.cursor/rules/human-project-owner.mdc`
 
-pixiu1 / BNB Presale 相关工作还必须遵守（默认生效）：
+盘古2（当前活跃项目）还必须遵守（默认生效）：
 
-- `.cursor/rules/pixiu1-baseline-core.mdc`
-- `.cursor/rules/pixiu1-baseline-development.mdc`
-- `.cursor/rules/pixiu1-baseline-matrices.mdc`
+- `.cursor/rules/pangu2-baseline-core.mdc`
+- `.cursor/rules/pangu2-baseline-protocol.mdc`
+- `.cursor/rules/pangu2-baseline-architecture.mdc`
 
-规范副本同步位于 `.agent-rules/`。基线原文位于 `hub/pixiu1/docs/baseline/`。
+pixiu1 归档项目仅在修改 `hub/pixiu1/**` 时加载 `pixiu1-baseline-*.mdc`。
+
+规范副本同步位于 `.agent-rules/`。盘古2 基线原文：`hub/pangu2/docs/`。
 
 ## 执行顺序（必须遵守）
 

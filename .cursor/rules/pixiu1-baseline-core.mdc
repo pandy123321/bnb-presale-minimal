@@ -1,6 +1,7 @@
 ---
-description: pixiu1 Phase 1 基线核心规则（范围、权威源、禁止项）。源自 GitHub hub/pixiu1/docs/baseline，本对话默认生效。
-alwaysApply: true
+description: pixiu1 Phase 1 基线核心规则（归档项目）。仅在修改 hub/pixiu1/** 时适用；盘古2 请用 pangu2-baseline-*。
+globs: hub/pixiu1/**
+alwaysApply: false
 ---
 
 # pixiu1 Phase 1 基线核心规则

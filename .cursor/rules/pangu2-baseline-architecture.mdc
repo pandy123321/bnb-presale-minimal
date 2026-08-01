@@ -1,0 +1,104 @@
+---
+description: 盘古2架构与交付规则：环境、模块边界、API/数据/事件、状态机、安全、测试与阶段任务。默认生效。
+alwaysApply: true
+---
+
+# 盘古2架构与交付规则
+
+来源：`PANGU2_DEVELOPMENT_BASELINE_V1.1_RC` §15–27；详细开发文档 V2.1 §6–12。
+
+## 环境
+
+| Env | 要点 |
+|---|---|
+| LOCAL | chainId 31337；Docker PG/Redis；可 `down -v`；日志脱敏 |
+| CI | frozen lockfile；临时 DB/Redis/Anvil；Artifact 绑 Head SHA；禁空报告/`continue-on-error`/Secret 泄露 |
+| BSC_TESTNET | chainId 97；RPC 仅 Secret/环境；角色分离；记录地址/code hash/ABI/部署区块 |
+| STAGING | 强制测网；独立 TLS/API/DB/Redis/Worker/DApp/Admin；无生产 Secret |
+| BSC_MAINNET | **NO-GO**；不记录真实凭证或部署指令 |
+
+晋级必须固定 Source SHA、Artifact Digest、配置、迁移、ABI、测试证据、回滚与批准角色。精确版本必须由锁文件/版本文件固定，不能只写 “Node LTS / OZ 5.x”。
+
+## 模块边界
+
+候选栈：Laravel 模块化单体 + TS Chain Worker + Horizon + Vue DApp/Admin + Foundry。第一阶段不拆微服务。全部在 `hub/pangu2/`。
+
+- **Chain Worker 唯一**拥有区块/tx/receipt/log/canonical/finality/reorg/chain cursor
+- Laravel 只消费 raw fact/outbox
+- **Horizon 唯一**负责业务投影、Snapshot、排名、Merkle、Proof、补偿
+- Scheduler 只派发 job
+- 禁止两个系统处理同一事实任务；用 lease/advisory lock、指数退避、dead-letter、审计补偿
+
+## DApp 硬要求
+
+页面：主页、交易、分红、托底、我的。覆盖独立状态机：Wallet / Network / Quote / Approval / Signature / Chain Tx / Indexing / Data Freshness / Claim。
+
+- 不允许用户选择 4% 或 10%
+- 买入 MAX 预留 Gas；授权与卖出是两笔独立交易
+- 估算排名、Epoch 结算排名、Merkle 可领取结果分开显示
+- 报价显示引用区块、过期、价格源、数据状态
+- 不显示固定 365 天；模拟数据必须 `MOCK_DATA`
+
+## 管理端硬要求
+
+只提供受控操作、Safe/Timelock 提案与状态。不得提供：改用户资产、任意提现 SupportPool、改写 Root 分配。
+
+## API
+
+前缀：
+
+```text
+/api/v1/projects/pangu2
+/admin-api/v1/projects/pangu2
+```
+
+金额用十进制整数字符串；响应带 project/environment/chain/data_status/block/generated_at。OpenAPI 独立 Schema Task 固定 SHA 前仅为候选。
+
+## 事件（最低候选）
+
+`PairUpdated`、`SystemAddressUpdated`、`TokensPurchased`、`TokensSold`、`CostBasisUpdated`、`FeeBucketCredited`、`FeesConverted`、`BuybackExecuted`、`LockBatchCreated/Released`、`DividendFunded`、`DividendRootPublished`、`DividendClaimed`、`Paused/Unpaused`。变更必须升版本并同步解析器、前端类型和测试。
+
+## 数据
+
+- `chain_transactions` = raw fact；用户/管理链操作 = `chain_operations`
+- 框架队列表 ≠ 业务 `job_runs`
+- 迁移唯一来源：`services/api/database/migrations`
+- 事件唯一键：`(chain_id, block_hash, tx_hash, log_index)`
+- canonical partial unique：`(chain_id, tx_hash, log_index) WHERE canonical=true`
+- 重组：旧记录 `canonical=false/removed=true`，再插入新 block_hash 记录
+- 关键表评估：project_id、environment、chain_id、block/tx/log、canonical、removed、finality、idempotency、status、version、审计字段
+
+## 状态机（必须分域）
+
+Quote：`IDLE→LOADING→READY→EXPIRED/FAILED`  
+Approval：`REQUIRED→SIGNATURE_PENDING→SUBMITTED→CONFIRMED/FAILED/REJECTED`  
+Chain：`CREATED→SUBMITTED→PENDING→CONFIRMED/FAILED/REPLACED/DROPPED`（确认后可 `REORGED`）  
+Indexer：`STOPPED→STARTING→SYNCING→LIVE/DEGRADED/FAILED`（可 `REORGING`）  
+Claim：`NOT_AVAILABLE→AVAILABLE→SIGNATURE_PENDING→SUBMITTED→CLAIMED/FAILED/REJECTED`
+
+每个 Task Spec 必须固定初态、允许/禁止迁移、触发、超时、重试、终止与 reorg 路径。
+
+## 安全
+
+用户私钥只在钱包；Secret 不入仓库/日志/DB；资金用整数、CEI、重入保护、固定 recipient；治理 allowlist；Oracle/RPC fail-closed；Root 发布校验资金/schema/checksum/state；管理写操作鉴权+RBAC+二次确认+审计并显示环境/合约/金额/calldata 摘要。
+
+## 阶段
+
+```text
+PB-S0 仓库/治理/版本/LOCAL-CI/Schema
+PB-S1 合约
+PB-S2 API Core + Chain Worker
+PB-S3 Pangu2 业务后端
+PB-S4 DApp
+PB-S5 Admin
+PB-S6 测试网/STAGING Closeout
+PB-S7 平台抽取（DEFERRED）
+```
+
+PB-S0 实际任务：`P2-G01`(完成) → `G02` 初始化 → `G03` Ruleset → `G04` 版本 → `G05` LOCAL/CI → `G06` Actions → `G07` Secret/Forbidden/Schema 检查 → `G08` 参数 Decision → `G09` Schema 候选 → `G10` Closeout。
+
+索引任务在独立 Task Spec 出具前状态为 `NOT_EXECUTABLE_PLANNING_RECORD`，禁止把索引当可执行任务。
+
+## 测试最低要求
+
+合约：unit/fuzz/invariant/攻击。后端：签名、RBAC、幂等、Outbox、重组、确定性 Merkle。前端：钱包/网络/报价/授权/拒签/替换/丢弃/reorg。管理端：危险操作、权限、审计。PB-S6：真实 BSC_TESTNET 闭环。未执行不得声称通过。
