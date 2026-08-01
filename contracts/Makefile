@@ -1,40 +1,31 @@
-.PHONY: install solc-check build test test-verbose fmt fmt-check clean coverage snapshot local-node deploy-local integration
+.PHONY: install fmt build test fuzz invariant fork snapshot validate
 
 install:
-	npm ci
-
-solc-check:
-	node tools/compile-all-solcjs.js
-
-build:
-	forge build
-
-test:
-	forge test
-
-test-verbose:
-	forge test -vvv
+	forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
+	forge install foundry-rs/forge-std@v1.16.2 --no-commit
 
 fmt:
-	forge fmt
-
-fmt-check:
 	forge fmt --check
 
-clean:
+build:
 	forge clean
+	forge build --sizes
 
-coverage:
-	./tools/run-coverage-gate.sh
+test:
+	forge test -vvv
+
+fuzz:
+	forge test --fuzz-runs 50000 -vvv
+
+invariant:
+	forge test --match-path 'test/invariant/**' -vvv
+
+fork:
+	@test -n "$$BSC_TESTNET_RPC_URL"
+	@test -n "$$BSC_TESTNET_FORK_BLOCK"
+	forge test --match-path 'test/fork/**' -vvv
 
 snapshot:
 	forge snapshot
 
-local-node:
-	anvil --chain-id 31337
-
-deploy-local:
-	forge script script/DeployLocal.s.sol:DeployLocal --rpc-url local --broadcast -vvv
-
-integration:
-	./tools/run-anvil-integration.sh
+validate: fmt build test fuzz invariant fork snapshot

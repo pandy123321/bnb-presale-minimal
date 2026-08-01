@@ -1,0 +1,41 @@
+{
+  "project_id": "PANGU2",
+  "stage_id": "PB-S1",
+  "prompt_version": "PB-S1-REPAIR-OPTIMIZATION-V1.1",
+  "previous_artifact_source_tree_sha256": "e7f360307404ef43646e79862eeb8f8c4ae1d94f1d2e169f17b165e9da65865e",
+  "current_source_tree_sha256": "f2f1230a507acefb5f516d828e9a1b549ccf3904f63c47ffda6b3505d42cdc65",
+  "generated_at_utc": "2026-08-01T14:42:05.531331+00:00",
+  "counts": {
+    "solidity_files": 43,
+    "production_source_files": 27,
+    "test_files": 14,
+    "script_files": 2,
+    "solidity_lines": 5692
+  },
+  "checks": {
+    "exact_pragma_0_8_24": true,
+    "spdx_present": true,
+    "delimiter_balance": true,
+    "imports_resolve": true,
+    "no_bad_test_src_imports": true,
+    "pangu2_remapping_present": true,
+    "support_pool_can_execute_present": true,
+    "buyback_amount_0_01": true,
+    "buyback_interval_60": true,
+    "locker_decision_inputs": true,
+    "no_formal_7_day_default": true,
+    "tier_values_preserved": true,
+    "tier_sum_guard": true,
+    "no_selfdestruct": true,
+    "no_tx_origin": true,
+    "no_delegatecall": true,
+    "mainnet_no_go": true
+  },
+  "errors": [],
+  "status": "PASS",
+  "compiler_validation": "NOT_RUN",
+  "forge_validation": "NOT_RUN",
+  "fork_validation": "NOT_RUN",
+  "block_reason": "ENVIRONMENT: forge/solc/anvil unavailable; BSC testnet RPC and fixed fork block not provided",
+  "mainnet": "NO-GO"
+}
