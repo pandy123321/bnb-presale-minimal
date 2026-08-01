@@ -1,0 +1,340 @@
+{
+  "generated_at_utc": "2026-08-01T14:42:05.531331+00:00",
+  "files": [
+    {
+      "path": ".tool-versions",
+      "sha256": "6ab5375d289fc2377d6096e340c67cdcfbc7833edb84bea7e62418a991481785",
+      "bytes": 30
+    },
+    {
+      "path": "DEPENDENCIES.lock.md",
+      "sha256": "a40bac87ff1df0adab9ba69b7472066b4fc4128ae0488568b94cee6c16bd1fb2",
+      "bytes": 440
+    },
+    {
+      "path": "Makefile",
+      "sha256": "f286db78f4dc31227e4976347801d32db325d3d3a6d27bc525683fb02d429be6",
+      "bytes": 605
+    },
+    {
+      "path": "README.md",
+      "sha256": "c5c1344461e45af9021637da82c1cd9e522467f7ccb6e095274eeda48e05aad9",
+      "bytes": 4600
+    },
+    {
+      "path": "STATIC_VALIDATION.json",
+      "sha256": "2fbf0ff874e19618382fd9d6ccc1aeb567e422f165e3b557f5917092b620fa4c",
+      "bytes": 1370
+    },
+    {
+      "path": "STATIC_VALIDATION_REPAIR.json",
+      "sha256": "2fbf0ff874e19618382fd9d6ccc1aeb567e422f165e3b557f5917092b620fa4c",
+      "bytes": 1370
+    },
+    {
+      "path": "abi/README.md",
+      "sha256": "a07cc2904fffaf6e6142eeeb8e6971d837b1ac51530fadb29c9ad50d9fc4fc08",
+      "bytes": 800
+    },
+    {
+      "path": "deploy.env.example",
+      "sha256": "110583034f90da3624e4a5343cda4aa970fb84e0e562f5836b25a76447846380",
+      "bytes": 965
+    },
+    {
+      "path": "foundry.toml",
+      "sha256": "73753bba55f918fa490d9a0b855f5c866e25845d8e5e12bc57e3bf050868294b",
+      "bytes": 453
+    },
+    {
+      "path": "remappings.txt",
+      "sha256": "32caf345ac83137b7a66f8503ce3e093cf3715b7f3c137cf88befe6af6d22809",
+      "bytes": 106
+    },
+    {
+      "path": "reports/ABI_EVENT_SCHEMA_CHANGELOG_V1.1.md",
+      "sha256": "98e0bb3b03d8fa314f85f6830d953016d37fa7ad5ff1eae0614b6a7a7d0eb9da",
+      "bytes": 865
+    },
+    {
+      "path": "reports/FINAL_SOURCE_TREE.json",
+      "sha256": "d3807db4ca762449575ebdc3c242be02c007f5b760eff8b39e901b7a6846a99f",
+      "bytes": 8076
+    },
+    {
+      "path": "reports/LOCAL_COMMAND_RESULTS_V1.1.txt",
+      "sha256": "de5790824094c5d3ee3b1ebe7d2bfee36bb77f1fc267f1654e71c09f21d2235f",
+      "bytes": 721
+    },
+    {
+      "path": "reports/LOCKER_DECISION_REQUIRED_V1.1.md",
+      "sha256": "2dd6b387e838bbfd7817fd7356f67c553e4b24543fe40d8f3cac96e727b37cf3",
+      "bytes": 674
+    },
+    {
+      "path": "reports/PB-S1_REPAIR_EXECUTION_REPORT.md",
+      "sha256": "74755302abbb5812d874b3568ad56d99c2447deb32912386b5a385a1190eccc8",
+      "bytes": 3175
+    },
+    {
+      "path": "reports/PB-S1_REPAIR_OPTIMIZATION_EXECUTION_REPORT_V1.1.md",
+      "sha256": "0a3e57840a579f4350fa7496f89ef9c37447e6d0b421316b81f6d2bd8a3d0baf",
+      "bytes": 5130
+    },
+    {
+      "path": "reports/REPAIR_FINDING_MATRIX.md",
+      "sha256": "ab86aa266ba56ead9dff154a1fafedd2a69ebcb9fbddb40c9099917aa3c2e13e",
+      "bytes": 1041
+    },
+    {
+      "path": "reports/ROUNDING_DECISION_REQUIRED.md",
+      "sha256": "8614769a9df9d35903fa7cc3e704259adc430a29648e22dcdaf43a8c3beb8f2f",
+      "bytes": 2063
+    },
+    {
+      "path": "reports/SOURCE_MANIFEST.json",
+      "sha256": "d3807db4ca762449575ebdc3c242be02c007f5b760eff8b39e901b7a6846a99f",
+      "bytes": 8076
+    },
+    {
+      "path": "reports/SOURCE_MANIFEST_REPAIR.json",
+      "sha256": "d3807db4ca762449575ebdc3c242be02c007f5b760eff8b39e901b7a6846a99f",
+      "bytes": 8076
+    },
+    {
+      "path": "reports/SOURCE_MANIFEST_V1.1.json",
+      "sha256": "d3807db4ca762449575ebdc3c242be02c007f5b760eff8b39e901b7a6846a99f",
+      "bytes": 8076
+    },
+    {
+      "path": "reports/STATIC_VALIDATION_V1.1.json",
+      "sha256": "2fbf0ff874e19618382fd9d6ccc1aeb567e422f165e3b557f5917092b620fa4c",
+      "bytes": 1370
+    },
+    {
+      "path": "reports/TASK_COVERAGE_MATRIX.md",
+      "sha256": "a2b7657d30d08e8c204e43703559a308f808da94095edff87a602cfba5690b44",
+      "bytes": 1339
+    },
+    {
+      "path": "reports/VALIDATION_STATUS.md",
+      "sha256": "2fc2fce1530177ae58dfcb81bbbd83de826d034481a1c52853b4bf439741cbef",
+      "bytes": 1098
+    },
+    {
+      "path": "script/DeployPangu2.s.sol",
+      "sha256": "9b8a582da0868eada5471512ed4cf75be390e29a4666a1141785863e7882667c",
+      "bytes": 21521
+    },
+    {
+      "path": "script/LockDecisionConfig.sol",
+      "sha256": "c2ace6272425065861754c40ef6c2e4f5fc70e72e36acc4151815fbe041318d3",
+      "bytes": 1951
+    },
+    {
+      "path": "src/BuybackLocker.sol",
+      "sha256": "a6702adf3871942b4bbce955eadd59e99b4375a414de314680a7cba75fa886b6",
+      "bytes": 5258
+    },
+    {
+      "path": "src/CostBasisManager.sol",
+      "sha256": "f3689419a35598d4856f73a5f92ee8dbaf17c769c759fe1baa63d694a0136bc8",
+      "bytes": 18555
+    },
+    {
+      "path": "src/DividendDistributor.sol",
+      "sha256": "b484821d09fa4e277a20c408becd9f744c54f2d6d0638a88695e0780e90d9742",
+      "bytes": 12546
+    },
+    {
+      "path": "src/FeeVault.sol",
+      "sha256": "8c39521f19f0a415dbf72968989257d91ae3823a79ce551fcd1c353aa447ee6a",
+      "bytes": 8544
+    },
+    {
+      "path": "src/GovernanceAdapter.sol",
+      "sha256": "8bc0b2642ebbd7e5811456e610737d62c1163f5171c65b2ccb98d940fe9028e5",
+      "bytes": 3148
+    },
+    {
+      "path": "src/Pangu2LiquidityGateway.sol",
+      "sha256": "ecad7f700286e9dd1b8923e153e52700b2d37652cbe96678978648ecce339c7d",
+      "bytes": 8893
+    },
+    {
+      "path": "src/Pangu2Token.sol",
+      "sha256": "48e46866d7518d995363175b684465ed9e731d62be20cb8a62c6880df09000e2",
+      "bytes": 14562
+    },
+    {
+      "path": "src/Pangu2TradeRouter.sol",
+      "sha256": "1b9ecda8e9e6bec429aedef2a7c01001d377ab635334cbcddc40ff57f7d934a7",
+      "bytes": 10203
+    },
+    {
+      "path": "src/SupportPool.sol",
+      "sha256": "a11c184e007bb18398cb722e0142c082aa29192bab474523de61f7b8280005f4",
+      "bytes": 7992
+    },
+    {
+      "path": "src/adapters/PancakeV3Adapter.sol",
+      "sha256": "825052b1f66144d748dbba2f31364a62f7a985ea3c4f6bf0c20f157a9816e7eb",
+      "bytes": 5838
+    },
+    {
+      "path": "src/interfaces/IBuybackLocker.sol",
+      "sha256": "68a07c47bf84e86b26bfdaaa27301e639ae301e5b460b450e5daf795c835085e",
+      "bytes": 252
+    },
+    {
+      "path": "src/interfaces/ICostBasisManager.sol",
+      "sha256": "58210b537a857b4be0f533be326b94a2192ef9781dd208376bf7f28bbd92a698",
+      "bytes": 1458
+    },
+    {
+      "path": "src/interfaces/IDividendDistributor.sol",
+      "sha256": "434cb1bd0ad8ad3fd473316d70c07b68948e0d4b814df0d2d990df7ccec629a5",
+      "bytes": 1124
+    },
+    {
+      "path": "src/interfaces/IFeeVault.sol",
+      "sha256": "9a09768e93ebe88549d0244be4ae6603842d27e3b396c132c81d148b74fbe96b",
+      "bytes": 472
+    },
+    {
+      "path": "src/interfaces/IPancakeV3.sol",
+      "sha256": "9a64c1d2218a72745fcbad1bcb53822195af0b217a3566c9ebcd65ea3a632333",
+      "bytes": 3772
+    },
+    {
+      "path": "src/interfaces/IPancakeV3Adapter.sol",
+      "sha256": "5e9de1e6464ac761aa28df0a0132416cd7eecb7cdaa203b6efa157aa2ee79e10",
+      "bytes": 543
+    },
+    {
+      "path": "src/interfaces/IPangu2Token.sol",
+      "sha256": "dcfc0330492215b48736f098c8feeb0ef8e8c3721e1ed6129aae5bc9278434be",
+      "bytes": 1552
+    },
+    {
+      "path": "src/interfaces/IPangu2TwapOracle.sol",
+      "sha256": "93fab80fda45f1196150df650c1fd5c68f687004630acfbd1a07b5391ff65a64",
+      "bytes": 427
+    },
+    {
+      "path": "src/interfaces/ISupportPool.sol",
+      "sha256": "1b42ee0df84bffbc613ce677bbf9a56ad272e71b17975436b195f6a95b645315",
+      "bytes": 636
+    },
+    {
+      "path": "src/libraries/CostMath.sol",
+      "sha256": "31cfab21b7cc5e232967db4e6a62bd235167ebb519c449dc034dd5505c805e89",
+      "bytes": 502
+    },
+    {
+      "path": "src/libraries/DividendTiers.sol",
+      "sha256": "895b40219663a7093ad7e798d7cb4ad085344fc30f5839599867e5fb84813f7d",
+      "bytes": 1294
+    },
+    {
+      "path": "src/libraries/FullMath.sol",
+      "sha256": "ea6a0ea68403e0bc83a8daf3f5d88972d48748af247ff02830c812381754b036",
+      "bytes": 2103
+    },
+    {
+      "path": "src/libraries/MerkleLeafV1.sol",
+      "sha256": "beb736e46756ee5798b3798bcb853bda1109638fc8ce5ecc1f8bfa36ba99aec8",
+      "bytes": 499
+    },
+    {
+      "path": "src/libraries/OracleQuote.sol",
+      "sha256": "f88a80c1891aa10ccd0107267b35a88e787a832a65aa3d799f77f34a70e4ca1d",
+      "bytes": 1021
+    },
+    {
+      "path": "src/libraries/TickMathLite.sol",
+      "sha256": "abdfea07d688d35fb66e73a5b2771b2d08eeb18ec88e2a268a7fc0c0e63b0173",
+      "bytes": 2811
+    },
+    {
+      "path": "src/libraries/TransferContext.sol",
+      "sha256": "2d5472e8a488206590d071cec9d7c6c5b3a777d28bf89f8393ee1502348d0644",
+      "bytes": 552
+    },
+    {
+      "path": "src/oracle/PancakeV3TwapOracle.sol",
+      "sha256": "29a1ac8f759db9f27054b1357f74af92bd0f8f036b9b79693dae5e54a5c3f7eb",
+      "bytes": 6392
+    },
+    {
+      "path": "test/BuybackLocker.t.sol",
+      "sha256": "051fe21265fcf8e1110b03790df62936abbae8497cd3ffb86740d8afc677ab36",
+      "bytes": 3463
+    },
+    {
+      "path": "test/CostBasisTransferContext.t.sol",
+      "sha256": "b32d8c06430fca055848acfc53c5df1994e13559efe7037732f411145567a99c",
+      "bytes": 6230
+    },
+    {
+      "path": "test/CostMath.t.sol",
+      "sha256": "9e4fb11bff69785e6285779525b292fcab24b2bca3a4e765c8832d46cc36037a",
+      "bytes": 903
+    },
+    {
+      "path": "test/DividendCommitment.t.sol",
+      "sha256": "923796a17720cf807514c56c74ed0470991ea20fdb19aa6fcd2769eb3df4c932",
+      "bytes": 6170
+    },
+    {
+      "path": "test/DividendTiers.t.sol",
+      "sha256": "6e1332fa1971f9118d7baff5fc58907f01f2adab097e89274aaf13a12d66a3bb",
+      "bytes": 1483
+    },
+    {
+      "path": "test/GovernanceDeployment.t.sol",
+      "sha256": "968882c454e62584e5280776d21bb276a741d836ba46729e819d2459f0990d42",
+      "bytes": 3707
+    },
+    {
+      "path": "test/LockDecisionConfig.t.sol",
+      "sha256": "64f029962785d0c814ec21846d8a8e775744c72b2d5564ce276937a0fa8293d8",
+      "bytes": 2765
+    },
+    {
+      "path": "test/Pangu2Integration.t.sol",
+      "sha256": "3f783b366b981e21a43bb9baf77efbbabade9e13e9c4dd36bf4d3d436220a281",
+      "bytes": 10982
+    },
+    {
+      "path": "test/SupportPoolStatus.t.sol",
+      "sha256": "b46d889dbe4d9a33da55a414ecafb595c4d8932194dfba900ac82ace9ab4342b",
+      "bytes": 8267
+    },
+    {
+      "path": "test/fork/PancakeV3BscTestnetFork.t.sol",
+      "sha256": "c372fdda8cf62dfed7a4dfb824a15dc94822fae73f481a92d3c09e3b399ec31c",
+      "bytes": 11192
+    },
+    {
+      "path": "test/invariant/Pangu2AccountingInvariant.t.sol",
+      "sha256": "8e30713487223c7db4f6348077354922b900ef9d98d03cf9016f34220e48794c",
+      "bytes": 10571
+    },
+    {
+      "path": "test/mocks/Pangu2Mocks.sol",
+      "sha256": "98b1c4ecc42fb813c2d2079d4e487b7ebf2654d6c2ff0bf42e6e319632f7f97e",
+      "bytes": 7765
+    },
+    {
+      "path": "test/security/Pangu2Security.t.sol",
+      "sha256": "5dab9edcbae9fa3367b82b31857e7770252ceec2ebaa50a7b923d5f55c4a0274",
+      "bytes": 10514
+    },
+    {
+      "path": "test/security/TransferContextAttacks.t.sol",
+      "sha256": "9ed355a422a451fc0f2c1a245e17632b2ec2d33023b04cff7d7761360d073305",
+      "bytes": 2546
+    }
+  ]
+}
