@@ -199,7 +199,6 @@ contract Pangu2TradeRouter is AccessControl, Pausable, ReentrancyGuard {
         _unpause();
     }
 
-
     function _previewBuy(uint256 bnbAmount) private view returns (BuyPreview memory preview) {
         if (bnbAmount == 0) revert InvalidAmount();
         if (bnbAmount > type(uint128).max) revert AmountExceedsUint128();
