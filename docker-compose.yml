@@ -1,0 +1,115 @@
+services:
+  # PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: bnb-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bnb_presale
+      POSTGRES_USER: bnb
+      POSTGRES_PASSWORD: bnb_dev_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bnb -d bnb_presale"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: bnb-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # PHP-FPM
+  php:
+    build:
+      context: ./docker/php
+      dockerfile: Dockerfile
+    container_name: bnb-php
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./backend:/var/www
+      - ./docker/php/php.ini:/usr/local/etc/php/conf.d/custom.ini
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Nginx
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: bnb-nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./backend:/var/www
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - php
+
+  # Laravel Queue Worker
+  queue:
+    build:
+      context: ./docker/php
+      dockerfile: Dockerfile
+    container_name: bnb-queue
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
+    volumes:
+      - ./backend:/var/www
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Laravel Scheduler
+  scheduler:
+    build:
+      context: ./docker/php
+      dockerfile: Dockerfile
+    container_name: bnb-scheduler
+    restart: unless-stopped
+    working_dir: /var/www
+    command: |
+      sh -c "while true; do php artisan schedule:run; sleep 60; done"
+    volumes:
+      - ./backend:/var/www
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Anvil local chain (Foundry)
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    container_name: bnb-anvil
+    restart: unless-stopped
+    command: >
+      anvil
+      --host 0.0.0.0
+      --port 8545
+      --chain-id 31337
+      --block-time 2
+      --balance 10000
+    ports:
+      - "8545:8545"
+
+volumes:
+  pgdata:

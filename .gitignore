@@ -16,6 +16,27 @@ contracts/node_modules/
 *.log
 .tmp/
 
+# Laravel / Backend
+backend/vendor/
+backend/.env
+backend/.env.*
+!backend/.env.example
+backend/storage/*.key
+backend/storage/framework/cache/data/
+backend/storage/framework/sessions/*
+!backend/storage/framework/sessions/.gitkeep
+backend/storage/framework/views/*
+!backend/storage/framework/views/.gitkeep
+backend/storage/logs/*
+!backend/storage/logs/.gitkeep
+backend/bootstrap/cache/*
+!backend/bootstrap/cache/.gitkeep
+backend/public/hot
+backend/public/storage
+
+# Docker
+docker/pgdata/
+
 # OS/editor
 .DS_Store
 .idea/
