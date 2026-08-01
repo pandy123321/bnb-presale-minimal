@@ -3,12 +3,11 @@ pragma solidity 0.8.24;
 
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IBuybackLocker} from "./interfaces/IBuybackLocker.sol";
+import {IPangu2Token} from "./interfaces/IPangu2Token.sol";
+import {TransferContext} from "./libraries/TransferContext.sol";
 
 contract BuybackLocker is ReentrancyGuard, IBuybackLocker {
-    using SafeERC20 for IERC20;
-
     enum LockMode {
         PERMANENT,
         FIXED_DURATION
@@ -29,7 +28,7 @@ contract BuybackLocker is ReentrancyGuard, IBuybackLocker {
         BatchStatus status;
     }
 
-    IERC20 public immutable token;
+    IPangu2Token public immutable token;
     address public immutable supportPool;
     LockMode public immutable mode;
     uint64 public immutable duration;
@@ -77,7 +76,7 @@ contract BuybackLocker is ReentrancyGuard, IBuybackLocker {
                 && (duration_ == 0 || block.timestamp + uint256(duration_) > type(uint64).max)
         ) revert InvalidConfiguration();
 
-        token = IERC20(token_);
+        token = IPangu2Token(token_);
         supportPool = supportPool_;
         mode = mode_;
         duration = duration_;
@@ -120,7 +119,7 @@ contract BuybackLocker is ReentrancyGuard, IBuybackLocker {
 
         batch.status = BatchStatus.RELEASED;
         outstandingLocked -= batch.amount;
-        token.safeTransfer(releaseRecipient, batch.amount);
+        token.systemTransfer(releaseRecipient, batch.amount, TransferContext.Kind.SYSTEM_CREDIT_UNKNOWN);
         emit LockBatchReleased(batchId, releaseRecipient, batch.amount);
     }
 
