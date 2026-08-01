@@ -10,16 +10,17 @@ import {IWBNB} from "./interfaces/IPancakeV3.sol";
 import {IPancakeV3Adapter} from "./interfaces/IPancakeV3Adapter.sol";
 import {IPangu2TwapOracle} from "./interfaces/IPangu2TwapOracle.sol";
 import {IBuybackLocker} from "./interfaces/IBuybackLocker.sol";
+import {ISupportPool} from "./interfaces/ISupportPool.sol";
 
-contract SupportPool is AccessControl, Pausable, ReentrancyGuard {
+contract SupportPool is AccessControl, Pausable, ReentrancyGuard, ISupportPool {
     using SafeERC20 for IERC20;
 
     bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant UNPAUSER_ROLE = keccak256("UNPAUSER_ROLE");
 
-    uint256 public constant BUYBACK_AMOUNT = 0.01 ether;
-    uint256 public constant MIN_BUYBACK_INTERVAL = 60 seconds;
+    uint256 public constant override BUYBACK_AMOUNT = 0.01 ether;
+    uint256 public constant override MIN_BUYBACK_INTERVAL = 60 seconds;
     uint16 public constant BPS_DENOMINATOR = 10_000;
 
     IERC20 public immutable token;
@@ -44,6 +45,7 @@ contract SupportPool is AccessControl, Pausable, ReentrancyGuard {
     error InsufficientNativeBalance(uint256 balance, uint256 required);
     error BuybackTooSoon(uint256 nextAllowedAt);
     error LockerNotConfigured();
+    error InvalidQuote();
 
     event FeeVaultConfigured(address indexed feeVault);
     event LockerConfigured(address indexed locker);
@@ -111,7 +113,68 @@ contract SupportPool is AccessControl, Pausable, ReentrancyGuard {
         emit LockerConfigured(locker_);
     }
 
-    function buyback() external whenNotPaused nonReentrant returns (uint256 tokenOut) {
+    function canExecuteBuyback()
+        external
+        view
+        override
+        returns (
+            bool allowed,
+            ISupportPool.BuybackBlockReason reason,
+            uint256 poolBalance,
+            uint256 nextAllowedAt
+        )
+    {
+        poolBalance = address(this).balance;
+        nextAllowedAt = lastSuccessfulBuybackAt == 0
+            ? 0
+            : lastSuccessfulBuybackAt + MIN_BUYBACK_INTERVAL;
+
+        if (paused()) return (false, ISupportPool.BuybackBlockReason.PAUSED, poolBalance, nextAllowedAt);
+        if (!lockerConfigured) {
+            return (
+                false,
+                ISupportPool.BuybackBlockReason.LOCKER_NOT_CONFIGURED,
+                poolBalance,
+                nextAllowedAt
+            );
+        }
+        if (poolBalance < BUYBACK_AMOUNT) {
+            return (
+                false,
+                ISupportPool.BuybackBlockReason.INSUFFICIENT_BNB,
+                poolBalance,
+                nextAllowedAt
+            );
+        }
+        if (lastSuccessfulBuybackAt != 0 && block.timestamp < nextAllowedAt) {
+            return (false, ISupportPool.BuybackBlockReason.COOLDOWN, poolBalance, nextAllowedAt);
+        }
+
+        try oracle.validatedQuote(address(wbnb), address(token), uint128(BUYBACK_AMOUNT)) returns (
+            IPangu2TwapOracle.Quote memory q
+        ) {
+            uint256 minimumOutput =
+                (q.amountOut * (BPS_DENOMINATOR - maximumSlippageBps)) / BPS_DENOMINATOR;
+            if (q.amountOut == 0 || minimumOutput == 0) {
+                return (
+                    false,
+                    ISupportPool.BuybackBlockReason.INVALID_QUOTE,
+                    poolBalance,
+                    nextAllowedAt
+                );
+            }
+            return (true, ISupportPool.BuybackBlockReason.NONE, poolBalance, nextAllowedAt);
+        } catch {
+            return (
+                false,
+                ISupportPool.BuybackBlockReason.ORACLE_UNAVAILABLE,
+                poolBalance,
+                nextAllowedAt
+            );
+        }
+    }
+
+    function buyback() external override whenNotPaused nonReentrant returns (uint256 tokenOut) {
         if (!lockerConfigured) revert LockerNotConfigured();
         if (address(this).balance < BUYBACK_AMOUNT) {
             revert InsufficientNativeBalance(address(this).balance, BUYBACK_AMOUNT);
@@ -121,6 +184,7 @@ contract SupportPool is AccessControl, Pausable, ReentrancyGuard {
 
         IPangu2TwapOracle.Quote memory q = oracle.validatedQuote(address(wbnb), address(token), uint128(BUYBACK_AMOUNT));
         uint256 minTokenOut = (q.amountOut * (BPS_DENOMINATOR - maximumSlippageBps)) / BPS_DENOMINATOR;
+        if (q.amountOut == 0 || minTokenOut == 0) revert InvalidQuote();
 
         wbnb.deposit{value: BUYBACK_AMOUNT}();
         IERC20(address(wbnb)).forceApprove(address(adapter), BUYBACK_AMOUNT);
