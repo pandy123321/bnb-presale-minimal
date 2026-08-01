@@ -7,6 +7,10 @@ namespace App\Modules\Core\Auth\Controllers;
 use App\Http\ApiEnvelope;
 use App\Modules\Core\Auth\Services\AuthenticationException;
 use App\Modules\Core\Auth\Services\Eip191VerificationService;
+use App\Modules\Core\Auth\Services\InvalidSignatureException;
+use App\Modules\Core\Auth\Services\NonceAlreadyUsedException;
+use App\Modules\Core\Auth\Services\NonceExpiredException;
+use App\Modules\Core\Auth\Services\NonceNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -73,11 +77,18 @@ class WalletAuthController extends Controller
             $this->eip191->validateSignatureFormat($validated['signature']);
             $record    = $this->eip191->validateNonceRecord($walletLower, $validated['nonce'], $domain, $chainId);
             $recovered = $this->eip191->recoverSigner($record->message, $validated['signature']);
+        } catch (NonceExpiredException $e) {
+            return ApiEnvelope::error('NONCE_EXPIRED', 'Nonce has expired. Request a new one.', false, [], 401);
+        } catch (NonceAlreadyUsedException $e) {
+            return ApiEnvelope::error('NONCE_ALREADY_USED', 'Nonce has already been used.', false, [], 409);
+        } catch (NonceNotFoundException $e) {
+            return ApiEnvelope::error('NONCE_INVALID', 'Nonce not found or does not belong to wallet.', false, [], 401);
+        } catch (InvalidSignatureException $e) {
+            return ApiEnvelope::error('INVALID_SIGNATURE', 'Signature verification failed.', false, [], 401);
         } catch (AuthenticationException $e) {
-            return ApiEnvelope::error('VERIFICATION_FAILED', $e->getMessage(), false, [], 401);
-        } catch (\Throwable $e) {
-            return ApiEnvelope::error('VERIFICATION_FAILED', 'Signature verification failed.', false, [], 401);
+            return ApiEnvelope::error('AUTHENTICATION_FAILED', 'Wallet authentication failed.', false, [], 401);
         }
+        // Infrastructure exceptions NOT caught here — handled by global exception handler as 500.
 
         if ($recovered !== $walletLower) {
             return ApiEnvelope::error('VERIFICATION_FAILED', 'Signature verification failed.', false, [], 401);
@@ -117,8 +128,9 @@ class WalletAuthController extends Controller
             $message = $status === 'expired'
                 ? 'Nonce expired during verification. Request a new one.'
                 : 'Nonce was already consumed.';
+            $http    = $status === 'expired' ? 401 : 409;
 
-            return ApiEnvelope::error($code, $message, false, [], 409);
+            return ApiEnvelope::error($code, $message, false, [], $http);
         }
 
         try {
@@ -128,7 +140,9 @@ class WalletAuthController extends Controller
             $request->session()->put('auth.domain', $domain);
             $request->session()->put('auth.authenticated_at', $authenticatedAt->toIso8601String());
             $request->session()->put('auth.expires_at', $sessionExpiry->toIso8601String());
+            $request->session()->save();
         } catch (\Throwable $e) {
+            $request->session()->invalidate();
             Log::error('Wallet auth session creation failed', [
                 'wallet_address'  => $walletLower,
                 'exception_class' => $e::class,
@@ -136,9 +150,9 @@ class WalletAuthController extends Controller
 
             return ApiEnvelope::error(
                 'SESSION_FAILED',
-                'Authentication succeeded but session creation failed. Please try again.',
-                true,
-                [],
+                'Authentication succeeded but session could not be created. Please request a new nonce.',
+                false,
+                ['next_action' => 'REQUEST_NEW_NONCE'],
                 503,
             );
         }

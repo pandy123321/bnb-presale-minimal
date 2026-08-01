@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1/projects/pangu2')->group(function () {
     Route::get('/auth/csrf', function () {
-        return ApiEnvelope::success(['csrf_initialized' => true]);
+        return ApiEnvelope::success(['csrf_initialized' => true], 'LIVE');
     });
 
     Route::post('/auth/nonce', [WalletAuthController::class, 'nonce']);
@@ -26,7 +26,7 @@ Route::prefix('v1/projects/pangu2')->group(function () {
                 'domain'           => $request->session()->get('auth.domain'),
                 'authenticated_at' => $request->session()->get('auth.authenticated_at'),
                 'expires_at'       => $request->session()->get('auth.expires_at'),
-            ]);
+            ], 'LIVE');
         });
     });
 });
