@@ -18,25 +18,18 @@ use RuntimeException;
  */
 final class Eip191VerificationService
 {
-    /**
-     * EIP-191 prefix for Ethereum Signed Message.
-     */
     private const EIP191_PREFIX = "\x19Ethereum Signed Message:\n";
-
-    /**
-     * Nonce expiry in minutes.
-     */
-    private const NONCE_TTL_MINUTES = 5;
-
     /**
      * Generate a fresh nonce and persist it.
+     * TTL is read from pangu2.nonce_ttl_minutes config (default 5).
      */
     public function generateNonce(
         string $walletAddress,
         string $domain,
         int $chainId,
     ): Nonce {
-        $nonce = bin2hex(random_bytes(32));
+        $nonce  = bin2hex(random_bytes(32));
+        $ttlMin = (int) config('pangu2.nonce_ttl_minutes', 5);
 
         $message = $this->buildMessage($nonce, $domain, $chainId);
 
@@ -46,25 +39,29 @@ final class Eip191VerificationService
             'message'        => $message,
             'domain'         => $domain,
             'chain_id'       => $chainId,
-            'expires_at'     => now()->addMinutes(self::NONCE_TTL_MINUTES),
+            'expires_at'     => now()->addMinutes($ttlMin),
         ]);
     }
 
     /**
-     * Verify an EIP-191 signature and consume the nonce.
+     * Verify an EIP-191 signature and atomically consume the nonce.
      *
-     * @throws RuntimeException When nonce is invalid, expired, already used, or signature mismatch.
+     * The nonce is consumed via a conditional UPDATE that checks used_at IS NULL
+     * in a database transaction, preventing concurrent replay.
+     *
+     * @return Nonce|null  null if nonce was already consumed by a concurrent request.
+     * @throws RuntimeException When nonce is expired, domain/chain mismatch, or signature invalid.
      */
     public function verify(
         string $walletAddress,
-        string $nonce,
+        string $nonceHex,
         string $signature,
-        string $domain,
-        int $chainId,
-    ): Nonce {
+        string $expectedDomain,
+        int $expectedChainId,
+    ): ?Nonce {
         $walletLower = $this->normalizeAddress($walletAddress);
 
-        $record = Nonce::where('nonce', $nonce)
+        $record = Nonce::where('nonce', $nonceHex)
             ->where('wallet_address', $walletLower)
             ->first();
 
@@ -80,15 +77,15 @@ final class Eip191VerificationService
             throw new RuntimeException('Nonce has already been used.');
         }
 
-        // Re-prompt signature on domain mismatch
-        if ($record->domain !== $domain) {
+        if ($record->domain !== $expectedDomain) {
             throw new RuntimeException('Domain mismatch. Request a new nonce for this origin.');
         }
 
-        // Re-prompt signature on chain ID mismatch
-        if ($record->chain_id !== $chainId) {
+        if ($record->chain_id !== $expectedChainId) {
             throw new RuntimeException('Chain ID mismatch. Request a new nonce for this chain.');
         }
+
+        $this->validateSignatureFormat($signature);
 
         $recoveredAddress = $this->recoverSigner($record->message, $signature);
 
@@ -96,15 +93,23 @@ final class Eip191VerificationService
             throw new RuntimeException('Signature verification failed.');
         }
 
-        $record->markUsed();
+        // Atomic consumption: conditional UPDATE
+        $consumed = Nonce::whereKey($record->id)
+            ->whereNull('used_at')
+            ->where('expires_at', '>', now())
+            ->update(['used_at' => now()]);
+
+        if ($consumed !== 1) {
+            return null; // Concurrent request already consumed it
+        }
+
+        $record->refresh();
 
         return $record;
     }
 
     /**
      * Build the EIP-191 message that the wallet will sign.
-     *
-     * Format: "{domain} wants you to sign in with your wallet.\n\nNonce: {nonce}\nChain ID: {chainId}"
      */
     public function buildMessage(string $nonce, string $domain, int $chainId): string
     {
@@ -114,9 +119,7 @@ final class Eip191VerificationService
     }
 
     /**
-     * Compute the EIP-191 hash (what the wallet actually signs).
-     *
-     * EIP-191: keccak256("\x19Ethereum Signed Message:\n" + len(message) + message)
+     * Compute the EIP-191 keccak256 hash.
      */
     public function eip191Hash(string $message): string
     {
@@ -126,10 +129,7 @@ final class Eip191VerificationService
     }
 
     /**
-     * Recover the EVM address (lowercase) from an EIP-191 signature.
-     *
-     * @param string $message   The raw message that was displayed to the user.
-     * @param string $signature Hex-encoded 65-byte signature (0x... or raw hex).
+     * Recover the EVM address from an EIP-191 signed message.
      */
     public function recoverSigner(string $message, string $signature): string
     {
@@ -139,41 +139,41 @@ final class Eip191VerificationService
 
         $ec = new EC('secp256k1');
 
-        $recoveryParam = $sig['v'] - 27;
-        if ($recoveryParam < 0 || $recoveryParam > 3) {
-            // Some wallets use v = 27/28, which maps to recoveryParam 0/1 after -27.
-            // v >= 27 indicates the old Ethereum signature scheme.
-            throw new RuntimeException('Invalid signature recovery parameter.');
+        // v ∈ {0,1,27,28} → recoveryParam ∈ {0,1}
+        $v = $sig['v'];
+        if ($v >= 27) {
+            $v -= 27;
+        }
+        if ($v !== 0 && $v !== 1) {
+            throw new RuntimeException('Invalid signature recovery parameter: v must be 0, 1, 27, or 28.');
         }
 
         $pubKey = $ec->recoverPubKey(
             $msgHash,
             ['r' => $sig['r'], 's' => $sig['s']],
-            $recoveryParam,
+            $v,
         );
 
         return $this->pubKeyToAddress($pubKey->encode('hex'));
     }
 
     /**
-     * Convert an uncompressed public key hex (04xxxx...yyyy) to an EVM address.
+     * Convert an uncompressed public key hex to an EVM address.
      */
     public function pubKeyToAddress(string $pubKeyHex): string
     {
-        // Remove "04" prefix, keep raw 64-byte x,y
         $pubKeyBin = hex2bin(substr($pubKeyHex, 2));
         if ($pubKeyBin === false || strlen($pubKeyBin) !== 64) {
             throw new RuntimeException('Invalid public key encoding.');
         }
 
-        // keccak256(pubKey) → last 20 bytes = address
         $hash = Keccak::hash($pubKeyBin, 256);
 
         return '0x' . substr($hash, -40);
     }
 
     /**
-     * Normalize an EVM address to lowercase 0x-prefixed 40-hex-char format.
+     * Normalize an EVM address to lowercase 0x-prefixed format.
      */
     public function normalizeAddress(string $address): string
     {
@@ -191,10 +191,40 @@ final class Eip191VerificationService
     }
 
     /**
-     * Parse a hex signature into r, s, v components.
+     * Validate signature format before parsing, rejecting obviously invalid input.
+     */
+    public function validateSignatureFormat(string $signature): void
+    {
+        $hex = str_starts_with($signature, '0x') ? substr($signature, 2) : $signature;
+        $hex = strtolower($hex);
+
+        if ($hex === '') {
+            throw new RuntimeException('Empty signature.');
+        }
+
+        if (!ctype_xdigit($hex)) {
+            throw new RuntimeException('Signature contains non-hexadecimal characters.');
+        }
+
+        if (strlen($hex) > 132) {
+            throw new RuntimeException('Signature too long.');
+        }
+
+        if (strlen($hex) < 130) {
+            throw new RuntimeException('Signature too short: expected 130 hex chars (65 bytes).');
+        }
+
+        // 64-byte compact signature (EIP-2098) is explicitly not supported
+        if (strlen($hex) === 128) {
+            throw new RuntimeException('EIP-2098 compact signatures are not supported. Use standard 65-byte format.');
+        }
+    }
+
+    /**
+     * Parse a standard 65-byte ECDSA signature into r, s, v.
      *
-     * Accepts: 0x-prefixed or raw hex, 130 or 132 hex chars (plus optional 0x).
-     * Returns: ['r' => hex, 's' => hex, 'v' => int]
+     * Accepts 130 hex chars (65 bytes: r=32, s=32, v=1).
+     * Also handles v in {0,1,27,28} format.
      */
     private function normalizeSignature(string $signature): array
     {
@@ -203,23 +233,25 @@ final class Eip191VerificationService
 
         $len = strlen($hex);
 
-        if ($len === 130) {
-            // v is implicit 0x1b (27)
-            return [
-                'r' => substr($hex, 0, 64),
-                's' => substr($hex, 64, 64),
-                'v' => 27,
-            ];
+        if ($len !== 130) {
+            throw new RuntimeException(
+                "Invalid signature length: expected 130 hex chars (65 bytes), got {$len}."
+            );
         }
 
-        if ($len === 132) {
-            return [
-                'r' => substr($hex, 0, 64),
-                's' => substr($hex, 64, 64),
-                'v' => hexdec(substr($hex, 128, 2)),
-            ];
+        $rHex = substr($hex, 0, 64);
+        $sHex = substr($hex, 64, 64);
+        $v    = hexdec(substr($hex, 128, 2));
+
+        // Validate r and s are not all zeros (invalid signature)
+        if (hexdec($rHex) === 0 || hexdec($sHex) === 0) {
+            throw new RuntimeException('Invalid signature: r or s is zero.');
         }
 
-        throw new RuntimeException('Invalid signature length: expected 130 or 132 hex chars.');
+        return [
+            'r' => $rHex,
+            's' => $sHex,
+            'v' => $v,
+        ];
     }
 }

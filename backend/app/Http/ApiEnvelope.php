@@ -10,7 +10,6 @@ use Illuminate\Http\JsonResponse;
  * PANGU2 Unified API Envelope.
  *
  * Every API response MUST use this envelope.
- * Matches docs/schemas/openapi/pangu2-api-v1.yaml
  */
 final class ApiEnvelope
 {
@@ -23,14 +22,16 @@ final class ApiEnvelope
         array $extraMeta = [],
     ): JsonResponse {
         return response()->json([
-            'data' => $data,
-            'meta' => array_merge([
-                'project' => 'PANGU2',
-                'environment' => config('app.env', 'LOCAL'),
-                'chain_id' => (int) config('pangu2.chain_id', 31337),
-                'data_status' => $dataStatus,
-                'block_number' => $blockNumber,
-                'generated_at' => now()->toIso8601String(),
+            'success' => true,
+            'data'    => $data,
+            'meta'    => array_merge([
+                'project'        => 'PANGU2',
+                'project_id'     => 'pangu2',
+                'environment'    => config('app.env', 'LOCAL'),
+                'chain_id'       => (int) config('pangu2.chain_id', 31337),
+                'data_status'    => $dataStatus,
+                'block_number'   => $blockNumber,
+                'generated_at'   => now()->toIso8601String(),
                 'schema_version' => '1.0.0',
             ], $extraMeta),
             'error' => null,
@@ -47,9 +48,9 @@ final class ApiEnvelope
     ): JsonResponse {
         return self::success($data, $dataStatus, $blockNumber, [
             'current_page' => $currentPage,
-            'per_page' => $perPage,
-            'total' => $total,
-            'last_page' => (int) ceil($total / max($perPage, 1)),
+            'per_page'     => $perPage,
+            'total'        => $total,
+            'last_page'    => (int) ceil($total / max($perPage, 1)),
         ]);
     }
 
@@ -61,21 +62,23 @@ final class ApiEnvelope
         int $httpStatus = 400,
     ): JsonResponse {
         return response()->json([
-            'data' => null,
-            'meta' => [
-                'project' => 'PANGU2',
-                'environment' => config('app.env', 'LOCAL'),
-                'chain_id' => (int) config('pangu2.chain_id', 31337),
-                'data_status' => 'UNAVAILABLE',
-                'block_number' => null,
-                'generated_at' => now()->toIso8601String(),
+            'success' => false,
+            'data'    => null,
+            'meta'    => [
+                'project'        => 'PANGU2',
+                'project_id'     => 'pangu2',
+                'environment'    => config('app.env', 'LOCAL'),
+                'chain_id'       => (int) config('pangu2.chain_id', 31337),
+                'data_status'    => 'UNAVAILABLE',
+                'block_number'   => null,
+                'generated_at'   => now()->toIso8601String(),
                 'schema_version' => '1.0.0',
             ],
             'error' => [
-                'code' => $code,
-                'message' => $message,
+                'code'      => $code,
+                'message'   => $message,
                 'retryable' => $retryable,
-                'details' => $details,
+                'details'   => $details,
             ],
         ], $httpStatus);
     }
