@@ -1,0 +1,58 @@
+{
+  "version": "1.0.0",
+  "project": "PANGU2",
+  "description": "Shared domain types and constants. Single source of truth for business concepts.",
+  "environments": ["LOCAL", "CI", "BSC_TESTNET", "STAGING"],
+  "bsc_mainnet": "NO-GO",
+  "chains": {
+    "anvil": 31337,
+    "bsc_testnet": 97,
+    "bsc_mainnet": 56
+  },
+  "data_statuses": ["MOCK_DATA", "SYNCING", "LIVE", "STALE", "DEGRADED", "UNAVAILABLE"],
+  "amount_rules": {
+    "native_currency": "BNB",
+    "token_symbol": "PANGU2",
+    "token_decimals": 18,
+    "wei_unit": "10^18",
+    "php_math": "BCMath only, no float",
+    "js_math": "BigInt-compatible, no number for blockchain amounts",
+    "json_format": "Unsigned decimal integer string",
+    "psql_type": "numeric(78,0)"
+  },
+  "tax_model": {
+    "buy_tax_percent": 4,
+    "buy_tax_destination": "DIVIDEND_BUCKET",
+    "sell_tax_tiers": [
+      {"rate_percent": 4, "support_pool_percent": 100, "burn_percent": 0},
+      {"rate_percent": 10, "support_pool_percent": 90, "burn_percent": 10}
+    ],
+    "rate_determined_by": "contract_preview_sell",
+    "user_cannot_select_rate": true
+  },
+  "dividend_tiers": [
+    {"rank": "1-10", "share_percent": 35},
+    {"rank": "11-30", "share_percent": 25},
+    {"rank": "31-60", "share_percent": 25},
+    {"rank": "61-100", "share_percent": 15}
+  ],
+  "buyback_rules": {
+    "amount_bnb": 0.01,
+    "min_interval_seconds": 60,
+    "token_destination": "Locker contract",
+    "triggers": "Anyone can trigger publicly"
+  },
+  "locker_rules": {
+    "duration_days": 365,
+    "mode": "Rolling lock"
+  },
+  "contract_addresses": {
+    "description": "Placeholder - fill after PB-S1 deployment",
+    "token": null,
+    "presale": null,
+    "distributor": null,
+    "buyback_locker": null,
+    "timelock": null,
+    "safe_multisig": null
+  }
+}

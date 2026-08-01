@@ -1,0 +1,20 @@
+{
+  "name": "@pangu2/mock-api",
+  "version": "1.0.0",
+  "description": "Mock API server for PANGU2 development. Always returns MOCK_DATA.",
+  "main": "src/server.ts",
+  "scripts": {
+    "dev": "tsx src/server.ts",
+    "start": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "express": "^4.21",
+    "cors": "^2.8"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0",
+    "@types/cors": "^2.8",
+    "tsx": "^4.19",
+    "typescript": "^5.7"
+  }
+}
