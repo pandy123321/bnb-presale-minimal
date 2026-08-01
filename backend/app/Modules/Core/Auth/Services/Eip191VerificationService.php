@@ -9,6 +9,12 @@ use Elliptic\EC;
 use kornrunner\Keccak;
 use RuntimeException;
 
+class AuthenticationException extends RuntimeException {}
+class NonceAlreadyUsedException extends AuthenticationException {}
+class NonceExpiredException extends AuthenticationException {}
+class NonceNotFoundException extends AuthenticationException {}
+class InvalidSignatureException extends AuthenticationException {}
+
 final class Eip191VerificationService
 {
     private const EIP191_PREFIX = "\x19Ethereum Signed Message:\n";
@@ -29,10 +35,6 @@ final class Eip191VerificationService
         ]);
     }
 
-    /**
-     * Look up and validate the nonce record. Does NOT consume it, does NOT do crypto.
-     * Call this OUTSIDE a DB transaction.
-     */
     public function validateNonceRecord(
         string $walletLower,
         string $nonceHex,
@@ -44,39 +46,42 @@ final class Eip191VerificationService
             ->first();
 
         if (!$record) {
-            throw new RuntimeException('Nonce not found or does not belong to wallet.');
+            throw new NonceNotFoundException('Nonce not found or does not belong to wallet.');
         }
         if ($record->isExpired()) {
-            throw new RuntimeException('Nonce has expired. Request a new one.');
+            throw new NonceExpiredException('Nonce has expired. Request a new one.');
         }
         if ($record->isUsed()) {
-            throw new RuntimeException('Nonce has already been used.');
+            throw new NonceAlreadyUsedException('Nonce has already been used.');
         }
         if ($record->domain !== $expectedDomain) {
-            throw new RuntimeException('Domain mismatch.');
+            throw new AuthenticationException('Domain mismatch.');
         }
         if ($record->chain_id !== $expectedChainId) {
-            throw new RuntimeException('Chain ID mismatch.');
+            throw new AuthenticationException('Chain ID mismatch.');
         }
 
         return $record;
     }
 
-    /**
-     * Atomically consume a nonce. Returns true if THIS call consumed it.
-     * Must be called INSIDE the same DB transaction as the audit insert.
-     */
-    public function consumeNonceAtomic(int $nonceId): bool
+    public function consumeNonceAtomic(int $nonceId): string // returns 'consumed' | 'expired' | 'already_used'
     {
         $consumed = Nonce::whereKey($nonceId)
             ->whereNull('used_at')
             ->where('expires_at', '>', now())
             ->update(['used_at' => now()]);
 
-        return $consumed === 1;
-    }
+        if ($consumed === 1) {
+            return 'consumed';
+        }
 
-    // ── Crypto ──────────────────────────────────────────
+        $record = Nonce::find($nonceId);
+        if ($record && $record->isExpired()) {
+            return 'expired';
+        }
+
+        return 'already_used';
+    }
 
     public function validateSignatureFormat(string $signature): void
     {
@@ -84,39 +89,48 @@ final class Eip191VerificationService
         $hex = strtolower($hex);
 
         if ($hex === '') {
-            throw new RuntimeException('Empty signature.');
+            throw new InvalidSignatureException('Empty signature.');
         }
         if (!ctype_xdigit($hex)) {
-            throw new RuntimeException('Signature contains non-hexadecimal characters.');
+            throw new InvalidSignatureException('Signature contains non-hexadecimal characters.');
         }
 
         $len = strlen($hex);
 
         if ($len === 128) {
-            throw new RuntimeException('EIP-2098 compact signatures are not supported. Use standard 65-byte format.');
+            throw new InvalidSignatureException('EIP-2098 compact signatures are not supported.');
         }
         if ($len !== 130) {
-            throw new RuntimeException("Invalid signature length: expected 130 hex chars (65 bytes), got {$len}.");
+            throw new InvalidSignatureException("Invalid signature length: expected 130 hex chars (65 bytes).");
         }
     }
 
+    /**
+     * Recover signer. All exceptions are wrapped as AuthenticationException.
+     */
     public function recoverSigner(string $message, string $signature): string
     {
-        $msgHash = $this->eip191Hash($message);
-        $sig     = $this->parseSignature($signature);
+        try {
+            $msgHash = $this->eip191Hash($message);
+            $sig     = $this->parseSignature($signature);
 
-        $ec = new EC('secp256k1');
-        $v  = $sig['v'];
-        if ($v >= 27) {
-            $v -= 27;
+            $ec = new EC('secp256k1');
+            $v  = $sig['v'];
+            if ($v >= 27) {
+                $v -= 27;
+            }
+            if ($v !== 0 && $v !== 1) {
+                throw new InvalidSignatureException('Invalid v: must be 0, 1, 27, or 28.');
+            }
+
+            $pubKey = $ec->recoverPubKey($msgHash, ['r' => $sig['r'], 's' => $sig['s']], $v);
+
+            return $this->pubKeyToAddress($pubKey->encode('hex'));
+        } catch (AuthenticationException) {
+            throw;
+        } catch (\Throwable $e) {
+            throw new InvalidSignatureException('Signature verification failed.', 0, $e);
         }
-        if ($v !== 0 && $v !== 1) {
-            throw new RuntimeException('Invalid v: must be 0, 1, 27, or 28.');
-        }
-
-        $pubKey = $ec->recoverPubKey($msgHash, ['r' => $sig['r'], 's' => $sig['s']], $v);
-
-        return $this->pubKeyToAddress($pubKey->encode('hex'));
     }
 
     public function eip191Hash(string $message): string
@@ -158,15 +172,15 @@ final class Eip191VerificationService
         $hex = strtolower($hex);
 
         if (strlen($hex) !== 130) {
-            throw new RuntimeException('Expected 130 hex chars (65 bytes: r+s+v).');
+            throw new InvalidSignatureException('Expected 130 hex chars (65 bytes: r+s+v).');
         }
 
         $r = substr($hex, 0, 64);
         $s = substr($hex, 64, 64);
         $v = hexdec(substr($hex, 128, 2));
 
-        if (hexdec($r) === 0 || hexdec($s) === 0) {
-            throw new RuntimeException('Invalid signature: r or s is zero.');
+        if (trim($r, '0') === '' || trim($s, '0') === '') {
+            throw new InvalidSignatureException('Invalid signature: r or s is zero.');
         }
 
         return ['r' => $r, 's' => $s, 'v' => $v];

@@ -15,7 +15,7 @@ final class ApiEnvelope
 
     public static function success(
         mixed $data,
-        string $dataStatus = 'LIVE',
+        string $dataStatus,
         ?string $blockNumber = null,
         array $extraMeta = [],
     ): JsonResponse {
