@@ -9,6 +9,7 @@ use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 use App\Http\ApiEnvelope;
+use App\Modules\Core\RBAC\Middleware\AdminRbacMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -23,11 +24,14 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Session\Middleware\StartSession::class,
             \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class,
         ]);
+
+        $middleware->alias([
+            'rbac' => AdminRbacMiddleware::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        // Unified envelope for all API errors
         $exceptions->render(function (ValidationException $e, Request $request) {
-            if ($request->expectsJson() || $request->is('api/*')) {
+            if ($request->expectsJson() || $request->is('api/*') || $request->is('admin-api/*')) {
                 return ApiEnvelope::error(
                     'VALIDATION_FAILED',
                     'The given data was invalid.',
@@ -39,7 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         $exceptions->render(function (TooManyRequestsHttpException $e, Request $request) {
-            if ($request->expectsJson() || $request->is('api/*')) {
+            if ($request->expectsJson() || $request->is('api/*') || $request->is('admin-api/*')) {
                 return ApiEnvelope::error(
                     'RATE_LIMITED',
                     $e->getMessage() ?: 'Too many requests.',
@@ -51,7 +55,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         $exceptions->render(function (NotFoundHttpException $e, Request $request) {
-            if ($request->expectsJson() || $request->is('api/*')) {
+            if ($request->expectsJson() || $request->is('api/*') || $request->is('admin-api/*')) {
                 return ApiEnvelope::error(
                     'NOT_FOUND',
                     'The requested resource was not found.',
@@ -63,7 +67,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         $exceptions->render(function (MethodNotAllowedHttpException $e, Request $request) {
-            if ($request->expectsJson() || $request->is('api/*')) {
+            if ($request->expectsJson() || $request->is('api/*') || $request->is('admin-api/*')) {
                 return ApiEnvelope::error(
                     'METHOD_NOT_ALLOWED',
                     'The HTTP method is not supported for this route.',
@@ -74,9 +78,8 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        // Catch-all for any unhandled exception on API routes
         $exceptions->render(function (\Throwable $e, Request $request) {
-            if ($request->expectsJson() || $request->is('api/*')) {
+            if ($request->expectsJson() || $request->is('api/*') || $request->is('admin-api/*')) {
                 $httpStatus = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
                 if ($httpStatus < 400) {
                     $httpStatus = 500;
