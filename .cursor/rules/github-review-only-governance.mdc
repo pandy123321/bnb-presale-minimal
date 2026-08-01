@@ -16,6 +16,7 @@ alwaysApply: true
 
 盘古2（当前活跃项目）还必须遵守（默认生效）：
 
+- `.cursor/rules/pangu2-p2-g03v31-task-baseline.mdc`（当前任务开发基线）
 - `.cursor/rules/pangu2-baseline-core.mdc`
 - `.cursor/rules/pangu2-baseline-protocol.mdc`
 - `.cursor/rules/pangu2-baseline-architecture.mdc`

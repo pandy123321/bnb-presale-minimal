@@ -1,0 +1,128 @@
+---
+description: P2-G03V31 当前开发基线。PB-S0 采用 V3.1 治理与 V1.1 拆分基线的 Task Gate/Spec/执行约束，默认生效。
+alwaysApply: true
+---
+
+# P2-G03V31 当前开发基线
+
+本对话/仓库当前以 **P2-G03V31** 为 PB-S0 活跃开发基线。权威文件：
+
+```text
+hub/pangu2/docs/specs/PB-S0/P2-G03V31.md
+hub/pangu2/docs/specs/PB-S0/03_P2-G03V31_TASK_START_GATE.md
+hub/pangu2/docs/specs/PB-S0/04_P2-G03V31_TASK_SPEC.md
+hub/pangu2/docs/specs/PB-S0/07_CURSOR_EXECUTION_PROMPT_P2-G03V31.md
+startup_records/03_P2-G03V31_TASK_START_GATE.md
+startup_records/04_P2-G03V31_TASK_SPEC.md
+startup_records/07_CURSOR_EXECUTION_PROMPT_P2-G03V31.md
+```
+
+## 固定身份
+
+```text
+Project ID: PANGU2
+Stage ID: PB-S0
+Task ID: P2-G03V31
+Task Title: 采用V3.1治理与V1.1拆分开发基线
+Task Start Gate: GO
+Task Status: READY
+Repository: pandy123321/bnb-presale-minimal
+Base Branch: pgbnb
+Task Start Base SHA: c8eaedbc47205194c518f2ff6a1415e3ff5abe16
+Project Root: hub/pangu2/
+Automatic Merge: FORBIDDEN
+Automatic Deployment: FORBIDDEN
+```
+
+Base Tip 若不等于 Task Start Base SHA，必须停止并重新 Gate。
+
+## Goal
+
+将治理、基线和 Cursor 规则作为纯文档 Draft PR 提交，使仓库从 V3.0/单体 RC 口径迁移到 V3.1/V1.1，为 P2-G04 及后续 Task 提供统一规范。**不开发产品代码。**
+
+## Allowed Paths（仅这些可变）
+
+```text
+AGENTS.md
+docs/governance/**
+.agent-rules/project-coordinator.md
+.agent-rules/execution-agent.md
+.agent-rules/review-agent.md
+.agent-rules/human-project-owner.md
+.cursor/rules/github-review-only-governance.mdc
+.cursor/rules/project-coordinator.mdc
+.cursor/rules/execution-agent.mdc
+.cursor/rules/review-agent.mdc
+.cursor/rules/human-project-owner.mdc
+.cursor/rules/pangu2-baseline-core.mdc
+.cursor/rules/pangu2-baseline-protocol.mdc
+.cursor/rules/pangu2-baseline-architecture.mdc
+hub/pangu2/docs/baseline/**
+hub/pangu2/docs/specs/PB-S0/P2-G03V31.md
+hub/pangu2/docs/evidence/PB-S0/P2-G03V31/**
+```
+
+为本基线文件本身额外允许（入库用）：
+
+```text
+startup_records/**
+hub/pangu2/docs/specs/PB-S0/03_P2-G03V31_TASK_START_GATE.md
+hub/pangu2/docs/specs/PB-S0/04_P2-G03V31_TASK_SPEC.md
+hub/pangu2/docs/specs/PB-S0/07_CURSOR_EXECUTION_PROMPT_P2-G03V31.md
+.cursor/rules/pangu2-p2-g03v31-task-baseline.mdc
+```
+
+## Forbidden Paths
+
+```text
+hub/pixiu1/**
+hub/pangu2/contracts/**
+hub/pangu2/apps/**
+hub/pangu2/services/**
+hub/pangu2/packages/**
+hub/pangu2/database/**
+hub/pangu2/infra/**
+hub/pangu2/config/**
+.github/workflows/**
+dependency lockfiles
+Secret or environment credentials
+```
+
+## 硬性要求
+
+1. 根 `docs/governance/**` 仅保存 Hub 共享治理。
+2. Pangu2 基线只能在 `hub/pangu2/docs/baseline/**`。
+3. 单体 `PANGU2_DEVELOPMENT_BASELINE_V1.1_RC.md` 须替换为 SUPERSEDED NOTICE（完整迁移时）。
+4. V3.1 规则必须明确：六层 Gate、独立生命周期、完整 SHA 模型、Required Check Manifest、Finding 状态。
+5. 不得将 PENDING_SIGNATURE/TBC 改为 ACTIVE 或 FROZEN。
+6. 不得输出 PB-S1 GO。
+7. 只建/更新 Draft PR；不得 merge/deploy。
+8. 首次正式审核前可整理 Commit；送审后禁止重写历史。
+
+## 执行前置
+
+工作区干净；分支从固定 Base SHA 创建；搜索重复 Task/PR/Finding；读取 AGENTS.md、治理与基线、本 Task Gate/Spec。不满足则 `BLOCKED`。
+
+推荐任务分支（完整执行时）：
+
+```text
+task/pangu2/pb-s0/p2-g03v31-governance-baseline
+```
+
+## Required Tests（摘要）
+
+UTF-8、单 H1、required-file manifest、内链、重复规范源、参数唯一来源、Decision 引用、Forbidden Path diff、Secret scan、旧 35/25/25/15 活跃使用检查、Gate 枚举、SHA 字段存在性。不存在的 CI Job 记 `NOT_IMPLEMENTED`，不得伪报 PASS。
+
+## Closure
+
+- 仅 Allowed Paths 变化
+- V3.1/V1.1 文件齐全；路径符合 DR-P2-0001
+- Blocking Finding 全部 VERIFIED_CLOSED 或 WONT_FIX_APPROVED
+- Closeout 绑定 Final Head；Task 进 `MERGE_READY`（不是 MERGED）
+- 下一角色唯一：Human Project Owner
+
+## 与其他规则关系
+
+- 角色治理：`github-review-only-governance` + 三角色规则
+- 盘古2 产品/协议/架构：`pangu2-baseline-*`（仍有效；本 Task 约束其文档迁移方式）
+- 冲突时：ACTIVE Decision → 本 Task Spec → 已批准基线 → 其他参考文档

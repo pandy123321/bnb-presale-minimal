@@ -1,3 +1,34 @@
+# SUPERSEDED NOTICE
+
+```text
+Document: PANGU2_DEVELOPMENT_BASELINE_V1.1_RC.md
+Status: SUPERSEDED
+Superseded By: P2-G03V31 V3.1 / V1.1 split development baseline
+Effective From: PB-S0 / P2-G03V31
+```
+
+本单体 RC 基线已由 **P2-G03V31** 任务基线接替，不再作为可执行开发规范源。
+
+请改用：
+
+1. `hub/pangu2/docs/specs/PB-S0/P2-G03V31.md`（索引）
+2. `hub/pangu2/docs/specs/PB-S0/03_P2-G03V31_TASK_START_GATE.md`
+3. `hub/pangu2/docs/specs/PB-S0/04_P2-G03V31_TASK_SPEC.md`
+4. `hub/pangu2/docs/specs/PB-S0/07_CURSOR_EXECUTION_PROMPT_P2-G03V31.md`
+5. 仓库根 `startup_records/` 同步副本
+6. Cursor Rule：`.cursor/rules/pangu2-p2-g03v31-task-baseline.mdc`
+
+历史正文保留在本文件下方，仅供追溯；实现与审核不得再以本节之后的单体正文为 ACTIVE 规范。
+
+---
+
+# 盘古2开发基线总文档 V1.1-RC（历史归档正文）
+
+> Baseline ID：`PANGU2-DEV-BASELINE-V1.1-RC`  
+> 本文件原状态为候选基线；现已 SUPERSEDED。以下为归档全文。
+
+---
+
 # 盘古2开发基线总文档 V1.1-RC
 
 > Baseline ID：`PANGU2-DEV-BASELINE-V1.1-RC`  

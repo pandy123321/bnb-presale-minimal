@@ -14,12 +14,13 @@
 | `.cursor/rules/review-agent.mdc` / `.agent-rules/review-agent.md` | 审核 Agent | 只读审核 PR、Finding、返修和 Closeout |
 | `.cursor/rules/human-project-owner.mdc` / `.agent-rules/human-project-owner.md` | 人工项目负责人 | 重大决策、合并、发布、权限和豁免 |
 | `.cursor/rules/github-review-only-governance.mdc` | 全体 | 架构边界与交接顺序（默认生效） |
+| `.cursor/rules/pangu2-p2-g03v31-task-baseline.mdc` | 全体 | **当前开发基线** P2-G03V31（Gate/Spec/执行约束，默认生效） |
 | `.cursor/rules/pangu2-baseline-core.mdc` | 全体 | 盘古2 核心：仓库边界/Gate/Decision/范围（默认生效） |
 | `.cursor/rules/pangu2-baseline-protocol.mdc` | 全体 | 盘古2 协议：合约/计税/成本/分红/锁仓/治理（默认生效） |
 | `.cursor/rules/pangu2-baseline-architecture.mdc` | 全体 | 盘古2 架构：环境/API/数据/阶段/测试（默认生效） |
 | `.cursor/rules/pixiu1-baseline-*.mdc` | pixiu1 | 归档项目基线（仅 `hub/pixiu1/**`） |
 
-盘古2 基线原文：`hub/pangu2/docs/baseline/` 与 `hub/pangu2/docs/current/`。Base Branch 固定 `pgbnb`。产品开发前须关闭开放 Decision 并固定 Spec/Ruleset SHA。
+当前活跃任务基线：`hub/pangu2/docs/specs/PB-S0/P2-G03V31.md` 与 `startup_records/`。Base Branch 固定 `pgbnb`。P2-G03V31 为纯文档/规则迁移；产品代码仍 BLOCKED。
 
 ## 整体执行顺序
 

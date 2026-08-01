@@ -15,6 +15,7 @@
 | 审核 Agent | `.cursor/rules/review-agent.mdc` | `.agent-rules/review-agent.md` |
 | 人工项目负责人 | `.cursor/rules/human-project-owner.mdc` | `.agent-rules/human-project-owner.md` |
 | 治理总规则 | `.cursor/rules/github-review-only-governance.mdc` | （见 `AGENTS.md`） |
+| 盘古2 当前任务基线 | `.cursor/rules/pangu2-p2-g03v31-task-baseline.mdc` | `hub/pangu2/docs/specs/PB-S0/P2-G03V31*` + `startup_records/` |
 | 盘古2 核心 | `.cursor/rules/pangu2-baseline-core.mdc` | `hub/pangu2/docs/baseline/` + `docs/current/` |
 | 盘古2 协议 | `.cursor/rules/pangu2-baseline-protocol.mdc` | 同上 §9–14 / V2.1 §5 |
 | 盘古2 架构交付 | `.cursor/rules/pangu2-baseline-architecture.mdc` | 同上 §15–27 / V2.1 §6–12 |

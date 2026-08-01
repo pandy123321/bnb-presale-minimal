@@ -58,11 +58,13 @@ ACTIVE Human Decision Record
 
 Finding 只能证明实现不符合已批准规范；不得用 Finding 改经济模型、API、权限、事件或状态机。
 
-## 当前 Gate
+## 当前 Gate / 活跃任务
 
 ```text
 Repository Strategy: APPROVED
-PB-S0 Repository Initialization Gate: GO          # 可做 P2-G02 等骨架/治理
+Active Task: P2-G03V31
+Task Start Gate: GO
+Task Start Base SHA: c8eaedbc47205194c518f2ff6a1415e3ff5abe16
 Project Start Gate: NEEDS_CONFIRMATION
 PB-S1..PB-S6 Product Development Gate: BLOCKED
 BSC_MAINNET: NO-GO
@@ -70,9 +72,16 @@ Automatic Merge: FORBIDDEN
 Automatic Deployment: FORBIDDEN
 ```
 
-- 可做：目录初始化、治理文件、工具链、LOCAL/CI、Schema 候选。
-- 不可做：在开放 Decision / Spec SHA / Ruleset Bundle SHA 未关闭前启动产品代码任务。
-- 下一任务形态：`P2-G02` 初始化 `hub/pangu2/`、迁移基线、保存 Decision；**不得开发产品代码**。
+当前开发基线文件：
+
+- `hub/pangu2/docs/specs/PB-S0/P2-G03V31.md`
+- `startup_records/03_P2-G03V31_TASK_START_GATE.md`
+- `startup_records/04_P2-G03V31_TASK_SPEC.md`
+- `startup_records/07_CURSOR_EXECUTION_PROMPT_P2-G03V31.md`
+- Rule：`.cursor/rules/pangu2-p2-g03v31-task-baseline.mdc`
+
+- 可做：P2-G03V31 Allowed Paths 内的纯文档/规则迁移。
+- 不可做：产品代码；将 TBC/PENDING 标为 FROZEN/ACTIVE；输出 PB-S1 GO；merge/deploy。
 
 ## 策略与范围
 
