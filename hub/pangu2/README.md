@@ -36,11 +36,17 @@
 - `.cursor/rules/pangu2-baseline-protocol.mdc`
 - `.cursor/rules/pangu2-baseline-architecture.mdc`
 
+## 合约（未审核草稿）
+
+- `contracts/src/*.sol`：8 个盘古2合约源码（UNAUDITED / UNREVIEWED）
+- 说明见 [`contracts/README.md`](./contracts/README.md)
+- **不构成审计结论、ABI FROZEN 或任何部署授权**
+
 ## 当前状态
 
 - Base Branch：`pgbnb`
 - Active Task：`P2-G03V31`（Task Start Gate GO）
 - Decision：`DR-P2-0001` ACTIVE（本目录为唯一项目根）
 - `hub/pixiu1/`：归档只读
-- 产品开发 Gate：BLOCKED；BSC_MAINNET：NO-GO
+- 合约：已入库草稿，未审核；BSC_MAINNET：NO-GO
 - Automatic Merge / Deployment：FORBIDDEN
