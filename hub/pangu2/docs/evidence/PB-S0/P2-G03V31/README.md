@@ -19,6 +19,11 @@ Review baseline:
 - startup_records/05_REQUIRED_CHECK_MANIFEST_P2-G03V31.md
 - startup_records/06_EVIDENCE_MANIFEST_P2-G03V31.md
 - startup_records/08_REVIEW_AGENT_PROMPT_P2-G03V31.md
+Candidate normative hashes:
+- startup_records/FULL_STARTUP_PACKAGE.md
+- startup_records/CURRENT_REPOSITORY_SHA_MANIFEST.md
+- startup_records/VALIDATION_REPORT.md
+- CANDIDATE_NORMATIVE_HASHES.md
 Also mirrored under hub/pangu2/docs/specs/PB-S0/ and this evidence directory.
 ```
 

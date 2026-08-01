@@ -13,8 +13,11 @@
 | `docs/specs/PB-S0/06_EVIDENCE_MANIFEST_P2-G03V31.md` | 审核基线：Evidence Manifest |
 | `docs/specs/PB-S0/07_CURSOR_EXECUTION_PROMPT_P2-G03V31.md` | 执行提示词 |
 | `docs/specs/PB-S0/08_REVIEW_AGENT_PROMPT_P2-G03V31.md` | 审核基线：审核提示词 |
+| `docs/specs/PB-S0/FULL_STARTUP_PACKAGE.md` | 候选规范哈希：启动包 |
+| `docs/specs/PB-S0/CURRENT_REPOSITORY_SHA_MANIFEST.md` | 候选规范哈希：SHA 证据 |
+| `docs/specs/PB-S0/VALIDATION_REPORT.md` | 候选规范哈希：验证报告 |
 | `../../startup_records/`（仓库根） | 上述同步副本 |
-| `docs/evidence/PB-S0/P2-G03V31/` | 证据与审核基线副本 |
+| `docs/evidence/PB-S0/P2-G03V31/` | 证据、审核基线与候选哈希 |
 
 ## 其他文档
 

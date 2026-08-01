@@ -21,7 +21,9 @@
 | `.cursor/rules/pixiu1-baseline-*.mdc` | pixiu1 | 归档项目基线（仅 `hub/pixiu1/**`） |
 
 当前活跃任务基线：`hub/pangu2/docs/specs/PB-S0/P2-G03V31.md` 与 `startup_records/`。  
-审核基线：`05_REQUIRED_CHECK_MANIFEST`、`06_EVIDENCE_MANIFEST`、`08_REVIEW_AGENT_PROMPT`（同目录 / `startup_records/`）。  
+审核基线：`05_REQUIRED_CHECK_MANIFEST`、`06_EVIDENCE_MANIFEST`、`08_REVIEW_AGENT_PROMPT`。  
+候选规范哈希：`FULL_STARTUP_PACKAGE.md`、`CURRENT_REPOSITORY_SHA_MANIFEST.md`、`VALIDATION_REPORT.md`  
+（Ruleset `91f2e06e…` / Baseline `f6536f2a…`，状态 CANDIDATE，非 FROZEN）。  
 Base Branch 固定 `pgbnb`。P2-G03V31 为纯文档/规则迁移；产品代码仍 BLOCKED。
 
 ## 整体执行顺序

@@ -30,6 +30,22 @@ hub/pangu2/docs/evidence/PB-S0/P2-G03V31/
 - Evidence Manifest：`06_EVIDENCE_MANIFEST_P2-G03V31.md`
 - Review Agent Prompt：`08_REVIEW_AGENT_PROMPT_P2-G03V31.md`
 
+候选规范哈希（CANDIDATE，非 FROZEN）：
+
+```text
+Candidate Ruleset Manifest SHA-256: 91f2e06e36f122869a6720aab655bad1e1bcbda6cc8d64b8104036b1746d758e
+Candidate Baseline Manifest SHA-256: f6536f2ab38052a63090edff7e234f11c97d0d69689692de288829aa2d9e4d4e
+```
+
+来源：
+
+- `startup_records/FULL_STARTUP_PACKAGE.md`
+- `startup_records/CURRENT_REPOSITORY_SHA_MANIFEST.md`
+- `startup_records/VALIDATION_REPORT.md`
+- `hub/pangu2/docs/evidence/PB-S0/P2-G03V31/CANDIDATE_NORMATIVE_HASHES.md`
+
+提交后必须映射到新的 Git Blob SHA / Current Head SHA；不得把候选哈希直接当已批准 FROZEN Spec/Ruleset。
+
 ## 固定身份
 
 ```text
@@ -85,6 +101,9 @@ hub/pangu2/docs/specs/PB-S0/05_REQUIRED_CHECK_MANIFEST_P2-G03V31.md
 hub/pangu2/docs/specs/PB-S0/06_EVIDENCE_MANIFEST_P2-G03V31.md
 hub/pangu2/docs/specs/PB-S0/07_CURSOR_EXECUTION_PROMPT_P2-G03V31.md
 hub/pangu2/docs/specs/PB-S0/08_REVIEW_AGENT_PROMPT_P2-G03V31.md
+hub/pangu2/docs/specs/PB-S0/FULL_STARTUP_PACKAGE.md
+hub/pangu2/docs/specs/PB-S0/CURRENT_REPOSITORY_SHA_MANIFEST.md
+hub/pangu2/docs/specs/PB-S0/VALIDATION_REPORT.md
 .cursor/rules/pangu2-p2-g03v31-task-baseline.mdc
 ```
 
