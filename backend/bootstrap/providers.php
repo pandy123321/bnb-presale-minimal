@@ -1,7 +1,5 @@
 <?php
 
 return [
-    'paths' => [
-        realpath(base_path('routes/api.php')),
-    ],
+    App\Providers\AppServiceProvider::class,
 ];

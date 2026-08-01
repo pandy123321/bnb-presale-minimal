@@ -4,11 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Laravel\Sanctum\HasApiTokens;
 
 class Admin extends Authenticatable
 {
-    use HasApiTokens, HasFactory;
+    use HasFactory;
 
     protected $fillable = [
         'name',
@@ -26,6 +25,11 @@ class Admin extends Authenticatable
         'is_active' => 'boolean',
         'last_login_at' => 'datetime',
     ];
+
+    public function setEmailAttribute(string $value): void
+    {
+        $this->attributes['email'] = mb_strtolower(trim($value));
+    }
 
     public function isSuperAdmin(): bool
     {

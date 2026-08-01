@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class RoleMiddleware
 {
@@ -11,12 +12,17 @@ class RoleMiddleware
     {
         $admin = $request->user();
 
-        if (!$admin || !$admin->is_active) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
+        if (!$admin) {
+            return redirect()->route('login');
+        }
+
+        if (!$admin->is_active) {
+            Auth::guard('web')->logout();
+            return redirect()->route('login')->withErrors(['email' => 'Account is deactivated.']);
         }
 
         if (!in_array($admin->role, $roles, true)) {
-            return response()->json(['message' => 'Forbidden. Insufficient permissions.'], 403);
+            abort(403, 'Forbidden. Insufficient permissions.');
         }
 
         return $next($request);
