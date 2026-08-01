@@ -12,7 +12,7 @@ class AdminSeeder extends Seeder
     {
         Admin::create([
             'name' => env('SEED_ADMIN_NAME', 'Super Admin'),
-            'email' => strtolower(env('SEED_ADMIN_EMAIL', 'admin@bnb-presale.local')),
+            'email' => Admin::normalizeEmail(env('SEED_ADMIN_EMAIL', 'admin@bnb-presale.local')),
             'password' => Hash::make(env('SEED_ADMIN_PASSWORD', 'admin123')),
             'role' => 'SUPER_ADMIN',
             'is_active' => true,

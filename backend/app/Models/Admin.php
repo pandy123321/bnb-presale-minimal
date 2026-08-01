@@ -28,7 +28,12 @@ class Admin extends Authenticatable
 
     public function setEmailAttribute(string $value): void
     {
-        $this->attributes['email'] = mb_strtolower(trim($value));
+        $this->attributes['email'] = static::normalizeEmail($value);
+    }
+
+    public static function normalizeEmail(string $value): string
+    {
+        return mb_strtolower(trim($value));
     }
 
     public function isSuperAdmin(): bool
