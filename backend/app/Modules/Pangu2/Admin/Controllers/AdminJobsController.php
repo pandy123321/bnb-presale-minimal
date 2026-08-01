@@ -51,10 +51,10 @@ class AdminJobsController extends Controller
     {
         $idempotencyKey = $request->header('Idempotency-Key');
 
-        if (!$idempotencyKey) {
+        if (!$idempotencyKey || strlen($idempotencyKey) < 16 || strlen($idempotencyKey) > 128) {
             return ApiEnvelope::error(
                 'VALIDATION_MISSING_HEADER',
-                'Idempotency-Key header is required for retry operations.',
+                'Idempotency-Key header is required (16-128 chars).',
                 false,
                 [],
                 422,
@@ -78,40 +78,59 @@ class AdminJobsController extends Controller
             ], 'LIVE');
         }
 
-        // Atomically insert the retry token
+        // Atomically insert the retry token + audit in one transaction
         $adminId = $request->user()?->id;
-        $now = now();
+        $now     = now();
 
-        try {
-            DB::table('job_retry_tokens')->insert([
+        $consumed = DB::transaction(function () use ($taskName, $idempotencyKey, $adminId, $request, $now): bool {
+            $inserted = DB::table('job_retry_tokens')->insertOrIgnore([
                 'task_name'       => $taskName,
                 'idempotency_key' => $idempotencyKey,
                 'admin_id'        => $adminId,
-                'status'          => 'executed',
-                'executed_at'     => $now,
-                'result'          => "Retry triggered for {$taskName}",
+                'status'          => 'queued',
                 'created_at'      => $now,
                 'updated_at'      => $now,
             ]);
 
-            // Write audit log
-            $this->writeAudit('JOB_RETRY', $taskName, $idempotencyKey, $request, $adminId);
+            if (!$inserted) {
+                return false;
+            }
+
+            DB::table('admin_audit_logs')->insert([
+                'admin_id'        => $adminId,
+                'action'          => 'JOB_RETRY_QUEUED',
+                'target_type'     => 'job',
+                'idempotency_key' => $idempotencyKey,
+                'ip_address'      => $request->ip(),
+                'user_agent'      => $request->userAgent(),
+                'after_data'      => json_encode(['task_name' => $taskName]),
+                'result'          => 'SUCCESS',
+                'created_at'      => $now,
+            ]);
+
+            return true;
+        });
+
+        if (!$consumed) {
+            $retry = DB::table('job_retry_tokens')
+                ->where('task_name', $taskName)
+                ->where('idempotency_key', $idempotencyKey)
+                ->first();
 
             return ApiEnvelope::success([
                 'task_name'       => $taskName,
-                'status'          => 'executed',
-                'idempotent'      => false,
-                'executed_at'     => $now->toIso8601String(),
+                'status'          => $retry?->status ?? 'queued',
+                'idempotent'      => true,
+                'created_at'      => $retry?->created_at,
             ], 'LIVE');
-        } catch (\Throwable $e) {
-            return ApiEnvelope::error(
-                'JOB_RETRY_FAILED',
-                $e->getMessage(),
-                true,
-                [],
-                500,
-            );
         }
+
+        return ApiEnvelope::success([
+            'task_name'       => $taskName,
+            'status'          => 'queued',
+            'idempotent'      => false,
+            'created_at'      => $now->toIso8601String(),
+        ], 'LIVE');
     }
 
     // ── Helpers ──────────────────────────────

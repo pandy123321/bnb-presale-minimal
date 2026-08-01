@@ -26,8 +26,9 @@ return new class extends Migration {
             $table->text('error_message')->nullable();
             $table->timestamps();
 
-            $table->unique('idempotency_key');
+            $table->unique(['task_name', 'idempotency_key']);
             $table->index(['task_name', 'status']);
+            $table->timestamp('expires_at')->nullable();
         });
     }
 
