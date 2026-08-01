@@ -6,6 +6,7 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ICostBasisManager} from "./interfaces/ICostBasisManager.sol";
 import {IFeeVault} from "./interfaces/IFeeVault.sol";
+import {TransferContext} from "./libraries/TransferContext.sol";
 
 contract Pangu2Token is ERC20, AccessControl, Pausable {
     bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
@@ -29,20 +30,31 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
     mapping(address => bool) public isPair;
     mapping(address => bool) public isSystemAddress;
     mapping(address => bool) public isLiquidityManager;
+    mapping(address => mapping(TransferContext.Kind => bool)) public systemTransferContextAllowed;
+
+    TransferContext.Kind private _activeContext;
+    address private _activeContextOperator;
 
     error ZeroAddress();
     error AddressHasNoCode(address account);
     error CoreAlreadyConfigured();
     error CoreNotConfigured();
     error DirectPairInteractionForbidden(address from, address to, address operator);
+    error DirectSystemInteractionForbidden(address from, address to, address operator);
     error UnsupportedTaxRate(uint16 taxBps);
     error InvalidAmount();
     error CoreSystemAddressImmutable(address account);
+    error InvalidTransferContext(TransferContext.Kind kind);
+    error TransferContextNotAllowed(address operator, TransferContext.Kind kind);
+    error TransferContextActive();
 
     event CoreConfigured(address indexed costBasisManager, address indexed feeVault);
     event PairUpdated(address indexed pair, bool enabled);
     event SystemAddressUpdated(address indexed account, bool enabled);
     event LiquidityManagerUpdated(address indexed account, bool enabled);
+    event SystemTransferContextUpdated(
+        address indexed account, TransferContext.Kind indexed kind, bool enabled
+    );
     event TokensPurchased(
         address indexed buyer,
         uint256 amountIn,
@@ -115,6 +127,43 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
         emit LiquidityManagerUpdated(account, enabled);
     }
 
+    function setSystemTransferContext(address account, TransferContext.Kind kind, bool enabled)
+        external
+        onlyRole(GOVERNANCE_ROLE)
+    {
+        if (!isSystemAddress[account]) revert DirectSystemInteractionForbidden(account, account, msg.sender);
+        if (
+            kind != TransferContext.Kind.LIQUIDITY_WITHDRAWAL
+                && kind != TransferContext.Kind.DIVIDEND_CLAIM
+                && kind != TransferContext.Kind.SYSTEM_CREDIT_UNKNOWN
+        ) revert InvalidTransferContext(kind);
+        if (kind == TransferContext.Kind.LIQUIDITY_WITHDRAWAL && !isLiquidityManager[account]) {
+            revert TransferContextNotAllowed(account, kind);
+        }
+        systemTransferContextAllowed[account][kind] = enabled;
+        emit SystemTransferContextUpdated(account, kind, enabled);
+    }
+
+    function systemTransfer(address to, uint256 amount, TransferContext.Kind kind)
+        external
+        whenNotPaused
+        returns (bool)
+    {
+        if (!coreConfigured) revert CoreNotConfigured();
+        if (to == address(0)) revert ZeroAddress();
+        if (amount == 0) revert InvalidAmount();
+        if (!isSystemAddress[msg.sender] || !systemTransferContextAllowed[msg.sender][kind]) {
+            revert TransferContextNotAllowed(msg.sender, kind);
+        }
+        if (isSystemAddress[to] || isPair[to]) {
+            revert DirectSystemInteractionForbidden(msg.sender, to, msg.sender);
+        }
+        _beginContext(msg.sender, kind);
+        _update(msg.sender, to, amount);
+        _endContext();
+        return true;
+    }
+
     function previewBuyTax(uint256 grossAmount)
         public
         pure
@@ -159,7 +208,9 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
 
         (taxAmount, netAmount) = previewBuyTax(grossAmount);
         _update(msg.sender, address(feeVault), taxAmount);
+        _beginContext(msg.sender, TransferContext.Kind.BUY_SETTLEMENT);
         _update(msg.sender, buyer, netAmount);
+        _endContext();
         feeVault.credit(IFeeVault.Bucket.DIVIDEND, taxAmount);
         costBasisManager.recordBuy(buyer, costWbnbWei, netAmount);
         emit TokensPurchased(buyer, costWbnbWei, grossAmount, taxAmount, netAmount);
@@ -179,7 +230,6 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
         }
 
         (supportAmount, burnAmount, swapAmount) = previewSellTax(sellAmount, taxBps);
-
         _update(msg.sender, address(feeVault), supportAmount);
         if (burnAmount != 0) {
             _burn(msg.sender, burnAmount);
@@ -216,21 +266,68 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
                 && (isPair[from] || isPair[to] || isSystemAddress[from] || isSystemAddress[to])
         ) revert EnforcedPause();
 
+        bool liquidityDeposit;
+        bool sellEntry;
+        bool fromUser = _isUser(from);
+        bool toUser = _isUser(to);
+
         if (from != address(0) && to != address(0) && (isPair[from] || isPair[to])) {
-            bool allowedPairPath =
-                (isPair[from] && isSystemAddress[to]) || (isPair[to] && isSystemAddress[from])
-                    || isLiquidityManager[msg.sender];
-            if (!allowedPairPath) revert DirectPairInteractionForbidden(from, to, msg.sender);
+            if (fromUser && isPair[to] && isLiquidityManager[msg.sender]) {
+                liquidityDeposit = true;
+            } else if (isPair[from] && toUser) {
+                revert DirectPairInteractionForbidden(from, to, msg.sender);
+            } else if (!((isPair[from] && isSystemAddress[to]) || (isPair[to] && isSystemAddress[from]))) {
+                revert DirectPairInteractionForbidden(from, to, msg.sender);
+            }
+        }
+
+        if (fromUser && isSystemAddress[to] && !isPair[to]) {
+            if (isLiquidityManager[to] && msg.sender == to) {
+                liquidityDeposit = true;
+            } else if (hasRole(SETTLEMENT_ROLE, to) && msg.sender == to) {
+                sellEntry = true;
+            } else {
+                revert DirectSystemInteractionForbidden(from, to, msg.sender);
+            }
+        }
+
+        if (isSystemAddress[from] && toUser) {
+            if (
+                _activeContext == TransferContext.Kind.NONE || _activeContextOperator != from
+                    || msg.sender != from
+            ) revert DirectSystemInteractionForbidden(from, to, msg.sender);
         }
 
         super._update(from, to, value);
 
-        if (
-            coreConfigured && value != 0 && from != address(0) && to != address(0) && !isPair[from]
-                && !isPair[to] && !isSystemAddress[from] && !isSystemAddress[to]
-        ) {
+        if (!coreConfigured || value == 0 || from == address(0) || to == address(0)) return;
+
+        if (liquidityDeposit) {
+            costBasisManager.onLiquidityDeposit(from, value);
+        } else if (_activeContext == TransferContext.Kind.LIQUIDITY_WITHDRAWAL) {
+            costBasisManager.onLiquidityWithdrawal(to, value);
+        } else if (_activeContext == TransferContext.Kind.SYSTEM_CREDIT_UNKNOWN) {
+            costBasisManager.onSystemCreditUnknown(to, value, keccak256("SYSTEM_CREDIT_UNKNOWN"));
+        } else if (fromUser && toUser) {
             costBasisManager.onUserTransfer(from, to, value);
+        } else if (sellEntry) {
+            // The router consumes the position after transfer and before settlement in the same transaction.
         }
+    }
+
+    function _isUser(address account) private view returns (bool) {
+        return account != address(0) && !isPair[account] && !isSystemAddress[account];
+    }
+
+    function _beginContext(address operator, TransferContext.Kind kind) private {
+        if (_activeContext != TransferContext.Kind.NONE) revert TransferContextActive();
+        _activeContextOperator = operator;
+        _activeContext = kind;
+    }
+
+    function _endContext() private {
+        _activeContext = TransferContext.Kind.NONE;
+        _activeContextOperator = address(0);
     }
 
     function _mulBpsRoundingUp(uint256 amount, uint16 bps) private pure returns (uint256) {
