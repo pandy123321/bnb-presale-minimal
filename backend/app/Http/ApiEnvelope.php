@@ -8,8 +8,6 @@ use Illuminate\Http\JsonResponse;
 
 /**
  * PANGU2 Unified API Envelope.
- *
- * Every API response MUST use this envelope.
  */
 final class ApiEnvelope
 {
@@ -17,7 +15,7 @@ final class ApiEnvelope
 
     public static function success(
         mixed $data,
-        string $dataStatus = 'MOCK_DATA',
+        string $dataStatus = 'LIVE',
         ?string $blockNumber = null,
         array $extraMeta = [],
     ): JsonResponse {
@@ -43,7 +41,7 @@ final class ApiEnvelope
         int $currentPage,
         int $perPage,
         int $total,
-        string $dataStatus = 'MOCK_DATA',
+        string $dataStatus = 'LIVE',
         ?string $blockNumber = null,
     ): JsonResponse {
         return self::success($data, $dataStatus, $blockNumber, [

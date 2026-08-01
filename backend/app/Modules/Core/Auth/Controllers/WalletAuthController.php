@@ -10,8 +10,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 
 class WalletAuthController extends Controller
 {
@@ -21,9 +23,6 @@ class WalletAuthController extends Controller
 
     /**
      * POST /api/v1/projects/pangu2/auth/nonce
-     *
-     * Generate a time-limited nonce for EIP-191 signing.
-     * Domain and chain_id are taken from server config, NOT from the client.
      */
     public function nonce(Request $request): JsonResponse
     {
@@ -39,10 +38,9 @@ class WalletAuthController extends Controller
             return ApiEnvelope::error('INVALID_ADDRESS', $e->getMessage(), false, [], 422);
         }
 
-        $authDomain = $this->getAuthDomain();
-        $chainId    = $this->getChainId();
+        $authDomain = config('pangu2.auth_domain', 'localhost');
+        $chainId    = (int) config('pangu2.chain_id', 31337);
 
-        // Clean expired nonces for this wallet
         \App\Modules\Core\Auth\Models\Nonce::where('wallet_address', $walletLower)
             ->where('expires_at', '<', now())
             ->delete();
@@ -56,14 +54,17 @@ class WalletAuthController extends Controller
             'domain'         => $authDomain,
             'chain_id'       => $chainId,
             'expires_at'     => $nonce->expires_at->toIso8601String(),
-        ], 'NONCE_ISSUED');
+        ]);
     }
 
     /**
      * POST /api/v1/projects/pangu2/auth/verify
      *
-     * Verify EIP-191 signature with atomic nonce consumption,
-     * create authenticated session, and write audit log.
+     * Flow:
+     * 1. Rate limit check (outside any DB transaction)
+     * 2. Validate nonce record + signature recovery (outside DB transaction, CPU work)
+     * 3. Atomic nonce consumption + audit insert (inside ONE DB transaction)
+     * 4. Session creation (after transaction commit)
      */
     public function verify(Request $request): JsonResponse
     {
@@ -75,82 +76,97 @@ class WalletAuthController extends Controller
             'signature'      => ['required', 'string', 'max:256'],
         ]);
 
-        $authDomain = $this->getAuthDomain();
-        $chainId    = $this->getChainId();
+        $authDomain = config('pangu2.auth_domain', 'localhost');
+        $chainId    = (int) config('pangu2.chain_id', 31337);
 
-        $walletLower = $this->eip191->normalizeAddress($validated['wallet_address']);
+        // ---- Phase 1 (outside transaction): validate + crypto ----
 
-        $now = now();
+        try {
+            $walletLower = $this->eip191->normalizeAddress($validated['wallet_address']);
+            $this->eip191->validateSignatureFormat($validated['signature']);
 
-        // Step 1: Verify signature & atomically consume nonce inside a transaction
-        $nonceRecord = DB::transaction(function () use (
-            $validated, $walletLower, $authDomain, $chainId
-        ) {
-            return $this->eip191->verify(
+            $record = $this->eip191->validateNonceRecord(
                 $walletLower,
                 $validated['nonce'],
-                $validated['signature'],
                 $authDomain,
                 $chainId,
             );
+
+            $recovered = $this->eip191->recoverSigner($record->message, $validated['signature']);
+        } catch (RuntimeException $e) {
+            return ApiEnvelope::error('VERIFICATION_FAILED', $e->getMessage(), false, [], 401);
+        }
+
+        if ($recovered !== $walletLower) {
+            return ApiEnvelope::error('VERIFICATION_FAILED', 'Signature verification failed.', false, [], 401);
+        }
+
+        // ---- Phase 2 (inside transaction): atomic consume + audit ----
+
+        $authenticatedAt = now();
+        $sessionExpiry   = $authenticatedAt->copy()->addMinutes((int) config('pangu2.session_ttl_minutes', 120));
+
+        $consumed = DB::transaction(function () use ($record, $request, $walletLower, $chainId, $authDomain, $authenticatedAt): bool {
+            $ok = $this->eip191->consumeNonceAtomic($record->id);
+
+            if (!$ok) {
+                return false;
+            }
+
+            DB::table('admin_audit_logs')->insert([
+                'action'      => 'WALLET_AUTHENTICATED',
+                'target_type' => 'wallet',
+                'ip_address'  => $request->ip(),
+                'user_agent'  => $request->userAgent(),
+                'after_data'  => json_encode([
+                    'wallet_address'   => $walletLower,
+                    'chain_id'         => $chainId,
+                    'domain'           => $authDomain,
+                    'authenticated_at' => $authenticatedAt->toIso8601String(),
+                ]),
+                'result'     => 'SUCCESS',
+                'created_at' => $authenticatedAt,
+            ]);
+
+            return true;
         });
 
-        if ($nonceRecord === null) {
+        if (!$consumed) {
             return ApiEnvelope::error(
                 'NONCE_ALREADY_USED',
-                'This nonce was already consumed by a concurrent request.',
+                'This nonce was already consumed.',
                 false,
                 [],
                 409,
             );
         }
 
-        // Step 2: Write audit log inside the same or a separate transaction
-        DB::table('admin_audit_logs')->insert([
-            'action'      => 'WALLET_AUTHENTICATED',
-            'target_type' => 'wallet',
-            'ip_address'  => $request->ip(),
-            'user_agent'  => $request->userAgent(),
-            'after_data'  => json_encode([
-                'wallet_address'   => $walletLower,
-                'chain_id'         => $chainId,
-                'domain'           => $authDomain,
-                'authenticated_at' => $now->toIso8601String(),
-            ]),
-            'result'     => 'SUCCESS',
-            'created_at' => $now,
-        ]);
-
-        // Step 3: Create session (after nonce consumption and audit are confirmed)
-        $sessionExpiry = $now->addMinutes(config('pangu2.session_ttl_minutes', 120));
+        // ---- Phase 3 (after commit): create session ----
 
         $request->session()->regenerate();
         $request->session()->put('auth.wallet_address', $walletLower);
         $request->session()->put('auth.chain_id', $chainId);
         $request->session()->put('auth.domain', $authDomain);
-        $request->session()->put('auth.authenticated_at', $now->toIso8601String());
+        $request->session()->put('auth.authenticated_at', $authenticatedAt->toIso8601String());
         $request->session()->put('auth.expires_at', $sessionExpiry->toIso8601String());
 
         return ApiEnvelope::success([
+            'auth_status'      => 'AUTHENTICATED',
             'wallet_address'   => $walletLower,
             'chain_id'         => $chainId,
             'domain'           => $authDomain,
-            'authenticated_at' => $now->toIso8601String(),
+            'authenticated_at' => $authenticatedAt->toIso8601String(),
             'expires_at'       => $sessionExpiry->toIso8601String(),
-        ], 'AUTHENTICATED');
+        ]);
     }
 
     /**
      * POST /api/v1/projects/pangu2/auth/logout
-     *
-     * Destroy the wallet session. Audit failure does NOT block logout.
      */
     public function logout(Request $request): JsonResponse
     {
         $walletAddress = $request->session()->get('auth.wallet_address');
-        $now = now();
 
-        // Write audit log best-effort; session cleanup is guaranteed
         try {
             if ($walletAddress) {
                 DB::table('admin_audit_logs')->insert([
@@ -160,69 +176,51 @@ class WalletAuthController extends Controller
                     'user_agent'  => $request->userAgent(),
                     'after_data'  => json_encode([
                         'wallet_address' => $walletAddress,
-                        'logged_out_at'  => $now->toIso8601String(),
+                        'logged_out_at'  => now()->toIso8601String(),
                     ]),
                     'result'     => 'SUCCESS',
-                    'created_at' => $now,
+                    'created_at' => now(),
                 ]);
             }
-        } catch (\Throwable) {
-            // Audit failure must not prevent session destruction
+        } catch (\Throwable $e) {
+            Log::warning('Wallet logout audit failed', [
+                'wallet_address'   => $walletAddress,
+                'exception_class'  => $e::class,
+            ]);
         } finally {
             $request->session()->invalidate();
             $request->session()->regenerateToken();
         }
 
         return ApiEnvelope::success([
-            'logged_out' => true,
-        ], 'LOGGED_OUT');
+            'auth_status' => 'LOGGED_OUT',
+            'logged_out'  => true,
+        ]);
     }
 
-    // ─── Helpers ─────────────────────────────────────────────
+    // ── Helpers ──────────────────────────────────────────
 
-    private function getAuthDomain(): string
-    {
-        return config('pangu2.auth_domain', 'localhost');
-    }
-
-    private function getChainId(): int
-    {
-        return (int) config('pangu2.chain_id', 31337);
-    }
-
-    // ─── Rate Limiting ────────────────────────────────────────
-
-    /**
-     * Nonce endpoint: 30 requests per minute per IP.
-     */
     private function rateLimitNonce(Request $request): void
     {
-        $key = 'auth-nonce:' . $request->ip();
-
         $executed = RateLimiter::attempt(
-            $key,
+            'auth-nonce:' . $request->ip(),
             maxAttempts: 30,
             callback: fn () => true,
             decaySeconds: 60,
         );
 
         if (!$executed) {
-            throw new \Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException(
-                60,
-                'Too many nonce requests. Please wait.'
-            );
+            throw new TooManyRequestsHttpException(60, 'Too many nonce requests.');
         }
     }
 
-    /**
-     * Verify endpoint: 5 attempts per minute per (normalized wallet + IP).
-     * Using wallet+IP prevents locking a target wallet across all IPs.
-     */
     private function rateLimitVerify(Request $request): void
     {
         $wallet = $request->input('wallet_address', 'unknown');
-        $walletLower = strtolower(trim($wallet));
-        $walletLower = str_starts_with($walletLower, '0x') ? $walletLower : '0x' . $walletLower;
+        $walletLower = strtolower(trim((string) $wallet));
+        if (!str_starts_with($walletLower, '0x')) {
+            $walletLower = '0x' . $walletLower;
+        }
 
         $key = 'auth-verify:' . md5($walletLower) . ':' . $request->ip();
 
@@ -234,10 +232,7 @@ class WalletAuthController extends Controller
         );
 
         if (!$executed) {
-            throw new \Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException(
-                60,
-                'Too many verification attempts. Please wait.'
-            );
+            throw new TooManyRequestsHttpException(60, 'Too many verification attempts.');
         }
     }
 }
