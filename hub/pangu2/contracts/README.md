@@ -1,38 +1,76 @@
-# Pangu2 Contracts（未审核草稿）
+# PANGU2 PB-S1 Contract Suite — Repair Optimization V1.1
 
-```text
-Status: UNAUDITED / UNREVIEWED DRAFT
-Project: PANGU2
-Path: hub/pangu2/contracts/src/
-Network: NOT AUTHORIZED FOR MAINNET
-Automatic Deploy: FORBIDDEN
+**Scope:** LOCAL / CI / BSC Testnet only. **BSC Mainnet remains NO-GO.**
+
+This package implements the approved DR-P2-0002 through DR-P2-0012 contract scope. It does not authorize a
+mainnet deployment, real production funds, production credentials, automatic merge, or automatic deployment.
+
+## Locked toolchain
+
+- Solidity: `0.8.24`
+- Foundry: `v1.7.1`
+- OpenZeppelin Contracts: `v5.0.2`
+- forge-std: `v1.16.2`
+- EVM target: `paris`
+- Solidity pipeline: optimizer enabled, `via_ir = true`
+- PancakeSwap V3 candidate fee tier: `2500` (0.25%)
+
+## Task mapping
+
+| Task | Delivered implementation |
+|---|---|
+| P2-C01 | `Pangu2Token.sol`: fixed 1B supply, no mint, one-time tax settlement, direct Pair bypass rejection |
+| P2-C02 | `Pangu2TradeRouter.sol`, V3 adapter and 30-minute fail-closed TWAP oracle |
+| P2-C03 | `CostBasisManager.sol` + `Pangu2LiquidityGateway.sol`: WBNB-wei cost, user/liquidity dual positions, explicit transfer contexts and fail-closed UNKNOWN |
+| P2-C04 | `FeeVault.sol`: isolated Dividend/Support buckets and support-only conversion |
+| P2-C05 | `SupportPool.sol`: public fixed 0.01 BNB buyback with a 60-second minimum interval |
+| P2-C06 | `BuybackLocker.sol`: immutable permanent/fixed modes; deployment requires explicit `LOCK_*` Decision inputs; seven days is test-fixture-only |
+| P2-C07 | `DividendDistributor.sol`: Timelock-approved immutable commitment, artifact checksum, exact 30-day claims, pause control; Merkle Leaf V1 and 35/30/20/15 reference library |
+| P2-C08 | `GovernanceAdapter.sol`, 1-hour Timelock deployment, role handoff and JSON manifest output |
+| P2-C09 | Unit, security, stateful invariant and mandatory fixed-block BSC Testnet Pancake V3 fork tests under `test/` |
+
+## Install and validate
+
+```bash
+forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-git
+forge install foundry-rs/forge-std@v1.16.2 --no-git
+forge fmt --check
+forge clean && forge build --sizes
+BSC_TESTNET_RPC_URL=<testnet-rpc> BSC_TESTNET_FORK_BLOCK=<fixed-block> forge test -vvv
+BSC_TESTNET_RPC_URL=<testnet-rpc> BSC_TESTNET_FORK_BLOCK=<fixed-block> forge test --fuzz-runs 50000
+forge test --match-path 'test/invariant/**' -vvv
+forge snapshot
 ```
 
-本目录存放盘古2合约**开发中、未审核**源码。当前仅作版本托管与后续审核输入，不构成：
+## Deployment safety
 
-- 第三方审计结论；
-- PB-S1 Closeout / ABI FROZEN；
-- 测试网或主网部署授权；
-- 生产可用性声明。
+Before any BSC Testnet write operation, independently verify chain ID 97, all configured code hashes, factory
+`getPool`, pool token ordering, fee tier, observation cardinality, minimum harmonic liquidity and every granted
+role. The script rejects chains other than Anvil/CI `31337` and BSC Testnet `97`.
 
-## 源文件
+Use `deploy.env.example` only as a field list. Never place private keys, mnemonics or production RPC credentials in
+this package.
 
-| Contract | File |
-|---|---|
-| Pangu2Token | `src/Pangu2Token.sol` |
-| Pangu2TradeRouter | `src/Pangu2TradeRouter.sol` |
-| CostBasisManager | `src/CostBasisManager.sol` |
-| FeeVault | `src/FeeVault.sol` |
-| SupportPool | `src/SupportPool.sol` |
-| BuybackLocker | `src/BuybackLocker.sol` |
-| DividendDistributor | `src/DividendDistributor.sol` |
-| GovernanceAdapter | `src/GovernanceAdapter.sol` |
+## Validation status in this delivery environment
 
-Compiler target per sources: Solidity `0.8.24` + OpenZeppelin imports（Foundry 工程/锁文件尚未齐备时，本目录可能无法独立编译）。
+The source tree was statically checked for imports, balanced delimiters, required constants, forbidden paths and
+secret-like content. The current artifact runtime did not contain `forge` or `solc`, so compilation, EVM execution,
+fuzzing, invariant runs, gas snapshots and ABI generation must be run in the pinned Foundry environment before a
+PR can enter formal review. Generated tests are test source, not a claim that the checks passed.
 
-## 使用约束
 
-1. 不得将本目录合约直接用于 BSC_MAINNET。
-2. 未通过审核 Agent 固定 SHA 审核与人工批准前，不得标为 FROZEN ABI。
-3. 不得从 `hub/pixiu1/**` 运行时依赖归档合约。
-4. 后续应补齐 `foundry.toml`、 remappings、测试与 CI；本次提交仅为源码入库。
+## PB-S1 Repair Optimization V1.1
+
+- F001：用户、系统、Pair和流动性路径使用不可伪造的Transfer Context；用户真实余额与tracked不一致时Fail Closed为UNKNOWN。
+- F002：Governance/Timelock先提交完整Epoch Commitment，Root Publisher只能精确匹配发布；checksum写入状态和事件；测试网领取期精确30天；Emergency只能暂停。
+- F003：新增固定区块BSC Testnet Pancake V3真实Fork全流程、状态化协议Invariant和上下文伪造/重入/角色攻击测试。
+- Fork测试不允许静默跳过；缺少`BSC_TESTNET_RPC_URL`或`BSC_TESTNET_FORK_BLOCK`时验证应失败。
+- 税费尘埃舍入未擅自改变，详见`reports/ROUNDING_DECISION_REQUIRED.md`。
+
+
+### V1.1 execution constraints
+
+- All Solidity tests import production sources through the `pangu2/=src/` remapping; invalid `./src` forms are forbidden.
+- `SupportPool.canExecuteBuyback()` exposes the permissionless buyback readiness and a machine-readable block reason without mutating pause state.
+- Deployment requires `LOCK_MODE`, `LOCK_DURATION`, `LOCK_RELEASE_RECIPIENT`, and `LOCK_DECISION_ID`; no locker duration or recipient is defaulted.
+- The current dividend reference remains 35/30/20/15 until an active Decision Record approves a replacement. The proposed 35/30/25/15 input is rejected because it totals 105%.
