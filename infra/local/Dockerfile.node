@@ -1,0 +1,17 @@
+# ═══════════════════════════════════════════
+# PANGU2 Local Dev Environment
+# Shared Node.js builder for Mock API / DApp / Admin
+# ═══════════════════════════════════════════
+
+FROM node:20-alpine
+
+RUN corepack enable && corepack prepare pnpm@9 --activate
+
+RUN apk add --no-cache curl bash
+
+WORKDIR /workspace
+
+COPY infra/local/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+CMD ["pnpm", "dev"]

@@ -1,0 +1,26 @@
+{
+  "name": "@pangu2/admin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.ts",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "vue": "^3.5",
+    "vue-router": "^4.5",
+    "pinia": "^2.3",
+    "@pangu2/api-types": "workspace:*",
+    "dayjs": "^1.11"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2",
+    "vite": "^6.1",
+    "typescript": "^5.7",
+    "vue-tsc": "^2.2"
+  }
+}

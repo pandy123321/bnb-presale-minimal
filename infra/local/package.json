@@ -1,0 +1,15 @@
+{
+  "name": "@pangu2/infra-local",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PANGU2 local development environment scripts",
+  "scripts": {
+    "up": "docker compose -f infra/local/docker-compose.local.yml up -d --build && bash infra/local/health-check.sh",
+    "down": "docker compose -f infra/local/docker-compose.local.yml down",
+    "reset": "docker compose -f infra/local/docker-compose.local.yml down -v && docker compose -f infra/local/docker-compose.local.yml up -d --build && bash infra/local/health-check.sh",
+    "health": "bash infra/local/health-check.sh",
+    "status": "docker compose -f infra/local/docker-compose.local.yml ps",
+    "logs": "docker compose -f infra/local/docker-compose.local.yml logs -f",
+    "clean": "docker compose -f infra/local/docker-compose.local.yml down -v --rmi all"
+  }
+}
