@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ICostBasisManager} from "./interfaces/ICostBasisManager.sol";
 import {CostMath} from "./libraries/CostMath.sol";
 
-/// @notice Tracks user token cost in WBNB wei and a separate token-denominated liquidity position.
+/// @notice Tracks user token cost in WBNB wei and per-tokenId liquidity positions.
 /// @dev UNKNOWN is fail-closed and never becomes KNOWN through an administrator operation.
 contract CostBasisManager is AccessControl, ICostBasisManager {
     bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
@@ -17,14 +17,26 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
     bytes32 public constant REASON_TRANSFER = keccak256("TRANSFER");
     bytes32 public constant REASON_LIQUIDITY_DEPOSIT = keccak256("LIQUIDITY_DEPOSIT");
     bytes32 public constant REASON_LIQUIDITY_WITHDRAWAL = keccak256("LIQUIDITY_WITHDRAWAL");
+    bytes32 public constant REASON_LIQUIDITY_FEE = keccak256("LIQUIDITY_FEE");
+    bytes32 public constant REASON_LP_LOSS = keccak256("LP_LOSS");
 
     address public immutable token;
     address public tradeRouter;
     address public dividendDistributor;
+    address public liquidityGateway;
     bool public operatorsConfigured;
+    bool public liquidityGatewayConfigured;
 
+    // Per-user position (aggregate)
     mapping(address => Position) private _positions;
-    mapping(address => Position) private _liquidityPositions;
+    // Per-tokenId LP position — keyed by (owner, tokenId) to avoid enumeration issues
+    mapping(address => mapping(uint256 => Position)) private _lpPositions;
+    // Track per-owner LP totals
+    mapping(address => uint256) public lpTrackedTotal;
+    mapping(address => uint256) public lpCostTotal;
+    // Pending LP deposit values — filled by onLiquidityDeposit, consumed by bindLpTokenId
+    mapping(address => uint256) private _pendingLpTokens;
+    mapping(address => uint256) private _pendingLpCost;
     mapping(address => bool) public systemAddress;
 
     error ZeroAddress();
@@ -34,6 +46,8 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
     error SystemAccount();
     error UnauthorizedHook(address caller);
     error OperatorsAlreadyConfigured();
+    error LiquidityGatewayAlreadyConfigured();
+    error UnauthorizedLiquidityGateway(address caller);
 
     event PositionChanged(
         address indexed account,
@@ -45,8 +59,9 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         PositionStatus newStatus,
         bytes32 indexed reason
     );
-    event LiquidityPositionChanged(
+    event LpPositionChanged(
         address indexed account,
+        uint256 indexed tokenId,
         uint256 oldCostWbnbWei,
         uint256 newCostWbnbWei,
         uint256 oldTrackedTokens,
@@ -54,6 +69,12 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         PositionStatus oldStatus,
         PositionStatus newStatus,
         bytes32 indexed reason
+    );
+    event LpLossRecorded(
+        address indexed account,
+        uint256 indexed tokenId,
+        uint256 lostTrackedTokens,
+        uint256 lostCostWbnbWei
     );
     event CostBasisTransferred(
         address indexed from,
@@ -63,8 +84,16 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         PositionStatus sourceStatus,
         PositionStatus destinationStatus
     );
+    event LpCostMigrated(
+        address indexed from,
+        address indexed to,
+        uint256 indexed tokenId,
+        uint256 costWbnbWei,
+        uint256 trackedTokens
+    );
     event SystemAddressUpdated(address indexed account, bool enabled);
     event OperatorsConfigured(address indexed tradeRouter, address indexed dividendDistributor);
+    event LiquidityGatewayConfigured(address indexed liquidityGateway);
 
     constructor(address token_, address governance) {
         if (token_ == address(0) || governance == address(0)) revert ZeroAddress();
@@ -89,6 +118,11 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         _;
     }
 
+    modifier onlyLiquidityGateway() {
+        if (msg.sender != liquidityGateway) revert UnauthorizedLiquidityGateway(msg.sender);
+        _;
+    }
+
     function configureOperators(address tradeRouter_, address dividendDistributor_)
         external
         onlyRole(GOVERNANCE_ROLE)
@@ -102,12 +136,30 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         emit OperatorsConfigured(tradeRouter_, dividendDistributor_);
     }
 
+    function configureLiquidityGateway(address gateway_) external onlyRole(GOVERNANCE_ROLE) {
+        if (liquidityGatewayConfigured) revert LiquidityGatewayAlreadyConfigured();
+        if (gateway_ == address(0)) revert ZeroAddress();
+        if (gateway_.code.length == 0) revert AddressHasNoCode(gateway_);
+        liquidityGateway = gateway_;
+        liquidityGatewayConfigured = true;
+        emit LiquidityGatewayConfigured(gateway_);
+    }
+
     function positionOf(address account) external view override returns (Position memory) {
         return _effectiveUserPosition(account, _positions[account]);
     }
 
     function liquidityPositionOf(address account) external view override returns (Position memory) {
-        return _liquidityPositions[account];
+        uint256 tracked = lpTrackedTotal[account];
+        uint256 cost = lpCostTotal[account];
+        if (tracked == 0 && cost == 0) {
+            return Position({costWbnbWei: 0, trackedBalance: 0, status: PositionStatus.NONE});
+        }
+        return Position({costWbnbWei: cost, trackedBalance: tracked, status: PositionStatus.KNOWN});
+    }
+
+    function lpPositionFor(address account, uint256 tokenId) external view returns (Position memory) {
+        return _lpPositions[account][tokenId];
     }
 
     function proportionalCost(address account, uint256 tokenAmount)
@@ -124,27 +176,23 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         return (CostMath.proportionalFloor(p.costWbnbWei, tokenAmount, p.trackedBalance), status);
     }
 
+    // ────────────────────────────────────────────────────────────
+    // User position hooks (unchanged from original — kept stable)
+    // ────────────────────────────────────────────────────────────
+
     function recordBuy(address account, uint256 costWbnbWei, uint256 netTokenAmount)
-        external
-        override
-        onlyToken
+        external override onlyToken
     {
         if (account == address(0)) revert ZeroAddress();
         if (systemAddress[account]) revert SystemAccount();
         if (netTokenAmount == 0 || costWbnbWei == 0) revert InvalidAmount();
-
         Position memory oldP = _positions[account];
         uint256 actualAfter = IERC20(token).balanceOf(account);
         if (actualAfter < netTokenAmount) revert InvalidPositionState();
         uint256 actualBefore = actualAfter - netTokenAmount;
-
         Position memory newP;
         if (_isKnownAndConsistent(oldP, actualBefore)) {
-            newP = Position({
-                costWbnbWei: oldP.costWbnbWei + costWbnbWei,
-                trackedBalance: actualAfter,
-                status: PositionStatus.KNOWN
-            });
+            newP = Position({costWbnbWei: oldP.costWbnbWei + costWbnbWei, trackedBalance: actualAfter, status: PositionStatus.KNOWN});
         } else {
             newP = _unknownAt(actualAfter);
         }
@@ -155,19 +203,13 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         if (account == address(0)) revert ZeroAddress();
         if (systemAddress[account]) revert SystemAccount();
         if (tokenAmount == 0) revert InvalidAmount();
-
         Position memory oldP = _positions[account];
         uint256 actualAfter = IERC20(token).balanceOf(account);
         if (actualAfter < tokenAmount) revert InvalidPositionState();
         uint256 actualBefore = actualAfter - tokenAmount;
-
         Position memory newP;
         if (_isKnownAndConsistent(oldP, actualBefore)) {
-            newP = Position({
-                costWbnbWei: oldP.costWbnbWei,
-                trackedBalance: actualAfter,
-                status: PositionStatus.KNOWN
-            });
+            newP = Position({costWbnbWei: oldP.costWbnbWei, trackedBalance: actualAfter, status: PositionStatus.KNOWN});
         } else {
             newP = _unknownAt(actualAfter);
         }
@@ -183,9 +225,7 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
     }
 
     function onSystemCreditUnknown(address account, uint256 tokenAmount, bytes32 reason)
-        external
-        override
-        onlyToken
+        external override onlyToken
     {
         if (account == address(0)) revert ZeroAddress();
         if (systemAddress[account]) revert SystemAccount();
@@ -195,37 +235,32 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
     }
 
     function consumeSell(address account, uint256 tokenAmount)
-        external
-        override
-        onlyTradeRouter
+        external override onlyTradeRouter
         returns (uint256 consumedCostWbnbWei, PositionStatus previousStatus)
     {
         if (account == address(0)) revert ZeroAddress();
         if (tokenAmount == 0) revert InvalidAmount();
-
         Position memory oldP = _positions[account];
         uint256 actualAfter = IERC20(token).balanceOf(account);
         uint256 actualBefore = actualAfter + tokenAmount;
-
         if (!_isKnownAndConsistent(oldP, actualBefore)) {
             previousStatus = PositionStatus.UNKNOWN;
             _storeUser(account, oldP, _unknownAt(actualAfter), REASON_SELL);
             return (0, previousStatus);
         }
-
         previousStatus = PositionStatus.KNOWN;
         consumedCostWbnbWei = tokenAmount == oldP.trackedBalance
             ? oldP.costWbnbWei
             : CostMath.proportionalFloor(oldP.costWbnbWei, tokenAmount, oldP.trackedBalance);
         Position memory newP = actualAfter == 0
             ? _none()
-            : Position({
-                costWbnbWei: oldP.costWbnbWei - consumedCostWbnbWei,
-                trackedBalance: actualAfter,
-                status: PositionStatus.KNOWN
-            });
+            : Position({costWbnbWei: oldP.costWbnbWei - consumedCostWbnbWei, trackedBalance: actualAfter, status: PositionStatus.KNOWN});
         _storeUser(account, oldP, newP, REASON_SELL);
     }
+
+    // ────────────────────────────────────────────────────────────
+    // FIXED: UNKNOWN → KNOWN no longer poisons receiver's cost
+    // ────────────────────────────────────────────────────────────
 
     function onUserTransfer(address from, address to, uint256 tokenAmount) external override onlyToken {
         if (from == address(0) || to == address(0)) revert ZeroAddress();
@@ -240,34 +275,58 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         uint256 fromBefore = fromAfter + tokenAmount;
         uint256 toBefore = toAfter - tokenAmount;
 
-        if (!_isKnownAndConsistent(fromOld, fromBefore) || !_isKnownAndConsistent(toOld, toBefore)) {
-            _storeUser(from, fromOld, _unknownAt(fromAfter), REASON_TRANSFER);
-            _storeUser(to, toOld, _unknownAt(toAfter), REASON_TRANSFER);
-            emit CostBasisTransferred(
-                from, to, 0, tokenAmount, PositionStatus.UNKNOWN, PositionStatus.UNKNOWN
-            );
+        bool fromKnown = _isKnownAndConsistent(fromOld, fromBefore);
+        bool toKnown = _isKnownAndConsistent(toOld, toBefore);
+
+        // Case 1: BOTH known → proportional cost transfer
+        if (fromKnown && toKnown) {
+            uint256 movedCost = tokenAmount == fromOld.trackedBalance
+                ? fromOld.costWbnbWei
+                : CostMath.proportionalFloor(fromOld.costWbnbWei, tokenAmount, fromOld.trackedBalance);
+            Position memory fromNew = fromAfter == 0
+                ? _none()
+                : Position({costWbnbWei: fromOld.costWbnbWei - movedCost, trackedBalance: fromAfter, status: PositionStatus.KNOWN});
+            Position memory toNew = Position({costWbnbWei: toOld.costWbnbWei + movedCost, trackedBalance: toAfter, status: PositionStatus.KNOWN});
+            _storeUser(from, fromOld, fromNew, REASON_TRANSFER);
+            _storeUser(to, toOld, toNew, REASON_TRANSFER);
+            emit CostBasisTransferred(from, to, movedCost, tokenAmount, fromOld.status, toNew.status);
             return;
         }
 
-        uint256 movedCost = tokenAmount == fromOld.trackedBalance
-            ? fromOld.costWbnbWei
-            : CostMath.proportionalFloor(fromOld.costWbnbWei, tokenAmount, fromOld.trackedBalance);
-        Position memory fromNew = fromAfter == 0
-            ? _none()
-            : Position({
-                costWbnbWei: fromOld.costWbnbWei - movedCost,
-                trackedBalance: fromAfter,
-                status: PositionStatus.KNOWN
-            });
-        Position memory toNew = Position({
-            costWbnbWei: toOld.costWbnbWei + movedCost,
-            trackedBalance: toAfter,
-            status: PositionStatus.KNOWN
-        });
-        _storeUser(from, fromOld, fromNew, REASON_TRANSFER);
-        _storeUser(to, toOld, toNew, REASON_TRANSFER);
-        emit CostBasisTransferred(from, to, movedCost, tokenAmount, fromOld.status, toNew.status);
+        // Case 2: UNKNOWN from → KNOWN to: receiver keeps existing cost, UNKNOWN amount is zero-cost
+        if (!fromKnown && toKnown) {
+            _storeUser(from, fromOld, _unknownAt(fromAfter), REASON_TRANSFER);
+            // toOld was known before — keep cost unchanged, just update tracked balance
+            Position memory toNew = Position({costWbnbWei: toOld.costWbnbWei, trackedBalance: toAfter, status: PositionStatus.KNOWN});
+            _storeUser(to, toOld, toNew, REASON_TRANSFER);
+            emit CostBasisTransferred(from, to, 0, tokenAmount, PositionStatus.UNKNOWN, PositionStatus.KNOWN);
+            return;
+        }
+
+        // Case 3: KNOWN from → UNKNOWN to: sender proportional cost deducted, receiver unknown
+        if (fromKnown && !toKnown) {
+            uint256 movedCost = tokenAmount == fromOld.trackedBalance
+                ? fromOld.costWbnbWei
+                : CostMath.proportionalFloor(fromOld.costWbnbWei, tokenAmount, fromOld.trackedBalance);
+            Position memory fromNew = fromAfter == 0
+                ? _none()
+                : Position({costWbnbWei: fromOld.costWbnbWei - movedCost, trackedBalance: fromAfter, status: PositionStatus.KNOWN});
+            _storeUser(from, fromOld, fromNew, REASON_TRANSFER);
+            _storeUser(to, toOld, _unknownAt(toAfter), REASON_TRANSFER);
+            // movedCost is burned from accounting
+            emit CostBasisTransferred(from, to, 0, tokenAmount, PositionStatus.KNOWN, PositionStatus.UNKNOWN);
+            return;
+        }
+
+        // Case 4: BOTH unknown → both stay unknown
+        _storeUser(from, fromOld, _unknownAt(fromAfter), REASON_TRANSFER);
+        _storeUser(to, toOld, _unknownAt(toAfter), REASON_TRANSFER);
+        emit CostBasisTransferred(from, to, 0, tokenAmount, PositionStatus.UNKNOWN, PositionStatus.UNKNOWN);
     }
+
+    // ────────────────────────────────────────────────────────────
+    // LP interactions: deposit, withdrawal, fee (per-tokenId)
+    // ────────────────────────────────────────────────────────────
 
     function onLiquidityDeposit(address account, uint256 tokenAmount) external override onlyToken {
         if (account == address(0)) revert ZeroAddress();
@@ -275,38 +334,54 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         if (tokenAmount == 0) revert InvalidAmount();
 
         Position memory userOld = _positions[account];
-        Position memory liquidityOld = _liquidityPositions[account];
         uint256 actualAfter = IERC20(token).balanceOf(account);
         uint256 actualBefore = actualAfter + tokenAmount;
 
-        if (!_isKnownAndConsistent(userOld, actualBefore) || liquidityOld.status == PositionStatus.UNKNOWN) {
+        if (_isKnownAndConsistent(userOld, actualBefore)) {
+            uint256 movedCost = tokenAmount == userOld.trackedBalance
+                ? userOld.costWbnbWei
+                : CostMath.proportionalFloor(userOld.costWbnbWei, tokenAmount, userOld.trackedBalance);
+            Position memory userNew = actualAfter == 0
+                ? _none()
+                : Position({costWbnbWei: userOld.costWbnbWei - movedCost, trackedBalance: actualAfter, status: PositionStatus.KNOWN});
+            _storeUser(account, userOld, userNew, REASON_LIQUIDITY_DEPOSIT);
+            _pendingLpTokens[account] = tokenAmount;
+            _pendingLpCost[account] = movedCost;
+            // Aggregate LP totals track the full pending deposit until bindLpTokenId settles
+            lpTrackedTotal[account] += tokenAmount;
+            lpCostTotal[account] += movedCost;
+        } else {
             _storeUser(account, userOld, _unknownAt(actualAfter), REASON_LIQUIDITY_DEPOSIT);
-            Position memory liquidityUnknown = Position({
-                costWbnbWei: 0,
-                trackedBalance: liquidityOld.trackedBalance + tokenAmount,
-                status: PositionStatus.UNKNOWN
-            });
-            _storeLiquidity(account, liquidityOld, liquidityUnknown, REASON_LIQUIDITY_DEPOSIT);
-            return;
+            _pendingLpTokens[account] = 0;
+            _pendingLpCost[account] = 0;
         }
+    }
 
-        uint256 movedCost = tokenAmount == userOld.trackedBalance
-            ? userOld.costWbnbWei
-            : CostMath.proportionalFloor(userOld.costWbnbWei, tokenAmount, userOld.trackedBalance);
-        Position memory userNew = actualAfter == 0
-            ? _none()
-            : Position({
-                costWbnbWei: userOld.costWbnbWei - movedCost,
-                trackedBalance: actualAfter,
-                status: PositionStatus.KNOWN
-            });
-        Position memory liquidityNew = Position({
-            costWbnbWei: liquidityOld.costWbnbWei + movedCost,
-            trackedBalance: liquidityOld.trackedBalance + tokenAmount,
-            status: PositionStatus.KNOWN
-        });
-        _storeUser(account, userOld, userNew, REASON_LIQUIDITY_DEPOSIT);
-        _storeLiquidity(account, liquidityOld, liquidityNew, REASON_LIQUIDITY_DEPOSIT);
+    /// @dev Called after mint to bind actual tokenUsed and cost to a tokenId.
+    ///      LP cost comes from user's PANGU acquisition cost (pending deposit), NEVER from wbnbUsed.
+    function bindLpTokenId(address account, uint256 tokenId, uint256 tokenUsed, uint256 wbnbUsed)
+        external onlyLiquidityGateway
+    {
+        if (account == address(0) || tokenId == 0) revert ZeroAddress();
+        if (tokenUsed == 0) revert InvalidAmount();
+        if (_lpPositions[account][tokenId].trackedBalance != 0) revert InvalidPositionState();
+
+        uint256 totalDeposited = _pendingLpTokens[account];
+        uint256 totalPendingCost = _pendingLpCost[account];
+        delete _pendingLpTokens[account];
+        delete _pendingLpCost[account];
+
+        if (totalDeposited == 0 || totalPendingCost == 0) return;
+
+        // LP cost is proportional to tokenUsed out of totalDeposited (the rest stays in lpCostTotal for refund)
+        uint256 lpCost = tokenUsed == totalDeposited
+            ? totalPendingCost
+            : CostMath.proportionalFloor(totalPendingCost, tokenUsed, totalDeposited);
+
+        Position memory lpPos = Position({costWbnbWei: lpCost, trackedBalance: tokenUsed, status: PositionStatus.KNOWN});
+        _lpPositions[account][tokenId] = lpPos;
+        // Aggregate totals already set in onLiquidityDeposit; this just creates the per-tokenId position
+        emit LpPositionChanged(account, tokenId, 0, lpCost, 0, tokenUsed, PositionStatus.NONE, PositionStatus.KNOWN, REASON_LIQUIDITY_DEPOSIT);
     }
 
     function onLiquidityWithdrawal(address account, uint256 tokenAmount) external override onlyToken {
@@ -315,55 +390,124 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         if (tokenAmount == 0) revert InvalidAmount();
 
         Position memory userOld = _positions[account];
-        Position memory liquidityOld = _liquidityPositions[account];
         uint256 actualAfter = IERC20(token).balanceOf(account);
         if (actualAfter < tokenAmount) revert InvalidPositionState();
         uint256 actualBefore = actualAfter - tokenAmount;
 
-        uint256 returnedTracked = tokenAmount > liquidityOld.trackedBalance
-            ? liquidityOld.trackedBalance
-            : tokenAmount;
-        bool exactKnownPath = _isKnownAndConsistent(userOld, actualBefore)
-            && liquidityOld.status != PositionStatus.UNKNOWN
-            && returnedTracked == tokenAmount;
+        bool knownUser = _isKnownAndConsistent(userOld, actualBefore);
 
-        if (!exactKnownPath) {
-            Position memory liquidityNewUnknown = _consumeUnknownLiquidity(liquidityOld, returnedTracked);
+        if (!knownUser) {
             _storeUser(account, userOld, _unknownAt(actualAfter), REASON_LIQUIDITY_WITHDRAWAL);
-            _storeLiquidity(account, liquidityOld, liquidityNewUnknown, REASON_LIQUIDITY_WITHDRAWAL);
             return;
         }
 
-        uint256 returnedCost = returnedTracked == liquidityOld.trackedBalance
-            ? liquidityOld.costWbnbWei
-            : CostMath.proportionalFloor(
-                liquidityOld.costWbnbWei, returnedTracked, liquidityOld.trackedBalance
-            );
-        Position memory liquidityNew = liquidityOld.trackedBalance == returnedTracked
-            ? _none()
-            : Position({
-                costWbnbWei: liquidityOld.costWbnbWei - returnedCost,
-                trackedBalance: liquidityOld.trackedBalance - returnedTracked,
+        // Principal withdrawal: move tracked LP balance down
+        uint256 returnedTracked = tokenAmount;
+        if (returnedTracked > lpTrackedTotal[account]) returnedTracked = lpTrackedTotal[account];
+
+        if (returnedTracked > 0) {
+            uint256 returnedCost = returnedTracked == lpTrackedTotal[account]
+                ? lpCostTotal[account]
+                : CostMath.proportionalFloor(lpCostTotal[account], returnedTracked, lpTrackedTotal[account]);
+
+            lpTrackedTotal[account] -= returnedTracked;
+            lpCostTotal[account] -= returnedCost;
+
+            Position memory userNew = actualAfter == 0
+                ? _none()
+                : Position({costWbnbWei: userOld.costWbnbWei + returnedCost, trackedBalance: actualAfter, status: PositionStatus.KNOWN});
+            _storeUser(account, userOld, userNew, REASON_LIQUIDITY_WITHDRAWAL);
+        } else {
+            Position memory userNew = Position({costWbnbWei: userOld.costWbnbWei, trackedBalance: actualAfter, status: PositionStatus.KNOWN});
+            _storeUser(account, userOld, userNew, REASON_LIQUIDITY_WITHDRAWAL);
+        }
+    }
+
+    /// @dev Consumes a specific LP position by tokenId (full exit — clears it).
+    function consumeLpTokenId(address account, uint256 tokenId, uint256 actualTokenReturned)
+        external onlyLiquidityGateway
+        returns (uint256 clearedTracked, uint256 clearedCost)
+    {
+        Position memory lpPos = _lpPositions[account][tokenId];
+        if (lpPos.trackedBalance == 0) return (0, 0);
+
+        clearedTracked = lpPos.trackedBalance;
+        clearedCost = lpPos.costWbnbWei;
+
+        // Track LP loss if actual returned < tracked
+        if (actualTokenReturned < clearedTracked) {
+            uint256 lost = clearedTracked - actualTokenReturned;
+            uint256 lostCost = CostMath.proportionalFloor(clearedCost, lost, clearedTracked);
+            emit LpLossRecorded(account, tokenId, lost, lostCost);
+            // Only clear up to what we can account for
+            clearedTracked = actualTokenReturned;
+            clearedCost = clearedCost > lostCost ? clearedCost - lostCost : 0;
+        }
+
+        // Remove this specific tokenId
+        delete _lpPositions[account][tokenId];
+        if (lpTrackedTotal[account] >= clearedTracked) lpTrackedTotal[account] -= clearedTracked;
+        if (lpCostTotal[account] >= clearedCost) lpCostTotal[account] -= clearedCost;
+
+        emit LpPositionChanged(account, tokenId, lpPos.costWbnbWei, 0, lpPos.trackedBalance, 0, lpPos.status, PositionStatus.NONE, REASON_LIQUIDITY_WITHDRAWAL);
+    }
+
+    /// @dev Migrate LP cost when NFT ownership transfers.
+    function migrateLpCost(address from, address to, uint256 tokenId)
+        external onlyLiquidityGateway
+        returns (uint256 costWbnbWei, uint256 trackedTokens)
+    {
+        Position memory lpPos = _lpPositions[from][tokenId];
+        costWbnbWei = lpPos.costWbnbWei;
+        trackedTokens = lpPos.trackedBalance;
+        if (trackedTokens == 0) return (0, 0);
+
+        delete _lpPositions[from][tokenId];
+        _lpPositions[to][tokenId] = lpPos;
+
+        if (lpTrackedTotal[from] >= trackedTokens) lpTrackedTotal[from] -= trackedTokens;
+        if (lpCostTotal[from] >= costWbnbWei) lpCostTotal[from] -= costWbnbWei;
+        lpTrackedTotal[to] += trackedTokens;
+        lpCostTotal[to] += costWbnbWei;
+
+        emit LpCostMigrated(from, to, tokenId, costWbnbWei, trackedTokens);
+    }
+
+    /// @dev Fee collection: ZERO COST — never moves LP principal or cost.
+    function onLiquidityFeeCollection(address account, uint256 tokenAmount) external override onlyToken {
+        if (account == address(0)) revert ZeroAddress();
+        if (tokenAmount == 0) return;
+
+        Position memory userOld = _positions[account];
+        uint256 actualAfter = IERC20(token).balanceOf(account);
+        if (actualAfter < tokenAmount) revert InvalidPositionState();
+        uint256 actualBefore = actualAfter - tokenAmount;
+
+        // Keep existing cost unchanged — fees are zero-cost
+        if (_isKnownAndConsistent(userOld, actualBefore)) {
+            Position memory userNew = Position({
+                costWbnbWei: userOld.costWbnbWei,
+                trackedBalance: actualAfter,
                 status: PositionStatus.KNOWN
             });
-        Position memory userNew = Position({
-            costWbnbWei: userOld.costWbnbWei + returnedCost,
-            trackedBalance: actualAfter,
-            status: PositionStatus.KNOWN
-        });
-        _storeUser(account, userOld, userNew, REASON_LIQUIDITY_WITHDRAWAL);
-        _storeLiquidity(account, liquidityOld, liquidityNew, REASON_LIQUIDITY_WITHDRAWAL);
+            _storeUser(account, userOld, userNew, REASON_LIQUIDITY_FEE);
+        } else {
+            _storeUser(account, userOld, _unknownAt(actualAfter), REASON_LIQUIDITY_FEE);
+        }
     }
 
     function setSystemAddress(address account, bool enabled) external override onlyToken {
         if (account == address(0)) revert ZeroAddress();
-        if (
-            enabled
-                && (_positions[account].trackedBalance != 0 || _liquidityPositions[account].trackedBalance != 0)
-        ) revert SystemAccount();
+        if (enabled && (_positions[account].trackedBalance != 0 || lpTrackedTotal[account] != 0)) {
+            revert SystemAccount();
+        }
         systemAddress[account] = enabled;
         emit SystemAddressUpdated(account, enabled);
     }
+
+    // ────────────────────────────────────────────────────────────
+    // Internal helpers
+    // ────────────────────────────────────────────────────────────
 
     function _effectiveUserPosition(address account, Position memory stored) private view returns (Position memory) {
         uint256 actual = IERC20(token).balanceOf(account);
@@ -378,19 +522,6 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         return p.trackedBalance == actualBalance && p.status == PositionStatus.KNOWN;
     }
 
-    function _consumeUnknownLiquidity(Position memory oldP, uint256 amount)
-        private
-        pure
-        returns (Position memory)
-    {
-        if (amount >= oldP.trackedBalance) return _none();
-        return Position({
-            costWbnbWei: 0,
-            trackedBalance: oldP.trackedBalance - amount,
-            status: PositionStatus.UNKNOWN
-        });
-    }
-
     function _unknownAt(uint256 actualBalance) private pure returns (Position memory) {
         if (actualBalance == 0) return _none();
         return Position({costWbnbWei: 0, trackedBalance: actualBalance, status: PositionStatus.UNKNOWN});
@@ -403,31 +534,7 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
     function _storeUser(address account, Position memory oldP, Position memory newP, bytes32 reason) private {
         _validate(newP);
         _positions[account] = newP;
-        emit PositionChanged(
-            account,
-            oldP.costWbnbWei,
-            newP.costWbnbWei,
-            oldP.trackedBalance,
-            newP.trackedBalance,
-            oldP.status,
-            newP.status,
-            reason
-        );
-    }
-
-    function _storeLiquidity(address account, Position memory oldP, Position memory newP, bytes32 reason) private {
-        _validate(newP);
-        _liquidityPositions[account] = newP;
-        emit LiquidityPositionChanged(
-            account,
-            oldP.costWbnbWei,
-            newP.costWbnbWei,
-            oldP.trackedBalance,
-            newP.trackedBalance,
-            oldP.status,
-            newP.status,
-            reason
-        );
+        emit PositionChanged(account, oldP.costWbnbWei, newP.costWbnbWei, oldP.trackedBalance, newP.trackedBalance, oldP.status, newP.status, reason);
     }
 
     function _validate(Position memory p) private pure {

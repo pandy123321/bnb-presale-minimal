@@ -169,7 +169,8 @@ contract DeployPangu2 is Script {
             c.emergency
         );
         d.liquidityGateway = new Pangu2LiquidityGateway(
-            address(d.token), c.wbnb, c.positionManager, PANCAKE_FEE_TIER
+            address(d.token), c.wbnb, c.positionManager, address(d.costBasis),
+            PANCAKE_FEE_TIER, c.deployer, c.emergency
         );
         d.governanceAdapter = new GovernanceAdapter(address(d.timelock));
 
@@ -279,6 +280,9 @@ contract DeployPangu2 is Script {
             address(d.liquidityGateway), TransferContext.Kind.LIQUIDITY_WITHDRAWAL, true
         );
         d.token.setSystemTransferContext(
+            address(d.liquidityGateway), TransferContext.Kind.LIQUIDITY_FEE_COLLECTION, true
+        );
+        d.token.setSystemTransferContext(
             address(d.distributor), TransferContext.Kind.DIVIDEND_CLAIM, true
         );
         d.token.setSystemTransferContext(
@@ -287,6 +291,7 @@ contract DeployPangu2 is Script {
         d.token.grantRole(d.token.SETTLEMENT_ROLE(), address(d.tradeRouter));
 
         d.costBasis.configureOperators(address(d.tradeRouter), address(d.distributor));
+        d.costBasis.configureLiquidityGateway(address(d.liquidityGateway));
         d.adapter.setCaller(address(d.tradeRouter), true);
         d.adapter.setCaller(address(d.feeVault), true);
         d.adapter.setCaller(address(d.supportPool), true);
@@ -304,6 +309,7 @@ contract DeployPangu2 is Script {
         _handoffFeeVault(d.feeVault, timelock, deployer);
         _handoffDistributor(d.distributor, timelock, deployer);
         _handoffTradeRouter(d.tradeRouter, timelock, deployer);
+        _handoffGateway(d.liquidityGateway, timelock, deployer);
         d.timelock.renounceRole(d.timelock.DEFAULT_ADMIN_ROLE(), deployer);
     }
 
@@ -439,6 +445,15 @@ contract DeployPangu2 is Script {
     }
 
     function _handoffTradeRouter(Pangu2TradeRouter c, address timelock, address deployer) private {
+        c.grantRole(c.DEFAULT_ADMIN_ROLE(), timelock);
+        c.grantRole(c.GOVERNANCE_ROLE(), timelock);
+        c.grantRole(c.UNPAUSER_ROLE(), timelock);
+        c.renounceRole(c.UNPAUSER_ROLE(), deployer);
+        c.renounceRole(c.GOVERNANCE_ROLE(), deployer);
+        c.renounceRole(c.DEFAULT_ADMIN_ROLE(), deployer);
+    }
+
+    function _handoffGateway(Pangu2LiquidityGateway c, address timelock, address deployer) private {
         c.grantRole(c.DEFAULT_ADMIN_ROLE(), timelock);
         c.grantRole(c.GOVERNANCE_ROLE(), timelock);
         c.grantRole(c.UNPAUSER_ROLE(), timelock);

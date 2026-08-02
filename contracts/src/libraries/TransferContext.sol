@@ -10,7 +10,10 @@ library TransferContext {
         BUY_SETTLEMENT,
         SELL_ENTRY,
         LIQUIDITY_DEPOSIT,
+        /// @dev LP principal withdrawal — tracked cost moves from LP to user.
         LIQUIDITY_WITHDRAWAL,
+        /// @dev LP fee collection — ZERO COST, never moves LP principal or cost.
+        LIQUIDITY_FEE_COLLECTION,
         DIVIDEND_CLAIM,
         SYSTEM_CREDIT_UNKNOWN
     }

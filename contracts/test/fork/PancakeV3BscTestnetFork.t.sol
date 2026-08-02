@@ -109,7 +109,7 @@ contract PancakeV3BscTestnetForkTest is Test {
         tradeRouter = new Pangu2TradeRouter(
             address(token), WBNB, address(costBasis), address(adapter), address(oracle), address(this), EMERGENCY
         );
-        liquidityGateway = new Pangu2LiquidityGateway(address(token), WBNB, POSITION_MANAGER, FEE_TIER);
+        liquidityGateway = new Pangu2LiquidityGateway(address(token), WBNB, POSITION_MANAGER, address(costBasis), FEE_TIER, address(this), EMERGENCY);
 
         token.configureCore(address(costBasis), address(feeVault));
         token.setPair(poolAddress, true);
@@ -123,6 +123,9 @@ contract PancakeV3BscTestnetForkTest is Test {
             address(liquidityGateway), TransferContext.Kind.LIQUIDITY_WITHDRAWAL, true
         );
         token.setSystemTransferContext(
+            address(liquidityGateway), TransferContext.Kind.LIQUIDITY_FEE_COLLECTION, true
+        );
+        token.setSystemTransferContext(
             address(distributor), TransferContext.Kind.DIVIDEND_CLAIM, true
         );
         token.setSystemTransferContext(
@@ -130,6 +133,8 @@ contract PancakeV3BscTestnetForkTest is Test {
         );
         token.grantRole(token.SETTLEMENT_ROLE(), address(tradeRouter));
         costBasis.configureOperators(address(tradeRouter), address(distributor));
+        costBasis.configureLiquidityGateway(address(liquidityGateway));
+        costBasis.configureLiquidityGateway(address(liquidityGateway));
         adapter.setCaller(address(tradeRouter), true);
         adapter.setCaller(address(feeVault), true);
         adapter.setCaller(address(supportPool), true);
