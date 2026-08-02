@@ -33,27 +33,28 @@ type DisplayState = "IN_PROGRESS" | "APPROVAL_REQUIRED" | "CONFIRMED" | "FAILED"
 const displayState = computed<DisplayState>(() => {
   const { chainTxState, approvalState, phase } = props;
 
+  // Chain on-chain fact first
   if (chainTxState === ChainTxState.CONFIRMED) return "CONFIRMED";
   if (chainTxState === ChainTxState.FAILED)    return "FAILED";
   if (chainTxState === ChainTxState.REORGED)   return "REORGED";
   if (chainTxState === ChainTxState.DROPPED)   return "DROPPED";
   if (chainTxState === ChainTxState.REPLACED)  return "REPLACED";
 
+  // Approval terminal states
   if (approvalState === ApprovalState.REJECTED) return "REJECTED";
   if (approvalState === ApprovalState.FAILED)   return "FAILED";
+
+  // Phase terminal fallback
+  if (phase === "CONFIRMED") return "CONFIRMED";
+  if (phase === "FAILED")    return "FAILED";
+  if (phase === "REJECTED")  return "REJECTED";
 
   if (phase === "APPROVAL_REQUIRED") return "APPROVAL_REQUIRED";
 
   return "IN_PROGRESS";
 });
 
-const show = computed(() =>
-  props.phase !== "NOT_STARTED" ||
-  displayState.value === "FAILED" ||
-  displayState.value === "CONFIRMED" ||
-  displayState.value === "REORGED" ||
-  displayState.value === "REJECTED"
-);
+const show = computed(() => props.phase !== "NOT_STARTED" || isTerminal.value);
 
 const isTerminal = computed(() =>
   displayState.value === "CONFIRMED" ||
