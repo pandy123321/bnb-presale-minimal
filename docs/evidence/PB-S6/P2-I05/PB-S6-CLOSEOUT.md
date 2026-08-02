@@ -3,7 +3,7 @@
 - **Phase:** PB-S6 (Staging & Integration)
 - **Date:** 2026-08-02
 - **Scope:** P2-I01, P2-I04, P2-I05
-- **Status:** PENDING TESTNET DEPLOYMENT
+- **Status:** **PB-S6 IN_PROGRESS** ⚠ — Gate PENDING, Evidence PENDING, Sign-off PENDING
 
 ## 1. Task Summary
 
