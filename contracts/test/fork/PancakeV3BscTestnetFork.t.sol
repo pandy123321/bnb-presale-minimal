@@ -134,7 +134,6 @@ contract PancakeV3BscTestnetForkTest is Test {
         token.grantRole(token.SETTLEMENT_ROLE(), address(tradeRouter));
         costBasis.configureOperators(address(tradeRouter), address(distributor));
         costBasis.configureLiquidityGateway(address(liquidityGateway));
-        costBasis.configureLiquidityGateway(address(liquidityGateway));
         adapter.setCaller(address(tradeRouter), true);
         adapter.setCaller(address(feeVault), true);
         adapter.setCaller(address(supportPool), true);
