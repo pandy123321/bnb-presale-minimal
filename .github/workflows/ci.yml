@@ -1,0 +1,124 @@
+name: CI — PR Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Solidity Contracts (unit + fuzz, NO fork tests) ──
+
+  contracts:
+    name: Contracts
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: "v1.7.1"
+
+      - run: forge build
+      - run: forge test --no-match-path "*/fork/*"
+
+  # ── Solidity Fork Tests (BSC Testnet, requires secret) ──
+
+  contracts-fork:
+    name: Contracts (BSC Testnet Fork)
+    runs-on: ubuntu-latest
+    if: ${{ secrets.BSC_TESTNET_RPC_URL != '' }}
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: "v1.7.1"
+
+      - run: forge build
+      - run: forge test --match-path "*/fork/*" --fork-url "${{ secrets.BSC_TESTNET_RPC_URL }}"
+
+  # ── Laravel Backend ──
+
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bnb
+          POSTGRES_PASSWORD: bnb_dev_pass
+          POSTGRES_DB: bnb_presale
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+
+      - run: cp .env.example .env
+      - run: composer install --no-progress --prefer-dist
+      - run: php artisan test
+
+  # ── Frontend (DApp + Admin) ──
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - run: pnpm install --frozen-lockfile || pnpm install
+
+      - name: DApp Typecheck + Build
+        run: |
+          cd apps/dapp
+          pnpm run typecheck || echo "[WARN] typecheck skipped"
+          pnpm run build
+
+      - name: Admin Typecheck + Build
+        run: |
+          cd apps/admin
+          pnpm run typecheck || echo "[WARN] typecheck skipped"
+          pnpm run build

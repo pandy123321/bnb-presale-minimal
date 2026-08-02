@@ -8,19 +8,29 @@ contracts/lcov.info
 
 # Node dependencies
 contracts/node_modules/
+apps/dapp/node_modules/
+apps/admin/node_modules/
+packages/api-types/node_modules/
+packages/mock-api/node_modules/
+packages/schema-validator/node_modules/
+services/chain-worker/node_modules/
+
+# Frontend build output
+apps/dapp/dist/
+apps/admin/dist/
 
 # Local secrets and transient logs
 .env
 .env.*
 !.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
 *.log
 .tmp/
 
 # Laravel / Backend
 backend/vendor/
-backend/.env
-backend/.env.*
-!backend/.env.example
 backend/storage/*.key
 backend/storage/framework/cache/data/
 backend/storage/framework/sessions/*
@@ -36,6 +46,10 @@ backend/public/storage
 
 # Docker
 docker/pgdata/
+
+# Archive artifacts (never committed)
+*.tar.gz
+*.zip
 
 # OS/editor
 .DS_Store
