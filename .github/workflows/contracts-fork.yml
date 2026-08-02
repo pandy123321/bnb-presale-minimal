@@ -1,15 +1,18 @@
-name: CI â€?Contracts Fork Gate
+name: CI - Contracts Fork Gate
 
 on:
   pull_request:
     branches: [main]
     paths:
-      - "contracts/src/**"
-      - "contracts/test/fork/**"
-      - "contracts/lib/**"
-      - "contracts/foundry.toml"
+      - "contracts/**"
+      - "config/testnet/FORK_CONFIG.txt"
+      - ".github/workflows/contracts-fork.yml"
   push:
     branches: [main]
+    paths:
+      - "contracts/**"
+      - "config/testnet/FORK_CONFIG.txt"
+      - ".github/workflows/contracts-fork.yml"
   workflow_dispatch:
 
 permissions:
@@ -19,7 +22,7 @@ jobs:
   contracts-fork:
     name: Contracts (BSC Testnet Fork)
     runs-on: ubuntu-latest
-    environment: bsc-testnet
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: contracts
@@ -32,34 +35,63 @@ jobs:
         with:
           version: "v1.7.1"
 
+      - name: Read fork config
+        id: config
+        run: |
+          FORK_BLOCK="$(sed -n 's/^FORK_BLOCK=//p' ../config/testnet/FORK_CONFIG.txt)"
+          test -n "$FORK_BLOCK" || { echo "ERROR: FORK_BLOCK not found in config/testnet/FORK_CONFIG.txt"; exit 1; }
+          case "$FORK_BLOCK" in
+            ''|*[!0-9]*) echo "ERROR: FORK_BLOCK is not a valid integer"; exit 1 ;;
+          esac
+          echo "fork_block=$FORK_BLOCK" >> "$GITHUB_OUTPUT"
+          echo "Config fork block: $FORK_BLOCK"
+
       - name: Validate fork environment
         env:
           FORK_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
-          FORK_BLOCK: ${{ vars.BSC_TESTNET_FORK_BLOCK }}
+          FORK_BLOCK: ${{ steps.config.outputs.fork_block }}
         run: |
           test -n "$FORK_URL" || {
-            echo "ERROR: BSC_TESTNET_RPC_URL secret is not configured in the bsc-testnet environment."
-            echo "Fork tests are a required gate. Configure this secret in GitHub repo Settings â†?Environments â†?bsc-testnet."
-            exit 1
-          }
-          test -n "$FORK_BLOCK" || {
-            echo "ERROR: BSC_TESTNET_FORK_BLOCK variable is not configured in the bsc-testnet environment."
-            echo "Fork tests require a fixed, approved block number from config/testnet/FORK_CONFIG.txt."
+            echo "ERROR: BSC_TESTNET_RPC_URL environment secret is not configured."
+            echo "Configure this secret in GitHub Settings -> Secrets and variables -> Actions."
+            echo "Use a public BSC Testnet RPC (no API key) to avoid credential exposure risk."
             exit 1
           }
           echo "Fork URL configured."
+          echo "Fork block (from config/testnet/FORK_CONFIG.txt): $FORK_BLOCK"
+
+      - name: Verify chain and block
+        env:
+          FORK_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
+          FORK_BLOCK: ${{ steps.config.outputs.fork_block }}
+        run: |
+          echo "=== Fork Verification ==="
+          echo "PR commit: ${{ github.event.pull_request.head.sha || github.sha }}"
+          echo "Checkout SHA: $(git rev-parse HEAD)"
+
+          CHAIN_ID="$(cast chain-id --rpc-url "$FORK_URL" 2>&1)"
+          test "$CHAIN_ID" = "97" || {
+            echo "ERROR: Expected chain 97 (BSC Testnet), got: $CHAIN_ID"
+            exit 1
+          }
+          echo "Chain ID: $CHAIN_ID (BSC Testnet)"
+
+          BLOCK_INFO="$(cast block "$FORK_BLOCK" --rpc-url "$FORK_URL" --json 2>&1)"
+          BLOCK_HASH="$(echo "$BLOCK_INFO" | grep -o '"hash":"[^"]*"' | head -1 | cut -d'"' -f4)"
+          test -n "$BLOCK_HASH" || {
+            echo "ERROR: Block $FORK_BLOCK not found on chain $CHAIN_ID"
+            exit 1
+          }
           echo "Fork block: $FORK_BLOCK"
-        shell: bash
+          echo "Block hash: $BLOCK_HASH"
 
       - run: forge build
 
       - name: Run fork tests
         env:
           FORK_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
-          FORK_BLOCK: ${{ vars.BSC_TESTNET_FORK_BLOCK }}
+          FORK_BLOCK: ${{ steps.config.outputs.fork_block }}
         run: |
-          echo "Chain ID: $(cast chain-id --rpc-url "$FORK_URL" 2>/dev/null || echo 'unreachable')"
-          echo "Fork block: $FORK_BLOCK"
           forge test \
             --match-path "*/fork/*" \
             --fork-url "$FORK_URL" \

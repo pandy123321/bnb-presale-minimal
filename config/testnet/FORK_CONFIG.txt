@@ -1,8 +1,8 @@
-# BSC Testnet Fork Configuration
-# Block: 44780000 (2026-08-01 candidate — verify in PancakeV3BscTestnetFork.t.sol before finalizing)
+# BSC Testnet Fork Block - Canonical Source
+# This file is the single authoritative source for the fork block number used in CI fork tests.
+# The CI workflow reads this file directly; no GitHub Variable or Secret contains a fork block number.
 # 
-# This block number serves as the canonical fork point for CI fork tests.
-# Update this file when a new approved fork block replaces the current one.
-# The same value must be configured as BSC_TESTNET_FORK_BLOCK GitHub secret.
+# Update this file and commit to change the fork point. Fork tests in CI will automatically use the new value.
+# The RPC URL is configured separately as a GitHub Actions secret (BSC_TESTNET_RPC_URL).
 
 FORK_BLOCK=44780000

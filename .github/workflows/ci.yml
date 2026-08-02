@@ -1,4 +1,4 @@
-name: CI â€?PR Gate
+name: CI - PR Gate
 
 on:
   pull_request:
