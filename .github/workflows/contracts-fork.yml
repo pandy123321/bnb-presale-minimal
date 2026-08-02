@@ -39,61 +39,99 @@ jobs:
         id: config
         run: |
           FORK_BLOCK="$(sed -n 's/^FORK_BLOCK=//p' ../config/testnet/FORK_CONFIG.txt)"
+          FORK_RPC="$(sed -n 's/^FORK_RPC=//p' ../config/testnet/FORK_CONFIG.txt)"
+
           test -n "$FORK_BLOCK" || { echo "ERROR: FORK_BLOCK not found in config/testnet/FORK_CONFIG.txt"; exit 1; }
           case "$FORK_BLOCK" in
             ''|*[!0-9]*) echo "ERROR: FORK_BLOCK is not a valid integer"; exit 1 ;;
           esac
           echo "fork_block=$FORK_BLOCK" >> "$GITHUB_OUTPUT"
-          echo "Config fork block: $FORK_BLOCK"
 
-      - name: Validate fork environment
-        env:
-          FORK_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
-          FORK_BLOCK: ${{ steps.config.outputs.fork_block }}
-        run: |
-          test -n "$FORK_URL" || {
-            echo "ERROR: BSC_TESTNET_RPC_URL environment secret is not configured."
-            echo "Configure this secret in GitHub Settings -> Secrets and variables -> Actions."
-            echo "Use a public BSC Testnet RPC (no API key) to avoid credential exposure risk."
-            exit 1
-          }
-          echo "Fork URL configured."
-          echo "Fork block (from config/testnet/FORK_CONFIG.txt): $FORK_BLOCK"
+          test -n "$FORK_RPC" || { echo "ERROR: FORK_RPC not found in config/testnet/FORK_CONFIG.txt"; exit 1; }
+          echo "fork_rpc=$FORK_RPC" >> "$GITHUB_OUTPUT"
+
+          echo "Config fork block: $FORK_BLOCK"
 
       - name: Verify chain and block
         env:
-          FORK_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
+          FORK_RPC: ${{ steps.config.outputs.fork_rpc }}
           FORK_BLOCK: ${{ steps.config.outputs.fork_block }}
         run: |
           echo "=== Fork Verification ==="
           echo "PR commit: ${{ github.event.pull_request.head.sha || github.sha }}"
           echo "Checkout SHA: $(git rev-parse HEAD)"
 
-          CHAIN_ID="$(cast chain-id --rpc-url "$FORK_URL" 2>&1)"
+          if ! CHAIN_ID="$(cast chain-id --rpc-url "$FORK_RPC" 2>&1)"; then
+            echo "ERROR: RPC unreachable: $CHAIN_ID"
+            exit 1
+          fi
           test "$CHAIN_ID" = "97" || {
             echo "ERROR: Expected chain 97 (BSC Testnet), got: $CHAIN_ID"
             exit 1
           }
           echo "Chain ID: $CHAIN_ID (BSC Testnet)"
 
-          BLOCK_INFO="$(cast block "$FORK_BLOCK" --rpc-url "$FORK_URL" --json 2>&1)"
-          BLOCK_HASH="$(echo "$BLOCK_INFO" | grep -o '"hash":"[^"]*"' | head -1 | cut -d'"' -f4)"
+          if ! BLOCK_INFO="$(cast block "$FORK_BLOCK" --rpc-url "$FORK_RPC" --json 2>&1)"; then
+            echo "ERROR: Failed to read block $FORK_BLOCK: $BLOCK_INFO"
+            exit 1
+          fi
+          BLOCK_HASH="$(printf '%s' "$BLOCK_INFO" | jq -er '.hash')" || {
+            echo "ERROR: Block $FORK_BLOCK not found or JSON parse failed"
+            exit 1
+          }
           test -n "$BLOCK_HASH" || {
-            echo "ERROR: Block $FORK_BLOCK not found on chain $CHAIN_ID"
+            echo "ERROR: Block hash is empty for block $FORK_BLOCK"
             exit 1
           }
           echo "Fork block: $FORK_BLOCK"
           echo "Block hash: $BLOCK_HASH"
 
+          echo "fork_block_hash=$BLOCK_HASH" >> "$GITHUB_OUTPUT"
+
       - run: forge build
 
       - name: Run fork tests
         env:
-          FORK_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
+          FORK_RPC: ${{ steps.config.outputs.fork_rpc }}
           FORK_BLOCK: ${{ steps.config.outputs.fork_block }}
         run: |
           forge test \
             --match-path "*/fork/*" \
-            --fork-url "$FORK_URL" \
+            --fork-url "$FORK_RPC" \
             --fork-block-number "$FORK_BLOCK" \
             -vvv
+
+      - name: Upload fork evidence
+        if: always()
+        env:
+          FORK_BLOCK: ${{ steps.config.outputs.fork_block }}
+          FORK_BLOCK_HASH: ${{ steps.config.outputs.fork_block_hash }}
+        run: |
+          mkdir -p ../docs/evidence/PB-S6/P2-I03/
+
+          jq -n \
+            --arg eventSha "${{ github.event.pull_request.head.sha || github.sha }}" \
+            --arg checkoutSha "$(git rev-parse HEAD)" \
+            --arg chainId "97" \
+            --arg forkBlock "$FORK_BLOCK" \
+            --arg forkBlockHash "${FORK_BLOCK_HASH:-}" \
+            --arg foundryVersion "v1.7.1" \
+            --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{
+              event_sha: $eventSha,
+              checkout_sha: $checkoutSha,
+              chain_id: $chainId,
+              fork_block: $forkBlock,
+              fork_block_hash: $forkBlockHash,
+              foundry_version: $foundryVersion,
+              timestamp: $timestamp
+            }' > ../docs/evidence/PB-S6/P2-I03/fork-evidence.json
+
+          echo "Evidence written."
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fork-evidence
+          path: docs/evidence/PB-S6/P2-I03/fork-evidence.json
+          retention-days: 90
