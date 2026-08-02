@@ -44,6 +44,13 @@ export class NetworkError extends Error {
   }
 }
 
+export class RequestCancelledError extends Error {
+  constructor() {
+    super("Request was cancelled.");
+    this.name = "RequestCancelledError";
+  }
+}
+
 // ── Client State ───────────────────────────
 
 export interface ClientState {
@@ -95,7 +102,7 @@ class Pangu2ApiClient {
       });
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === "AbortError") {
-        throw new NetworkError("Request was cancelled.");
+        throw new RequestCancelledError();
       }
       throw new NetworkError(
         err instanceof Error ? err.message : "Network request failed."

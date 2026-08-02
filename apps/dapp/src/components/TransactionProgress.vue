@@ -30,23 +30,40 @@ const emit = defineEmits<{ close: []; recover: [] }>();
 
 const show = computed(() => props.phase !== "NOT_STARTED");
 
-const phaseLabels: Partial<Record<TxPhase, string>> = {
-  FETCHING_QUOTE: "Fetching quote...",
-  APPROVAL_CHECK: "Checking approval...",
-  APPROVAL_REQUIRED: "Approval needed",
-  APPROVAL_SIGNING: "Sign approval...",
-  APPROVAL_SUBMITTED: "Approval submitted",
-  APPROVAL_CONFIRMING: "Confirming approval...",
-  APPROVAL_DONE: "Approval confirmed",
-  SIGNING: "Sign transaction...",
-  SUBMITTING: "Broadcasting...",
-  PENDING: "Pending confirmation...",
-  CONFIRMED: "Confirmed",
-  FAILED: "Failed",
-  REJECTED: "Rejected",
-};
+/** Compute display label from chainTxState + approvalState (not just phase). */
+const displayLabel = computed(() => {
+  const { chainTxState, approvalState, phase } = props;
 
-const label = computed(() => phaseLabels[props.phase] ?? props.phase);
+  // ChainTxState is authoritative for terminal states
+  if (chainTxState === ChainTxState.FAILED) return "Failed";
+  if (chainTxState === ChainTxState.REORGED) return "Reorged — please check";
+  if (chainTxState === ChainTxState.DROPPED) return "Dropped — no longer in mempool";
+  if (chainTxState === ChainTxState.REPLACED) return "Replaced by another tx";
+  if (chainTxState === ChainTxState.CONFIRMED) return "Confirmed";
+
+  // Approval states
+  if (approvalState === ApprovalState.REJECTED) return "Approval rejected";
+  if (approvalState === ApprovalState.FAILED) return "Approval failed";
+
+  // Phase-based labels for in-progress
+  const m: Partial<Record<TxPhase, string>> = {
+    FETCHING_QUOTE: "Fetching quote...",
+    APPROVAL_CHECK: "Checking approval...",
+    APPROVAL_REQUIRED: "Approval needed",
+    APPROVAL_SIGNING: "Sign approval...",
+    APPROVAL_SUBMITTED: "Approval submitted",
+    APPROVAL_CONFIRMING: "Confirming approval...",
+    APPROVAL_DONE: "Approval confirmed",
+    SIGNING: "Sign transaction...",
+    SUBMITTING: "Broadcasting...",
+    PENDING: "Pending confirmation...",
+    READY: "Ready",
+    REJECTED: "Rejected",
+    FAILED: "Failed",
+    CONFIRMED: "Confirmed",
+  };
+  return m[phase] ?? phase;
+});
 
 const barPct = computed(() => {
   const m: Partial<Record<TxPhase, string>> = {
@@ -73,7 +90,7 @@ const link = computed(() =>
         <button v-if="phase==='CONFIRMED'||phase==='FAILED'||phase==='REJECTED'"
           class="tx-close" @click="emit('close')">✕</button>
         <div class="tx-header">
-          <span class="tx-status" :class="{ok:phase==='CONFIRMED',danger:phase==='FAILED',warn:phase==='REJECTED'}">{{ label }}</span>
+          <span class="tx-status" :class="{ok:displayLabel==='Confirmed',danger:displayLabel.includes('Failed')||displayLabel.includes('Dropped'),warn:displayLabel.includes('Rejected')||displayLabel.includes('Replaced')||displayLabel.includes('Reorged')}">{{ displayLabel }}</span>
         </div>
         <div v-if="phase!=='CONFIRMED'&&phase!=='FAILED'&&phase!=='REJECTED'" class="bar-wrap">
           <div class="bar anim" :style="{width:barPct}" />

@@ -6,7 +6,7 @@
 import { ref, type Ref, onUnmounted } from "vue";
 import type { EnvelopeMeta } from "@pangu2/api-types";
 import { DataStatus } from "@pangu2/api-types";
-import { apiClient, ApiError, NetworkError, SchemaVersionError } from "@/api/client";
+import { apiClient, ApiError, NetworkError, SchemaVersionError, RequestCancelledError } from "@/api/client";
 import type { ClientState } from "@/api/client";
 
 export interface AsyncDataState<T> {
@@ -86,7 +86,7 @@ export function useAsyncData<T>(
 
       return true;
     } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === "AbortError") {
+      if (err instanceof RequestCancelledError || (err instanceof DOMException && err.name === "AbortError")) {
         state.value.isLoading = false;
         return false;
       }
