@@ -18,11 +18,11 @@ jobs:
       run:
         working-directory: contracts
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           submodules: recursive
 
-      - uses: foundry-rs/foundry-toolchain@v1
+      - uses: foundry-rs/foundry-toolchain@8f1998e9878d786675189ef566a2e4bf24869773
         with:
           version: "v1.7.1"
 
@@ -69,9 +69,9 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@cf4c1e7f2e5b8e9c6d7a3f0b2e1c4d8a5f6e7c9d
         with:
           php-version: "8.4"
 
@@ -116,13 +116,13 @@ jobs:
     name: Frontend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@f31e1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f
         with:
           version: "10.34.5"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@cddd736ef542bbd0b8e86a305cfe0aadcbe17fc5
         with:
           node-version: 22
           cache: "pnpm"
@@ -149,13 +149,13 @@ jobs:
     name: Shared Packages
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@f31e1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f
         with:
           version: "10.34.5"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@cddd736ef542bbd0b8e86a305cfe0aadcbe17fc5
         with:
           node-version: 22
           cache: "pnpm"
@@ -195,13 +195,13 @@ jobs:
     name: Chain Worker
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@f31e1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f
         with:
           version: "10.34.5"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@cddd736ef542bbd0b8e86a305cfe0aadcbe17fc5
         with:
           node-version: 22
           cache: "pnpm"
