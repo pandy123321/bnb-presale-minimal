@@ -27,11 +27,11 @@ jobs:
       run:
         working-directory: contracts
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - uses: foundry-rs/foundry-toolchain@8f1998e9878d786675189ef566a2e4bf24869773  # v1.3.1
+      - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: "v1.7.1"
 
@@ -43,18 +43,18 @@ jobs:
           FORK_BLOCK="$(sed -n 's/^FORK_BLOCK=//p' ../config/testnet/FORK_CONFIG.txt)"
           EXPECTED_HASH="$(sed -n 's/^FORK_BLOCK_HASH=//p' ../config/testnet/FORK_CONFIG.txt)"
 
-          test -n "$FORK_RPC" || { echo "ERROR: FORK_RPC not found"; exit 1; }
-          test -n "$FORK_CHAIN_ID" || { echo "ERROR: FORK_CHAIN_ID not found"; exit 1; }
-          test -n "$FORK_BLOCK" || { echo "ERROR: FORK_BLOCK not found"; exit 1; }
+          test -n "$FORK_RPC" || { echo "ERROR: FORK_RPC missing"; exit 1; }
+          test -n "$FORK_CHAIN_ID" || { echo "ERROR: FORK_CHAIN_ID missing"; exit 1; }
+          test -n "$FORK_BLOCK" || { echo "ERROR: FORK_BLOCK missing"; exit 1; }
           test -n "$EXPECTED_HASH" || { echo "ERROR: FORK_BLOCK_HASH not configured"; exit 1; }
 
           case "$FORK_BLOCK" in ''|*[!0-9]*) echo "ERROR: FORK_BLOCK invalid"; exit 1 ;; esac
           case "$FORK_CHAIN_ID" in ''|*[!0-9]*) echo "ERROR: FORK_CHAIN_ID invalid"; exit 1 ;; esac
-          case "$EXPECTED_HASH" in
-            0x[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F])
-              ;;
-            *) echo "ERROR: FORK_BLOCK_HASH must be 0x + 64 hex chars"; exit 1 ;;
-          esac
+
+          if ! printf '%s' "$EXPECTED_HASH" | grep -Eq '^0x[0-9a-fA-F]{64}$'; then
+            echo "ERROR: FORK_BLOCK_HASH must be 0x + 64 hex characters"
+            exit 1
+          fi
 
           echo "fork_rpc=$FORK_RPC" >> "$GITHUB_OUTPUT"
           echo "fork_chain_id=$FORK_CHAIN_ID" >> "$GITHUB_OUTPUT"
@@ -72,40 +72,33 @@ jobs:
           echo "=== Fork Verification ==="
           echo "PR commit: ${{ github.event.pull_request.head.sha || github.sha }}"
 
-          # Retry helper for RPC calls (public endpoints may need retries)
-          retry() {
-            local name="$1" url="$2" max=3 delay=2
-            local i=0 out=""
-            for i in $(seq 1 $max); do
-              out="$(cast "$@" --rpc-url "$url" 2>&1)" && echo "$out" && return 0
-              echo "RPC retry $i/$max for $name..."
-              sleep $delay
-              delay=$((delay * 2))
+          cast_retry() {
+            local name="$1" url="$2"; shift 2
+            local max=3 delay=2 attempt output
+            for attempt in $(seq 1 "$max"); do
+              output="$(cast "$@" --rpc-url "$url" 2>&1)" && { printf '%s' "$output"; return 0; }
+              printf 'RPC retry %s/%s for %s\n' "$attempt" "$max" "$name" >&2
+              sleep "$delay"; delay=$((delay * 2))
             done
-            echo "ERROR: RPC failed after $max retries for $name" >&2
-            return 1
+            printf 'ERROR: RPC failed after %s retries\n' "$max" >&2; return 1
           }
 
-          if ! CHAIN_ID="$(retry chain-id "$FORK_RPC" chain-id 2>&1)"; then
-            echo "ERROR: RPC unreachable: $CHAIN_ID"
-            exit 1
+          if ! CHAIN_ID="$(cast_retry chain-id "$FORK_RPC" chain-id)"; then
+            echo "ERROR: RPC unreachable"; exit 1
           fi
           test "$CHAIN_ID" = "$FORK_CHAIN_ID" || {
-            echo "ERROR: Expected chain $FORK_CHAIN_ID, got: $CHAIN_ID"
-            exit 1
+            echo "ERROR: Expected chain $FORK_CHAIN_ID, got $CHAIN_ID"; exit 1
           }
           echo "Chain ID: $CHAIN_ID"
           echo "actual_chain_id=$CHAIN_ID" >> "$GITHUB_OUTPUT"
 
-          if ! BLOCK_INFO="$(retry block "$FORK_RPC" block "$FORK_BLOCK" --json 2>&1)"; then
-            echo "ERROR: Failed to read block $FORK_BLOCK: $BLOCK_INFO"
-            exit 1
+          if ! BLOCK_INFO="$(cast_retry block "$FORK_RPC" block "$FORK_BLOCK" --json)"; then
+            echo "ERROR: Block $FORK_BLOCK not reachable"; exit 1
           fi
           ACTUAL_HASH="$(printf '%s' "$BLOCK_INFO" | jq -er '.hash')" || {
-            echo "ERROR: Block $FORK_BLOCK not found or JSON parse failed"
-            exit 1
+            echo "ERROR: Block $FORK_BLOCK not found"; exit 1
           }
-          test -n "$ACTUAL_HASH" || { echo "ERROR: Block hash empty for $FORK_BLOCK"; exit 1; }
+          test -n "$ACTUAL_HASH" || { echo "ERROR: Empty block hash"; exit 1; }
 
           ACTUAL_LOWER="$(printf '%s' "$ACTUAL_HASH" | tr '[:upper:]' '[:lower:]')"
           EXPECTED_LOWER="$(printf '%s' "$EXPECTED_HASH" | tr '[:upper:]' '[:lower:]')"
@@ -113,11 +106,9 @@ jobs:
           HASH_OK="false"
           if [ "$ACTUAL_LOWER" = "$EXPECTED_LOWER" ]; then
             HASH_OK="true"
-            echo "Block hash matches: $ACTUAL_HASH"
+            echo "Block hash match: $ACTUAL_HASH"
           else
-            echo "ERROR: Fork block hash mismatch"
-            echo "Expected: $EXPECTED_HASH"
-            echo "Actual:   $ACTUAL_HASH"
+            echo "ERROR: Hash mismatch. Expected $EXPECTED_HASH, got $ACTUAL_HASH"
             exit 1
           fi
 
@@ -134,37 +125,49 @@ jobs:
           FORK_RPC: ${{ steps.config.outputs.fork_rpc }}
           FORK_BLOCK: ${{ steps.config.outputs.fork_block }}
         run: |
-          set -o pipefail
+          set +e -o pipefail
+
           forge test \
             --match-path "*/fork/*" \
             --fork-url "$FORK_RPC" \
             --fork-block-number "$FORK_BLOCK" \
             -vvv 2>&1 | tee fork-test.log
+          FORGE_STATUS=${PIPESTATUS[0]}
 
-          # Parse test counts
-          DISCOVERED=$(grep -c 'test' fork-test.log 2>/dev/null || echo 0)
-          PASSED=$(grep -c '\[PASS\]' fork-test.log 2>/dev/null || echo 0)
-          FAILED=$(grep -c '\[FAIL' fork-test.log 2>/dev/null || echo 0)
+          set -e
 
-          # Fail if zero tests found
-          if [ "$FAILED" -gt 0 ]; then
-            echo "fork_tests_failed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "fork_tests_failed=false" >> "$GITHUB_OUTPUT"
-          fi
+          # Count test results
+          PASSED="$(grep -c '\[PASS\]' fork-test.log || true)"
+          FAILED="$(grep -c '\[FAIL' fork-test.log || true)"
+          PASSED="${PASSED## }"; PASSED="${PASSED%% }"
+          FAILED="${FAILED## }"; FAILED="${FAILED%% }"
+          case "$PASSED$FAILED" in
+            *[!0-9]*) echo "ERROR: Invalid test count values"; echo "tests_discovered=0" >> "$GITHUB_OUTPUT"; exit 1 ;;
+          esac
+          DISCOVERED=$(( "$PASSED" + "$FAILED" ))
+
           echo "tests_discovered=$DISCOVERED" >> "$GITHUB_OUTPUT"
           echo "tests_passed=$PASSED" >> "$GITHUB_OUTPUT"
           echo "tests_failed=$FAILED" >> "$GITHUB_OUTPUT"
+
+          # Check for "No tests found" in output
+          if grep -Fq "No tests found" fork-test.log; then
+            echo "ERROR: No fork tests matched. Gate fails closed."
+            exit 1
+          fi
 
           if [ "$DISCOVERED" -eq 0 ]; then
             echo "ERROR: Zero fork tests discovered. Gate fails closed."
             exit 1
           fi
 
+          exit "$FORGE_STATUS"
+
       - name: Upload fork evidence
         if: always()
         env:
           EVENT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
           EXPECTED_HASH: ${{ steps.config.outputs.expected_hash }}
           ACTUAL_HASH: ${{ steps.verify.outputs.actual_hash }}
           HASH_MATCH: ${{ steps.verify.outputs.hash_match }}
@@ -184,14 +187,15 @@ jobs:
           FOUNDRY_VER="$(forge --version 2>/dev/null || echo 'unknown')"
           CHECKOUT_SHA="$(git rev-parse HEAD)"
 
-          # Compute test log hash if log exists
           TEST_LOG_SHA256=""
           if [ -f fork-test.log ]; then
             TEST_LOG_SHA256="$(sha256sum fork-test.log | cut -d' ' -f1)"
           fi
 
           ALL_PASS="false"
-          if [ "${VERIFY_OUTCOME:-}" = "success" ] && [ "${BUILD_OUTCOME:-}" = "success" ] && [ "${TEST_OUTCOME:-}" = "success" ]; then
+          if [ "${VERIFY_OUTCOME:-}" = "success" ] \
+            && [ "${BUILD_OUTCOME:-}" = "success" ] \
+            && [ "${TEST_OUTCOME:-}" = "success" ]; then
             ALL_PASS="true"
           fi
 
@@ -204,6 +208,7 @@ jobs:
             --arg forkBlock "${FORK_BLOCK:-}" \
             --arg foundryVersion "$FOUNDRY_VER" \
             --arg eventSha "$EVENT_SHA" \
+            --arg baseSha "${BASE_SHA:-}" \
             --arg checkoutSha "$CHECKOUT_SHA" \
             --arg verifyOutcome "${VERIFY_OUTCOME:-skipped}" \
             --arg buildOutcome "${BUILD_OUTCOME:-skipped}" \
@@ -228,6 +233,7 @@ jobs:
               fork_block: $forkBlock,
               foundry_version: $foundryVersion,
               event_sha: $eventSha,
+              base_sha: $baseSha,
               checkout_sha: $checkoutSha,
               verify_status: $verifyOutcome,
               build_status: $buildOutcome,
