@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  # ══�?Solidity Contracts (unit + fuzz, NO fork) ══�?
+  # ══�?Solidity Contracts (unit + fuzz, NO fork) ══�?
   contracts:
     name: Contracts
     runs-on: ubuntu-latest
@@ -30,7 +30,35 @@ jobs:
       - run: forge build
       - run: forge test --no-match-path "*/fork/*"
 
-  # ══�?Laravel Backend ══�?
+  contracts-fork:
+    name: Contracts (Fork BSC Testnet)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: "v1.7.1"
+      - name: Read fork config
+        id: fork-config
+        run: |
+          source ../config/testnet/FORK_CONFIG.txt
+          echo "rpc=$FORK_RPC" >> "$GITHUB_OUTPUT"
+          echo "block=$FORK_BLOCK" >> "$GITHUB_OUTPUT"
+      - name: Forge build
+        run: forge build
+      - name: Fork test (fixed block)
+        env:
+          BSC_TESTNET_RPC_URL: ${{ steps.fork-config.outputs.rpc }}
+          BSC_TESTNET_FORK_BLOCK: ${{ steps.fork-config.outputs.block }}
+        run: forge test --match-path "test/fork/**" -vvv
+
+  # ══�?Laravel Backend ══�?
   backend:
     name: Backend
     runs-on: ubuntu-latest
@@ -111,7 +139,7 @@ jobs:
       - run: php artisan migrate:fresh --env=testing --force
       - run: php artisan test
 
-  # ══�?Frontend (DApp + Admin) ══�?
+  # ══�?Frontend (DApp + Admin) ══�?
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
@@ -144,7 +172,7 @@ jobs:
           pnpm run test
           pnpm run build
 
-  # ══�?Shared Packages Tests ══�?
+  # ══�?Shared Packages Tests ══�?
   packages:
     name: Shared Packages
     runs-on: ubuntu-latest
@@ -190,7 +218,7 @@ jobs:
           cd packages/schema-validator
           pnpm run validate
 
-  # ══�?Chain Worker Tests ══�?
+  # ══�?Chain Worker Tests ══�?
   chain-worker:
     name: Chain Worker
     runs-on: ubuntu-latest

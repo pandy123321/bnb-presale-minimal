@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
+import {IPancakeFactory} from "../src/interfaces/IPancakeV2.sol";
 import {Pangu2Token} from "../src/Pangu2Token.sol";
 import {CostBasisManager} from "../src/CostBasisManager.sol";
 import {PancakeV2Adapter} from "../src/adapters/PancakeV2Adapter.sol";
@@ -33,6 +34,19 @@ contract DeployPangu2 is Script {
         emergencyAccount = vm.envAddress("EMERGENCY_ADDRESS");
         keeper = vm.envAddress("KEEPER_ADDRESS");
         releaseRecipient = vm.envAddress("RELEASE_RECIPIENT_ADDRESS");
+
+        if (block.chainid != 97 && block.chainid != 56) revert("Unsupported chain");
+        require(WBNB.code.length > 0, "WBNB not deployed");
+        require(FACTORY.code.length > 0, "Factory not deployed");
+        require(ROUTER.code.length > 0, "Router not deployed");
+
+        address[] memory roles = new address[](4);
+        roles[0] = governance; roles[1] = emergencyAccount; roles[2] = keeper; roles[3] = releaseRecipient;
+        for (uint256 i = 0; i < roles.length; i++) {
+            for (uint256 j = i + 1; j < roles.length; j++) {
+                require(roles[i] != roles[j], "duplicate role address");
+            }
+        }
 
         vm.startBroadcast();
 
@@ -71,6 +85,13 @@ contract DeployPangu2 is Script {
         costBasis.configureOperators(address(tradeRouter), address(distributor));
         costBasis.configureLiquidityGateway(address(adapter));
 
+        // Sync CostBasisManager system addresses with Token
+        costBasis.setSystemAddress(address(tradeRouter), true);
+        costBasis.setSystemAddress(address(adapter), true);
+        costBasis.setSystemAddress(address(supportPool), true);
+        costBasis.setSystemAddress(address(locker), true);
+        costBasis.setSystemAddress(address(distributor), true);
+
         adapter.setCaller(address(tradeRouter), true);
         adapter.setCaller(address(feeVault), true);
         adapter.setCaller(address(supportPool), true);
@@ -95,9 +116,18 @@ contract DeployPangu2 is Script {
     }
 
     function createV2Pair(address token) internal returns (address) {
-        // Call PancakeFactory.createPair to create the V2 liquidity pool
-        (bool ok, bytes memory data) = FACTORY.call(abi.encodeWithSignature("createPair(address,address)", token, WBNB));
-        require(ok, "createPair failed");
-        return abi.decode(data, (address));
+        bytes memory payload = abi.encodeWithSignature("createPair(address,address)", token, WBNB);
+        (bool ok, bytes memory data) = FACTORY.call(payload);
+        if (!ok) {
+            if (data.length > 0) {
+                assembly { revert(add(data, 0x20), mload(data)) }
+            }
+            revert("createPair reverted");
+        }
+        address pair = abi.decode(data, (address));
+        require(pair != address(0), "createPair returned zero");
+        require(pair.code.length > 0, "Pair has no code");
+        require(IPancakeFactory(FACTORY).getPair(token, WBNB) == pair, "getPair mismatch");
+        return pair;
     }
 }

@@ -4,14 +4,14 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - "contracts/**"
+      - "contracts/**|contracts-v2/**"
       - "config/testnet/FORK_CONFIG.txt"
       - "config/mainnet/FORK_CONFIG.txt"
       - ".github/workflows/contracts-fork.yml"
   push:
     branches: [main]
     paths:
-      - "contracts/**"
+      - "contracts/**|contracts-v2/**"
       - "config/testnet/FORK_CONFIG.txt"
       - "config/mainnet/FORK_CONFIG.txt"
       - ".github/workflows/contracts-fork.yml"

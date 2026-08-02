@@ -6,8 +6,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ICostBasisManager} from "./interfaces/ICostBasisManager.sol";
 import {CostMath} from "./libraries/CostMath.sol";
 
-/// @notice Tracks user token cost in WBNB wei and per-tokenId liquidity positions.
+/// @notice Tracks user token cost in WBNB wei and LP liquidity positions.
 /// @dev UNKNOWN is fail-closed and never becomes KNOWN through an administrator operation.
+///      V2 fork note: retains V3-style tokenId-based LP position tracking.
+///      This model will be refactored to match V2 ERC-20 LP tokens in a future iteration.
 contract CostBasisManager is AccessControl, ICostBasisManager {
     bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
 
@@ -29,7 +31,7 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
 
     // Per-user position (aggregate)
     mapping(address => Position) private _positions;
-    // Per-tokenId LP position — keyed by (owner, tokenId) to avoid enumeration issues
+    // Per-tokenId LP position — keyed by (owner, tokenId) to avoid enumeration issues (V3 model retained for V2 MVP)
     mapping(address => mapping(uint256 => Position)) private _lpPositions;
     // Track per-owner LP totals
     mapping(address => uint256) public lpTrackedTotal;
