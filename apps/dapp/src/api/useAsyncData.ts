@@ -53,8 +53,8 @@ export function useAsyncData<T>(
 
   let controller: AbortController | null = null;
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
+  let requestVersion = 0;
 
-  /** Abort any in-flight request */
   function cancel(): void {
     if (controller) {
       controller.abort();
@@ -62,8 +62,8 @@ export function useAsyncData<T>(
     }
   }
 
-  /** Execute the fetch. Returns true on success. */
   async function execute(): Promise<boolean> {
+    const version = ++requestVersion;
     cancel();
 
     controller = new AbortController();
@@ -77,6 +77,8 @@ export function useAsyncData<T>(
     try {
       const result = await fetchFn(signal);
 
+      if (version !== requestVersion) return false;
+
       state.value.data = result.data;
       state.value.meta = result.meta;
       state.value.dataStatus = result.meta.data_status;
@@ -86,6 +88,8 @@ export function useAsyncData<T>(
 
       return true;
     } catch (err: unknown) {
+      if (version !== requestVersion) return false;
+
       if (err instanceof RequestCancelledError || (err instanceof DOMException && err.name === "AbortError")) {
         state.value.isLoading = false;
         return false;

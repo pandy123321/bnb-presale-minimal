@@ -28,47 +28,67 @@ const props = withDefaults(
 
 const emit = defineEmits<{ close: []; recover: [] }>();
 
-const show = computed(() => props.phase !== "NOT_STARTED");
+type DisplayState = "IN_PROGRESS" | "APPROVAL_REQUIRED" | "CONFIRMED" | "FAILED" | "REJECTED" | "DROPPED" | "REPLACED" | "REORGED";
 
-/** Compute display label from chainTxState + approvalState (not just phase). */
-const displayLabel = computed(() => {
+const displayState = computed<DisplayState>(() => {
   const { chainTxState, approvalState, phase } = props;
 
-  // ChainTxState is authoritative for terminal states
-  if (chainTxState === ChainTxState.FAILED) return "Failed";
-  if (chainTxState === ChainTxState.REORGED) return "Reorged — please check";
-  if (chainTxState === ChainTxState.DROPPED) return "Dropped — no longer in mempool";
-  if (chainTxState === ChainTxState.REPLACED) return "Replaced by another tx";
-  if (chainTxState === ChainTxState.CONFIRMED) return "Confirmed";
+  if (chainTxState === ChainTxState.CONFIRMED) return "CONFIRMED";
+  if (chainTxState === ChainTxState.FAILED)    return "FAILED";
+  if (chainTxState === ChainTxState.REORGED)   return "REORGED";
+  if (chainTxState === ChainTxState.DROPPED)   return "DROPPED";
+  if (chainTxState === ChainTxState.REPLACED)  return "REPLACED";
 
-  // Approval states
-  if (approvalState === ApprovalState.REJECTED) return "Approval rejected";
-  if (approvalState === ApprovalState.FAILED) return "Approval failed";
+  if (approvalState === ApprovalState.REJECTED) return "REJECTED";
+  if (approvalState === ApprovalState.FAILED)   return "FAILED";
 
-  // Phase-based labels for in-progress
-  const m: Partial<Record<TxPhase, string>> = {
-    FETCHING_QUOTE: "Fetching quote...",
-    APPROVAL_CHECK: "Checking approval...",
-    APPROVAL_REQUIRED: "Approval needed",
-    APPROVAL_SIGNING: "Sign approval...",
-    APPROVAL_SUBMITTED: "Approval submitted",
-    APPROVAL_CONFIRMING: "Confirming approval...",
-    APPROVAL_DONE: "Approval confirmed",
-    SIGNING: "Sign transaction...",
-    SUBMITTING: "Broadcasting...",
-    PENDING: "Pending confirmation...",
-    READY: "Ready",
-    REJECTED: "Rejected",
-    FAILED: "Failed",
-    CONFIRMED: "Confirmed",
-  };
-  return m[phase] ?? phase;
+  if (phase === "APPROVAL_REQUIRED") return "APPROVAL_REQUIRED";
+
+  return "IN_PROGRESS";
 });
 
+const show = computed(() =>
+  props.phase !== "NOT_STARTED" ||
+  displayState.value === "FAILED" ||
+  displayState.value === "CONFIRMED" ||
+  displayState.value === "REORGED" ||
+  displayState.value === "REJECTED"
+);
+
+const isTerminal = computed(() =>
+  displayState.value === "CONFIRMED" ||
+  displayState.value === "FAILED" ||
+  displayState.value === "REORGED" ||
+  displayState.value === "DROPPED" ||
+  displayState.value === "REPLACED" ||
+  displayState.value === "REJECTED"
+);
+
+const displayLabel = computed(() => {
+  const m: Record<DisplayState, string> = {
+    IN_PROGRESS: props.phase === "PENDING" ? "Pending confirmation..." : props.phase === "SIGNING" ? "Sign transaction..." : props.phase === "SUBMITTING" ? "Broadcasting..." : "Processing...",
+    APPROVAL_REQUIRED: "Approval needed",
+    CONFIRMED: "Confirmed",
+    FAILED: "Failed",
+    REJECTED: "Rejected",
+    DROPPED: "Dropped — no longer in mempool",
+    REPLACED: "Replaced by another tx",
+    REORGED: "Reorged — please check",
+  };
+  return m[displayState.value] ?? props.phase;
+});
+
+const statusClass = computed(() => ({
+  ok: displayState.value === "CONFIRMED",
+  danger: ["FAILED", "DROPPED"].includes(displayState.value),
+  warn: ["REJECTED", "REPLACED", "REORGED"].includes(displayState.value),
+}));
+
 const barPct = computed(() => {
+  if (isTerminal.value) return "100%";
   const m: Partial<Record<TxPhase, string>> = {
     FETCHING_QUOTE: "15%", APPROVAL_SIGNING: "40%", APPROVAL_SUBMITTED: "55%",
-    SIGNING: "70%", SUBMITTING: "85%", PENDING: "92%", CONFIRMED: "100%",
+    SIGNING: "70%", SUBMITTING: "85%", PENDING: "92%",
   };
   return m[props.phase] ?? "10%";
 });
@@ -87,12 +107,11 @@ const link = computed(() =>
   <Transition name="tx-fade">
     <div v-if="show" class="tx-overlay">
       <div class="tx-panel">
-        <button v-if="phase==='CONFIRMED'||phase==='FAILED'||phase==='REJECTED'"
-          class="tx-close" @click="emit('close')">✕</button>
+        <button v-if="isTerminal" class="tx-close" @click="emit('close')">✕</button>
         <div class="tx-header">
-          <span class="tx-status" :class="{ok:displayLabel==='Confirmed',danger:displayLabel.includes('Failed')||displayLabel.includes('Dropped'),warn:displayLabel.includes('Rejected')||displayLabel.includes('Replaced')||displayLabel.includes('Reorged')}">{{ displayLabel }}</span>
+          <span class="tx-status" :class="statusClass">{{ displayLabel }}</span>
         </div>
-        <div v-if="phase!=='CONFIRMED'&&phase!=='FAILED'&&phase!=='REJECTED'" class="bar-wrap">
+        <div v-if="!isTerminal" class="bar-wrap">
           <div class="bar anim" :style="{width:barPct}" />
         </div>
         <div v-if="sellTxHash" class="tx-info">
@@ -101,9 +120,9 @@ const link = computed(() =>
         </div>
         <div v-if="blockNumber" class="tx-info">Block: #{{ blockNumber }}</div>
         <div v-if="error" class="tx-err" :class="{rec:errorRecoverable}">{{ error }}</div>
-        <div class="tx-actions" v-if="errorRecoverable||phase==='APPROVAL_REQUIRED'">
-          <button class="btn" :class="phase==='APPROVAL_REQUIRED'?'pri':'warn'" @click="emit('recover')">
-            {{ phase==='APPROVAL_REQUIRED'?'Approve':'Retry' }}</button>
+        <div class="tx-actions" v-if="errorRecoverable||displayState==='APPROVAL_REQUIRED'">
+          <button class="btn" :class="displayState==='APPROVAL_REQUIRED'?'pri':'warn'" @click="emit('recover')">
+            {{ displayState==='APPROVAL_REQUIRED'?'Approve':'Retry' }}</button>
           <button class="btn sec" @click="emit('close')">Cancel</button>
         </div>
       </div>

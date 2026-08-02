@@ -3,6 +3,7 @@ export {
   ApiError,
   SchemaVersionError,
   NetworkError,
+  RequestCancelledError,
 } from "./client";
 export type { ClientState } from "./client";
 export { useAsyncData, fetchGet, fetchPost } from "./useAsyncData";
