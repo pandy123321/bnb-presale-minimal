@@ -234,11 +234,28 @@ app.get("/api/v1/projects/pangu2/locker/batches", (_req, res) => {
 });
 
 // ── Admin ──
+const MOCK_ADMIN = {
+  id: 1,
+  name: "Super Admin",
+  email: "admin@pangu2.io",
+  role: "SUPER_ADMIN" as const,
+};
+
 app.post("/admin-api/v1/projects/pangu2/auth/login", (_req, res) => {
   res.json(envelope({
     token: "admin-session-token",
-    admin: { id: 1, name: "Super Admin", email: "admin@pangu2.io", role: "SUPER_ADMIN" },
+    admin: MOCK_ADMIN,
   }));
+});
+
+// Required by Admin router guard (checkSession) after refresh / navigation
+app.get("/admin-api/v1/projects/pangu2/auth/me", (req, res) => {
+  const auth = req.headers.authorization ?? "";
+  if (!auth.startsWith("Bearer ")) {
+    res.status(401).json({ data: null, meta: envelope(null).meta, error: { code: "UNAUTHORIZED", message: "Missing bearer token" } });
+    return;
+  }
+  res.json(envelope(MOCK_ADMIN));
 });
 
 app.get("/admin-api/v1/projects/pangu2/dashboard", (_req, res) => {
@@ -255,22 +272,33 @@ app.get("/admin-api/v1/projects/pangu2/dashboard", (_req, res) => {
 
 app.get("/admin-api/v1/projects/pangu2/contracts", (_req, res) => {
   res.json(envelope([
-    { name: "BNBPresale", address: "0xaaa", abi_version: "1.0.0", deployment_block: "42000000", status: "ACTIVE" },
+    { name: "BNBPresale", address: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", abi_version: "1.0.0", deployment_block: "42000000", status: "ACTIVE" },
+    { name: "Distributor", address: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", abi_version: "1.0.0", deployment_block: "42000001", status: "ACTIVE" },
+    { name: "BuybackLocker", address: "0xcccccccccccccccccccccccccccccccccccccccc", abi_version: "1.0.0", deployment_block: "42000002", status: "ACTIVE" },
   ]));
 });
 
 app.get("/admin-api/v1/projects/pangu2/jobs", (_req, res) => {
   res.json(envelope([
-    { name: "chain-sync", status: "RUNNING", last_run: new Date().toISOString(), errors: 0 },
-    { name: "dividend-snapshot", status: "IDLE", last_run: "2026-08-01T00:00:00Z", errors: 0 },
-    { name: "buyback-watcher", status: "RUNNING", last_run: new Date().toISOString(), errors: 0 },
+    { name: "chain-sync", status: "RUNNING", run_id: "run-chain-sync-001", last_error: null, processed: 1284, errors: 0, last_run: new Date().toISOString() },
+    { name: "dividend-snapshot", status: "IDLE", run_id: "run-dividend-001", last_error: null, processed: 28, errors: 0, last_run: "2026-08-01T00:00:00Z" },
+    { name: "buyback-watcher", status: "RUNNING", run_id: "run-buyback-001", last_error: null, processed: 1247, errors: 0, last_run: new Date().toISOString() },
   ]));
 });
 
 app.get("/admin-api/v1/projects/pangu2/audit-logs", (_req, res) => {
   res.json({
     data: [
-      { id: 1, admin: "admin@pangu2.io", action: "price.update", target: "token_per_bnb", result: "success", timestamp: new Date().toISOString() },
+      {
+        id: 1,
+        action: "JOB_RETRY_QUEUED",
+        target_type: "job:chain-sync",
+        admin_email: "admin@pangu2.io",
+        admin_role: "SUPER_ADMIN",
+        ip_address: "127.0.0.1",
+        result: "SUCCESS",
+        created_at: new Date().toISOString(),
+      },
     ],
     meta: { ...envelope([]).meta, current_page: 1, per_page: 20, total: 1, last_page: 1 },
     error: null,

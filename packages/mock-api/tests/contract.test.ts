@@ -259,6 +259,13 @@ describe("Admin API", () => {
     validateEnvelope(env, "/admin/auth/login");
   });
 
+  it("GET /admin/auth/me", async () => {
+    const env = await fetchEnvelope<unknown>("/admin-api/v1/projects/pangu2/auth/me", {
+      headers: { Authorization: "Bearer admin-session-token" },
+    });
+    validateEnvelope(env, "/admin/auth/me");
+  });
+
   it("GET /admin/dashboard", async () => {
     const env = await fetchEnvelope<unknown>("/admin-api/v1/projects/pangu2/dashboard");
     validateEnvelope(env, "/admin/dashboard");

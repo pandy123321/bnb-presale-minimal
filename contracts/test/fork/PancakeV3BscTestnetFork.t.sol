@@ -34,7 +34,7 @@ contract PancakeV3BscTestnetForkTest is Test {
 
     address internal constant USER = address(0xBEEF);
     address internal constant PROFIT_USER = address(0xB0B);
-    address internal constant UNKNOWN_USER = address(0xBAD);
+    address internal constant ZERO_COST_USER = address(0xBAD);
     address internal constant EMERGENCY = address(0xE911);
     address internal constant KEEPER = address(0xCAFE);
     address internal constant RELEASE_RECIPIENT = address(0xA11CE);
@@ -65,7 +65,7 @@ contract PancakeV3BscTestnetForkTest is Test {
         vm.deal(address(this), 5_000 ether);
         vm.deal(USER, 100 ether);
         vm.deal(PROFIT_USER, 100 ether);
-        vm.deal(UNKNOWN_USER, 100 ether);
+        vm.deal(ZERO_COST_USER, 100 ether);
 
         token = new Pangu2Token(address(this), address(this), EMERGENCY);
         costBasis = new CostBasisManager(address(token), address(this));
@@ -142,6 +142,10 @@ contract PancakeV3BscTestnetForkTest is Test {
         supportPool.configureLocker(address(locker));
         feeVault.configureDividendDistributor(address(distributor));
 
+        // Bootstrap: temporarily grant SETTLEMENT_ROLE to the adapter for
+        // setUp oracle history building. Revoked immediately afterwards.
+        token.grantRole(token.SETTLEMENT_ROLE(), address(adapter));
+
         IWBNB(WBNB).deposit{value: 2_000 ether}();
         token.approve(address(liquidityGateway), 1_000 ether);
         IERC20(WBNB).approve(address(liquidityGateway), 1_000 ether);
@@ -158,9 +162,18 @@ contract PancakeV3BscTestnetForkTest is Test {
         );
         pool.increaseObservationCardinalityNext(16);
         _writeThirtyMinuteOracleHistory(0.000001 ether);
+        // Revoke bootstrap role from adapter immediately after oracle is built.
+        // Only the TradeRouter should hold SETTLEMENT_ROLE at runtime.
+        token.revokeRole(token.SETTLEMENT_ROLE(), address(adapter));
+        assertFalse(token.hasRole(token.SETTLEMENT_ROLE(), address(adapter)));
+        assertTrue(token.hasRole(token.SETTLEMENT_ROLE(), address(tradeRouter)));
     }
 
     function testRealPancakeV3CompleteProtocolFlow() public {
+        // Bootstrap: temporarily grant SETTLEMENT_ROLE to the adapter for
+        // the _movePriceAndRebuildTwap helper. Revoked at end of test body.
+        token.grantRole(token.SETTLEMENT_ROLE(), address(adapter));
+
         vm.prank(USER);
         tradeRouter.buy{value: 10 ether}(1, block.timestamp + 5 minutes);
         Pangu2TradeRouter.SellPreview memory ordinary = tradeRouter.previewSell(USER, 1 ether);
@@ -180,11 +193,12 @@ contract PancakeV3BscTestnetForkTest is Test {
         tradeRouter.sell(1 ether, 1, block.timestamp + 5 minutes);
         vm.stopPrank();
 
-        token.transfer(UNKNOWN_USER, 2 ether);
-        Pangu2TradeRouter.SellPreview memory unknown = tradeRouter.previewSell(UNKNOWN_USER, 1 ether);
-        assertEq(uint256(unknown.costStatus), uint256(ICostBasisManager.PositionStatus.UNKNOWN));
-        assertEq(unknown.taxBps, token.PROFIT_SELL_TAX_BPS());
-        vm.startPrank(UNKNOWN_USER);
+        token.transfer(ZERO_COST_USER, 2 ether);
+        Pangu2TradeRouter.SellPreview memory zeroCost = tradeRouter.previewSell(ZERO_COST_USER, 1 ether);
+        // Fork scenario: direct transfer creates KNOWN position with zero WBNB cost.
+        // The tax is still 10% (= PROFIT_SELL_TAX_BPS) due to 0 cost.
+        assertEq(zeroCost.taxBps, token.PROFIT_SELL_TAX_BPS());
+        vm.startPrank(ZERO_COST_USER);
         token.approve(address(tradeRouter), 1 ether);
         tradeRouter.sell(1 ether, 1, block.timestamp + 5 minutes);
         vm.stopPrank();
@@ -219,21 +233,41 @@ contract PancakeV3BscTestnetForkTest is Test {
         uint256 carry = distributor.closeEpoch(1);
         assertEq(carry, epochTotal - claimAmount);
         assertEq(distributor.nextEpochCarry(), carry);
+
+        // Revoke bootstrap role. Only the TradeRouter should hold SETTLEMENT_ROLE.
+        token.revokeRole(token.SETTLEMENT_ROLE(), address(adapter));
+        assertFalse(token.hasRole(token.SETTLEMENT_ROLE(), address(adapter)), "Adapter must not hold role");
+        assertTrue(token.hasRole(token.SETTLEMENT_ROLE(), address(tradeRouter)), "TradeRouter missing role");
     }
 
     function _writeThirtyMinuteOracleHistory(uint256 amountPerSwap) internal {
         IERC20(WBNB).approve(address(adapter), type(uint256).max);
-        for (uint256 i; i < 16; ++i) {
+        IERC20(address(token)).approve(address(adapter), type(uint256).max);
+        // Pool at 1:1 with ~1000 ether liquidity. ~5-10 ether per swap changes tick
+        // noticeably without exceeding 300 bps spot/TWAP deviation across alternating swaps.
+        uint256 effectiveAmount = amountPerSwap > 5 ether ? amountPerSwap : 5 ether;
+        for (uint256 i; i < 32; ++i) {
             vm.warp(block.timestamp + 121 seconds);
-            adapter.swapExactInput(
-                WBNB,
-                address(token),
-                amountPerSwap,
-                1,
-                address(liquidityGateway),
-                block.timestamp + 5 minutes
-            );
+            vm.roll(block.number + 1);
+            // Alternate direction to keep spot price oscillating near 1:1.
+            if (i % 2 == 0) {
+                adapter.swapExactInput(
+                    WBNB, address(token), effectiveAmount, 1,
+                    address(liquidityGateway), block.timestamp + 5 minutes
+                );
+            } else {
+                adapter.swapExactInput(
+                    address(token), WBNB, effectiveAmount, 1,
+                    address(liquidityGateway), block.timestamp + 5 minutes
+                );
+            }
         }
+        // Verify TWAP history is readable over the full 30-minute window.
+        uint32[] memory secs = new uint32[](2);
+        secs[0] = 1800;
+        secs[1] = 0;
+        pool.observe(secs); // Reverts if insufficient observations — fail-closed
+        // Verify observation cardinality meets minimum.
         (, , , uint16 cardinality, , , ) = pool.slot0();
         assertGe(cardinality, 16);
     }

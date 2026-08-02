@@ -22,7 +22,15 @@ contract DeployPangu2 is Script {
     uint256 internal constant TESTNET_TIMELOCK_DELAY = 1 hours;
     uint24 internal constant PANCAKE_FEE_TIER = 2500;
     uint32 internal constant TWAP_WINDOW = 30 minutes;
+    /// @notice Minimum observation cardinality the TWAP oracle accepts as "ready".
+    ///         If actual cardinality < MIN_CARDINALITY, validatedQuote reverts.
     uint16 internal constant MIN_CARDINALITY = 16;
+    /// @notice Target cardinality the pool should be expanded to at deployment.
+    ///         This must be >= MIN_CARDINALITY and should be set higher than the
+    ///         maximum number of tick-changing swaps expected in a single TWAP_WINDOW,
+    ///         so that old observations are not evicted before they age past the window.
+    ///         For high-frequency BSC pools, 128–256 is recommended.
+    uint16 internal constant TARGET_CARDINALITY = 128;
     uint16 internal constant MAX_SPOT_TWAP_DEVIATION_BPS = 300;
     uint16 internal constant BUYBACK_MAX_SLIPPAGE_BPS = 300;
     uint16 internal constant CONVERSION_MAX_SLIPPAGE_BPS = 300;
@@ -256,15 +264,36 @@ contract DeployPangu2 is Script {
 
     function _createOrLoadPool(DeployConfig memory c, address token) private returns (address pool) {
         pool = IPancakeV3Factory(c.factory).getPool(token, c.wbnb, PANCAKE_FEE_TIER);
-        if (pool == address(0)) {
+        bool newPool = pool == address(0);
+        if (newPool) {
             pool = IPancakeV3Factory(c.factory).createPool(token, c.wbnb, PANCAKE_FEE_TIER);
         }
         _assertExpectedCodeHash(pool, c.poolCodeHash);
         (uint160 sqrtPriceX96, , , , uint16 observationCardinalityNext, , ) = IPancakeV3Pool(pool).slot0();
         if (sqrtPriceX96 == 0) IPancakeV3Pool(pool).initialize(c.initialSqrtPriceX96);
-        if (observationCardinalityNext < MIN_CARDINALITY) {
-            IPancakeV3Pool(pool).increaseObservationCardinalityNext(MIN_CARDINALITY);
+        if (observationCardinalityNext < TARGET_CARDINALITY) {
+            IPancakeV3Pool(pool).increaseObservationCardinalityNext(TARGET_CARDINALITY);
         }
+        // ── Oracle Readiness Gate ──
+        // A brand-new or freshly-loaded pool has zero historical observations.
+        // The TWAP oracle cannot serve validatedQuote() until at least TWAP_WINDOW
+        // seconds of tick-changing swaps have accumulated. This script does NOT
+        // execute the bootstrap phase — it only reserves capacity and leaves the
+        // pool in a "capacity reserved, history pending" state.
+        //
+        // Required post-deployment phases (MUST be executed sequentially):
+        //   Phase 1 – Pool exists, capacity reserved, trading DISABLED.
+        //   Phase 2 – Add initial liquidity, execute >TARGET_CARDINALITY
+        //             tick-changing swaps over >=TWAP_WINDOW seconds.
+        //   Phase 3 – Verify pool.observe([TWAP_WINDOW, 0]) succeeds and
+        //             spot/TWAP deviation < maximumSpotTwapDeviationBps.
+        //   Phase 4 – Run _verifyOracleReadiness() via a separate script.
+        //   Phase 5 – Revoke bootstrap permissions, grant Router + Keeper roles,
+        //             enable trading.
+        //
+        // DO NOT skip Phase 2–3. A pool with zero observations will fail-close
+        // every Oracle-dependent operation (buy, sell, preview, FeeVault conversion,
+        // SupportPool buyback), rendering the protocol inoperable.
     }
 
     function _configureProtocol(Deployment memory d, address pool) private {
