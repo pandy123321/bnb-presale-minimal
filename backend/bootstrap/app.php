@@ -18,12 +18,16 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // API routes need Session for wallet auth, but CSRF only on write operations.
+        // Public read-only routes and nonce generation are exempt from CSRF.
         $middleware->api(prepend: [
             \Illuminate\Cookie\Middleware\EncryptCookies::class,
             \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
             \Illuminate\Session\Middleware\StartSession::class,
-            \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class,
         ]);
+
+        // CSRF is applied per-route on mutation endpoints, not globally on api group.
+        // See routes/web.php for admin-api CSRF (Laravel web guard already has it).
 
         $middleware->alias([
             'rbac' => AdminRbacMiddleware::class,

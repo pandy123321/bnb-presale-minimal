@@ -20,8 +20,8 @@ class BuybackController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $page    = (int) $request->query('page', 1);
-        $perPage = (int) $request->query('per_page', 20);
+        $page    = max(1, (int) $request->query('page', 1));
+        $perPage = min(100, max(1, (int) $request->query('per_page', 20)));
         $chainId = $this->chainId();
 
         $query = BuybackEvent::where('chain_id', $chainId)
@@ -55,8 +55,8 @@ class BuybackController extends Controller
      */
     public function lockerBatches(Request $request): JsonResponse
     {
-        $page    = (int) $request->query('page', 1);
-        $perPage = (int) $request->query('per_page', 20);
+        $page    = max(1, (int) $request->query('page', 1));
+        $perPage = min(100, max(1, (int) $request->query('per_page', 20)));
         $chainId = $this->chainId();
 
         $query = LockerBatch::where('chain_id', $chainId)

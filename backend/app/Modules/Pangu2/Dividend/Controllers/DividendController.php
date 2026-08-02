@@ -97,17 +97,18 @@ class DividendController extends Controller
         }
 
         // Rebuild the tree deterministically to generate proof
-        $allAllocations = DividendAllocation::where('chain_id', $this->chainId())
+        // Uses Solidity Leaf Schema V1: keccak256(abi.encode(chainId, distributor, epochId, rewardToken, account, amount))
+        $chainId    = $this->chainId();
+        $tokenAddr  = (string) config('pangu2.token_address', '0x0000000000000000000000000000000000000000');
+        $distAddr   = (string) config('pangu2.dividend_distributor_address', '0x0000000000000000000000000000000000000000');
+        $allAllocations = DividendAllocation::where('chain_id', $chainId)
             ->where('epoch_id', $epochId)
             ->orderBy('rank')
             ->get()
-            ->map(fn ($a) => [
-                'wallet_address' => $a->wallet_address,
-                'balance_raw'    => $a->balance_raw,
-            ])
+            ->map(fn ($a) => ['wallet_address' => $a->wallet_address, 'balance_raw' => $a->balance_raw])
             ->toArray();
 
-        $tree = $this->merkle->buildTree($allAllocations);
+        $tree = $this->merkle->buildTree($allAllocations, $chainId, $distAddr, $epochId, $tokenAddr);
 
         // Find the leaf index for this address
         $leafIndex = null;

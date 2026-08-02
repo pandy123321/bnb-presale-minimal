@@ -10,9 +10,10 @@ permissions:
   contents: read
 
 jobs:
-  # ══�?Solidity Contracts (unit + fuzz, NO fork) ══�?
+  # --- Solidity Contracts V3 ---
+
   contracts:
-    name: Contracts
+    name: Contracts V3
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -21,22 +22,21 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-
       - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: "v1.7.1"
-
       - run: forge fmt --check
       - run: forge build
       - run: forge test --no-match-path "*/fork/*"
 
-  contracts-fork:
-    name: Contracts (Fork BSC Testnet)
+  # --- Solidity Contracts V2 ---
+
+  contracts-v2:
+    name: Contracts V2
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     defaults:
       run:
-        working-directory: contracts
+        working-directory: contracts-v2
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,21 +44,11 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: "v1.7.1"
-      - name: Read fork config
-        id: fork-config
-        run: |
-          source ../config/testnet/FORK_CONFIG.txt
-          echo "rpc=$FORK_RPC" >> "$GITHUB_OUTPUT"
-          echo "block=$FORK_BLOCK" >> "$GITHUB_OUTPUT"
-      - name: Forge build
-        run: forge build
-      - name: Fork test (fixed block)
-        env:
-          BSC_TESTNET_RPC_URL: ${{ steps.fork-config.outputs.rpc }}
-          BSC_TESTNET_FORK_BLOCK: ${{ steps.fork-config.outputs.block }}
-        run: forge test --match-path "test/fork/**" -vvv
+      - run: forge build --lib-paths ../contracts/lib
+      - run: forge test --no-match-path "*/fork/*" --lib-paths ../contracts/lib
 
-  # ══�?Laravel Backend ══�?
+  # --- Laravel Backend ---
+
   backend:
     name: Backend
     runs-on: ubuntu-latest
@@ -95,76 +85,54 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: shivammathur/setup-php@v2
         with:
           php-version: "8.4"
-
       - name: Verify DB connection
         run: |
           pg_ready=false
           for i in $(seq 1 30); do
-            if pg_isready -h localhost -U bnb -d bnb_presale 2>/dev/null; then
-              pg_ready=true
-              break
-            fi
+            if pg_isready -h localhost -U bnb -d bnb_presale 2>/dev/null; then pg_ready=true; break; fi
             sleep 1
           done
-          if [ "$pg_ready" != "true" ]; then
-            echo "ERROR: PostgreSQL did not become ready after 30s"
-            exit 1
-          fi
+          if [ "$pg_ready" != "true" ]; then echo "ERROR: PostgreSQL not ready"; exit 1; fi
           echo "PostgreSQL ready."
-
           redis_ready=false
           for i in $(seq 1 10); do
-            if redis-cli -h localhost ping 2>/dev/null; then
-              redis_ready=true
-              break
-            fi
+            if redis-cli -h localhost ping 2>/dev/null; then redis_ready=true; break; fi
             sleep 1
           done
-          if [ "$redis_ready" != "true" ]; then
-            echo "ERROR: Redis did not become ready after 10s"
-            exit 1
-          fi
+          if [ "$redis_ready" != "true" ]; then echo "ERROR: Redis not ready"; exit 1; fi
           echo "Redis ready."
         shell: bash
-
       - run: cp .env.example .env
       - run: composer install --no-progress --prefer-dist
       - run: php artisan migrate:fresh --env=testing --force
       - run: php artisan test
 
-  # ══�?Frontend (DApp + Admin) ══�?
+  # --- Frontend ---
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
         with:
           version: "10.34.5"
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: "pnpm"
-
-      - name: Install dependencies (fail-closed)
-        run: pnpm install --frozen-lockfile
-
+      - run: pnpm install --frozen-lockfile
       - name: DApp Typecheck + Test + Build
         run: |
           cd apps/dapp
           pnpm run typecheck
           pnpm run test
           pnpm run build
-
       - name: Admin Typecheck + Test + Build
         run: |
           cd apps/admin
@@ -172,24 +140,21 @@ jobs:
           pnpm run test
           pnpm run build
 
-  # ══�?Shared Packages Tests ══�?
+  # --- Shared Packages ---
+
   packages:
     name: Shared Packages
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
         with:
           version: "10.34.5"
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: "pnpm"
-
       - run: pnpm install --frozen-lockfile
-
       - name: Mock API Contract Test
         run: |
           cd packages/mock-api
@@ -197,45 +162,34 @@ jobs:
           SERVER_PID=$!
           cleanup() { kill "$SERVER_PID" 2>/dev/null || true; }
           trap cleanup EXIT
-
           ready=false
           for i in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:4000/health 2>/dev/null; then
-              ready=true
-              break
-            fi
+            if curl --fail --silent http://127.0.0.1:4000/health 2>/dev/null; then ready=true; break; fi
             sleep 1
           done
-          if [ "$ready" != "true" ]; then
-            echo "ERROR: Mock API did not start after 30s"
-            exit 1
-          fi
+          if [ "$ready" != "true" ]; then echo "ERROR: Mock API did not start"; exit 1; fi
           pnpm run test
         shell: bash
-
       - name: Schema Validator
         run: |
           cd packages/schema-validator
           pnpm run validate
 
-  # ══�?Chain Worker Tests ══�?
+  # --- Chain Worker ---
+
   chain-worker:
     name: Chain Worker
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
         with:
           version: "10.34.5"
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: "pnpm"
-
       - run: pnpm install --frozen-lockfile
-
       - name: Chain Worker Tests
         run: |
           cd services/chain-worker

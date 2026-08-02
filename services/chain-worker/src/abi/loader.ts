@@ -18,7 +18,9 @@ export interface AbiArtifact {
   deployedBytecode?: { object: string };
 }
 
-const ABI_DIR = resolve(__dirname, "../../../contracts/out");
+import { keccak256, toHex } from "viem";
+
+const ABI_DIR = resolve(__dirname, "../../../contracts-v2/out");
 
 /**
  * Load a Foundry-compiled ABI JSON file.
@@ -50,10 +52,9 @@ export function extractEventSignatures(abi: AbiArtifact): Map<string, string> {
 
     const paramTypes = (entry.inputs ?? []).map((i) => i.type).join(",");
     const sig = `${entry.name}(${paramTypes})`;
-
-    // keccak256 of the event signature
-    const hash = require("crypto").createHash("sha3-256").update(sig).digest("hex");
-    signatures.set("0x" + hash, entry.name);
+    // viem keccak256: returns 0x-prefixed hex
+    const hash = keccak256(toHex(sig));
+    signatures.set(hash, entry.name);
   }
 
   return signatures;

@@ -42,9 +42,10 @@ const ROUTER_ABI = parseAbi([
   "function sell(uint256 tokenIn, uint256 minBnbOut, uint256 deadline) payable",
 ]);
 
-// Known addresses (from domain constants — replace with on-chain registry)
-const TRADE_ROUTER_ADDRESS = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as `0x${string}`;
-const TOKEN_ADDRESS = "0xcccccccccccccccccccccccccccccccccccccccc" as `0x${string}`;
+// Known addresses — injected from deployment manifest or contract registry at build time.
+// NEVER commit real addresses here. Set via process.env or deploy-time replacement.
+const TRADE_ROUTER_ADDRESS = (typeof process !== 'undefined' && process.env?.VITE_TRADE_ROUTER_ADDRESS as `0x${string}`) || "0x0000000000000000000000000000000000000000" as `0x${string}`;
+const TOKEN_ADDRESS        = (typeof process !== 'undefined' && process.env?.VITE_TOKEN_ADDRESS as `0x${string}`)        || "0x0000000000000000000000000000000000000000" as `0x${string}`;
 
 // ── Transaction State ──────────────────────
 

@@ -210,9 +210,8 @@ async function scanStream(stream: {
     try {
       await insertRawEvents(dbClient, rawEvents);
 
-      // Mark blocks beyond confirmation depth as CONFIRMED
-      const confirmationBlock = toBlock - CONFIRMATION_BLOCKS;
-      for (let bn = fromBlock; bn <= confirmationBlock; bn++) {
+      // Mark all scanned blocks as CONFIRMED (toBlock is already safe)
+      for (let bn = fromBlock; bn <= toBlock; bn++) {
         await dbClient.query(
           `UPDATE chain_raw_events SET status = 'CONFIRMED', confirmed_at = NOW()
            WHERE chain_id = $1 AND block_number = $2 AND status = 'PENDING_CONFIRMATION'`,

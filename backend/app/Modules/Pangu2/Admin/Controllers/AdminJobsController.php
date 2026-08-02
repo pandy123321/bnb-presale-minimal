@@ -17,6 +17,16 @@ use Illuminate\Support\Str;
 class AdminJobsController extends Controller
 {
     /**
+     * Allowed task names for retry. Only known, idempotent-safe tasks can be retried.
+     */
+    private const RETRY_ALLOWLIST = [
+        'chain-sync',
+        'purchase_event_sync',
+        'dividend-snapshot',
+        'buyback-watcher',
+    ];
+
+    /**
      * GET /admin-api/v1/projects/pangu2/jobs
      *
      * List system tasks with their current status.
@@ -57,6 +67,17 @@ class AdminJobsController extends Controller
                 'Idempotency-Key header is required (16-128 chars).',
                 false,
                 [],
+                422,
+            );
+        }
+
+        // Validate task name against allowlist
+        if (!in_array($taskName, self::RETRY_ALLOWLIST, true)) {
+            return ApiEnvelope::error(
+                'INVALID_TASK',
+                "Task '{$taskName}' is not in the retry allowlist.",
+                false,
+                ['allowed_tasks' => self::RETRY_ALLOWLIST],
                 422,
             );
         }

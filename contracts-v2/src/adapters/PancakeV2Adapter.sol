@@ -85,6 +85,16 @@ contract PancakeV2Adapter is AccessControl, ReentrancyGuard, IPancakeV2Adapter {
         if (!((tokenIn == token && tokenOut == wbnb) || (tokenIn == wbnb && tokenOut == token))) revert InvalidPair();
     }
 
+    /**
+     * Accept native BNB from WBNB withdraw() and Pancake Router swapExactTokensForETH.
+     * Rejects BNB from unknown addresses to prevent accidental lockup.
+     */
+    receive() external payable {
+        if (msg.sender != wbnb && msg.sender != address(router)) {
+            revert("BNB only accepted from WBNB or Router");
+        }
+    }
+
     function _requireContract(address account) private view {
         if (account == address(0)) revert ZeroAddress();
         if (account.code.length == 0) revert AddressHasNoCode(account);

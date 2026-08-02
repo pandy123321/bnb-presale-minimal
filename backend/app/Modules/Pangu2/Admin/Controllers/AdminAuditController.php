@@ -25,9 +25,10 @@ class AdminAuditController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $perPage     = (int) $request->query('per_page', 20);
+        $page          = max(1, (int) $request->query('page', 1));
+        $perPage       = min(100, max(1, (int) $request->query('per_page', 20)));
         $administrator = $request->query('administrator');
-        $action      = $request->query('action');
+        $action        = $request->query('action');
 
         $query = DB::table('admin_audit_logs')
             ->leftJoin('admins', 'admin_audit_logs.admin_id', '=', 'admins.id')
