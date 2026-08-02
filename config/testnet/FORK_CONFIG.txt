@@ -1,0 +1,8 @@
+# BSC Testnet Fork Configuration
+# Block: 44780000 (2026-08-01 candidate — verify in PancakeV3BscTestnetFork.t.sol before finalizing)
+# 
+# This block number serves as the canonical fork point for CI fork tests.
+# Update this file when a new approved fork block replaces the current one.
+# The same value must be configured as BSC_TESTNET_FORK_BLOCK GitHub secret.
+
+FORK_BLOCK=44780000

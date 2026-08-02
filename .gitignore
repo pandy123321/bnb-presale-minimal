@@ -6,14 +6,8 @@ contracts/reports/remediation-build/
 contracts/coverage/
 contracts/lcov.info
 
-# Node dependencies
-contracts/node_modules/
-apps/dapp/node_modules/
-apps/admin/node_modules/
-packages/api-types/node_modules/
-packages/mock-api/node_modules/
-packages/schema-validator/node_modules/
-services/chain-worker/node_modules/
+# Node dependencies (all workspaces + root)
+node_modules/
 
 # Frontend build output
 apps/dapp/dist/
@@ -23,9 +17,6 @@ apps/admin/dist/
 .env
 .env.*
 !.env.example
-backend/.env
-backend/.env.*
-!backend/.env.example
 *.log
 .tmp/
 

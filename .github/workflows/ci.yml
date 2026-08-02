@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  # ── Solidity Contracts (unit + fuzz, NO fork tests) ──
+  # ═══ Solidity Contracts (unit + fuzz, NO fork) ═══
 
   contracts:
     name: Contracts
@@ -27,15 +27,19 @@ jobs:
         with:
           version: "v1.7.1"
 
+      - run: forge fmt --check
       - run: forge build
       - run: forge test --no-match-path "*/fork/*"
 
-  # ── Solidity Fork Tests (BSC Testnet, requires secret) ──
+  # ═══ Contracts Fork Tests (requires BSC_TESTNET_RPC_URL repo secret) ═══
+  # Only runs on push to main, not on PR from forks.
+  # Must FAIL if secret is missing — fork tests are a required gate.
 
   contracts-fork:
     name: Contracts (BSC Testnet Fork)
     runs-on: ubuntu-latest
-    if: ${{ secrets.BSC_TESTNET_RPC_URL != '' }}
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: bsc-testnet
     defaults:
       run:
         working-directory: contracts
@@ -48,14 +52,47 @@ jobs:
         with:
           version: "v1.7.1"
 
-      - run: forge build
-      - run: forge test --match-path "*/fork/*" --fork-url "${{ secrets.BSC_TESTNET_RPC_URL }}"
+      - name: Validate fork environment variables
+        run: |
+          if [ -z "${{ secrets.BSC_TESTNET_RPC_URL }}" ]; then
+            echo "ERROR: BSC_TESTNET_RPC_URL secret is not configured."
+            echo "Fork tests are a required gate and cannot be skipped."
+            exit 1
+          fi
+          if [ -z "${{ secrets.BSC_TESTNET_FORK_BLOCK }}" ]; then
+            echo "ERROR: BSC_TESTNET_FORK_BLOCK secret is not configured."
+            echo "Fork tests require a fixed, approved block number."
+            exit 1
+          fi
+          echo "Fork URL and block number configured."
+        shell: bash
 
-  # ── Laravel Backend ──
+      - run: forge build
+
+      - name: Run fork tests
+        env:
+          FORK_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
+          FORK_BLOCK: ${{ secrets.BSC_TESTNET_FORK_BLOCK }}
+        run: >
+          forge test
+          --match-path "*/fork/*"
+          --fork-url "$FORK_URL"
+          --fork-block-number "$FORK_BLOCK"
+
+  # ═══ Laravel Backend ═══
 
   backend:
     name: Backend
     runs-on: ubuntu-latest
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_DATABASE: bnb_presale
+      DB_USERNAME: bnb
+      DB_PASSWORD: bnb_dev_pass
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
     defaults:
       run:
         working-directory: backend
@@ -88,11 +125,26 @@ jobs:
         with:
           php-version: "8.4"
 
+      - name: Verify DB connection
+        run: |
+          echo "Waiting for PostgreSQL..."
+          for i in $(seq 1 30); do
+            pg_isready -h localhost -U bnb -d bnb_presale && break
+            sleep 1
+          done
+          echo "Waiting for Redis..."
+          for i in $(seq 1 10); do
+            redis-cli -h localhost ping && break
+            sleep 1
+          done
+        shell: bash
+
       - run: cp .env.example .env
       - run: composer install --no-progress --prefer-dist
+      - run: php artisan migrate:fresh --env=testing --force
       - run: php artisan test
 
-  # ── Frontend (DApp + Admin) ──
+  # ═══ Frontend (DApp + Admin) ═══
 
   frontend:
     name: Frontend
@@ -102,23 +154,83 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: latest
+          version: "10.9.2"
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: "pnpm"
 
-      - run: pnpm install --frozen-lockfile || pnpm install
+      - name: Install dependencies (fail-closed)
+        run: pnpm install --frozen-lockfile
 
-      - name: DApp Typecheck + Build
+      - name: DApp Typecheck + Test + Build
         run: |
           cd apps/dapp
-          pnpm run typecheck || echo "[WARN] typecheck skipped"
+          pnpm run typecheck
+          pnpm run test
           pnpm run build
 
-      - name: Admin Typecheck + Build
+      - name: Admin Typecheck + Test + Build
         run: |
           cd apps/admin
-          pnpm run typecheck || echo "[WARN] typecheck skipped"
+          pnpm run typecheck
+          pnpm run test
           pnpm run build
+
+  # ═══ Shared Packages Tests ═══
+
+  packages:
+    name: Shared Packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "10.9.2"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Mock API Contract Test
+        run: |
+          cd packages/mock-api
+          pnpm run dev &
+          sleep 3
+          pnpm run test
+          kill %1 2>/dev/null || true
+
+      - name: Schema Validator
+        run: |
+          cd packages/schema-validator
+          pnpm run validate
+
+  # ═══ Chain Worker Tests ═══
+
+  chain-worker:
+    name: Chain Worker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "10.9.2"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Chain Worker Tests
+        run: |
+          cd services/chain-worker
+          pnpm run typecheck
+          pnpm run test
