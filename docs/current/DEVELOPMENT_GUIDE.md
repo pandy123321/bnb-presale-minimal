@@ -9,7 +9,7 @@ Updated: 2026-08-02
 | 工具 | 需安装版本 |
 |---|---|
 | Node.js | 22+ |
-| pnpm | 10.9.2+ |
+| pnpm | 10.34.5 |
 | PHP | 8.4+ |
 | Composer | 2.x |
 | Foundry | v1.7.1 (含 forge + cast) |

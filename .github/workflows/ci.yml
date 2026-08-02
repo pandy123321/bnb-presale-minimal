@@ -1,4 +1,4 @@
-name: CI — PR Gate
+name: CI �?PR Gate
 
 on:
   pull_request:
@@ -10,8 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  # ═══ Solidity Contracts (unit + fuzz, NO fork) ═══
-
+  # ══�?Solidity Contracts (unit + fuzz, NO fork) ══�?
   contracts:
     name: Contracts
     runs-on: ubuntu-latest
@@ -31,56 +30,7 @@ jobs:
       - run: forge build
       - run: forge test --no-match-path "*/fork/*"
 
-  # ═══ Contracts Fork Tests (requires BSC_TESTNET_RPC_URL repo secret) ═══
-  # Only runs on push to main, not on PR from forks.
-  # Must FAIL if secret is missing — fork tests are a required gate.
-
-  contracts-fork:
-    name: Contracts (BSC Testnet Fork)
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment: bsc-testnet
-    defaults:
-      run:
-        working-directory: contracts
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: "v1.7.1"
-
-      - name: Validate fork environment variables
-        run: |
-          if [ -z "${{ secrets.BSC_TESTNET_RPC_URL }}" ]; then
-            echo "ERROR: BSC_TESTNET_RPC_URL secret is not configured."
-            echo "Fork tests are a required gate and cannot be skipped."
-            exit 1
-          fi
-          if [ -z "${{ secrets.BSC_TESTNET_FORK_BLOCK }}" ]; then
-            echo "ERROR: BSC_TESTNET_FORK_BLOCK secret is not configured."
-            echo "Fork tests require a fixed, approved block number."
-            exit 1
-          fi
-          echo "Fork URL and block number configured."
-        shell: bash
-
-      - run: forge build
-
-      - name: Run fork tests
-        env:
-          FORK_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
-          FORK_BLOCK: ${{ secrets.BSC_TESTNET_FORK_BLOCK }}
-        run: >
-          forge test
-          --match-path "*/fork/*"
-          --fork-url "$FORK_URL"
-          --fork-block-number "$FORK_BLOCK"
-
-  # ═══ Laravel Backend ═══
-
+  # ══�?Laravel Backend ══�?
   backend:
     name: Backend
     runs-on: ubuntu-latest
@@ -127,16 +77,33 @@ jobs:
 
       - name: Verify DB connection
         run: |
-          echo "Waiting for PostgreSQL..."
+          pg_ready=false
           for i in $(seq 1 30); do
-            pg_isready -h localhost -U bnb -d bnb_presale && break
+            if pg_isready -h localhost -U bnb -d bnb_presale 2>/dev/null; then
+              pg_ready=true
+              break
+            fi
             sleep 1
           done
-          echo "Waiting for Redis..."
+          if [ "$pg_ready" != "true" ]; then
+            echo "ERROR: PostgreSQL did not become ready after 30s"
+            exit 1
+          fi
+          echo "PostgreSQL ready."
+
+          redis_ready=false
           for i in $(seq 1 10); do
-            redis-cli -h localhost ping && break
+            if redis-cli -h localhost ping 2>/dev/null; then
+              redis_ready=true
+              break
+            fi
             sleep 1
           done
+          if [ "$redis_ready" != "true" ]; then
+            echo "ERROR: Redis did not become ready after 10s"
+            exit 1
+          fi
+          echo "Redis ready."
         shell: bash
 
       - run: cp .env.example .env
@@ -144,8 +111,7 @@ jobs:
       - run: php artisan migrate:fresh --env=testing --force
       - run: php artisan test
 
-  # ═══ Frontend (DApp + Admin) ═══
-
+  # ══�?Frontend (DApp + Admin) ══�?
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
@@ -154,7 +120,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: "10.9.2"
+          version: "10.34.5"
 
       - uses: actions/setup-node@v4
         with:
@@ -178,8 +144,7 @@ jobs:
           pnpm run test
           pnpm run build
 
-  # ═══ Shared Packages Tests ═══
-
+  # ══�?Shared Packages Tests ══�?
   packages:
     name: Shared Packages
     runs-on: ubuntu-latest
@@ -188,7 +153,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: "10.9.2"
+          version: "10.34.5"
 
       - uses: actions/setup-node@v4
         with:
@@ -201,17 +166,31 @@ jobs:
         run: |
           cd packages/mock-api
           pnpm run dev &
-          sleep 3
+          SERVER_PID=$!
+          cleanup() { kill "$SERVER_PID" 2>/dev/null || true; }
+          trap cleanup EXIT
+
+          ready=false
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4000/health 2>/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" != "true" ]; then
+            echo "ERROR: Mock API did not start after 30s"
+            exit 1
+          fi
           pnpm run test
-          kill %1 2>/dev/null || true
+        shell: bash
 
       - name: Schema Validator
         run: |
           cd packages/schema-validator
           pnpm run validate
 
-  # ═══ Chain Worker Tests ═══
-
+  # ══�?Chain Worker Tests ══�?
   chain-worker:
     name: Chain Worker
     runs-on: ubuntu-latest
@@ -220,7 +199,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: "10.9.2"
+          version: "10.34.5"
 
       - uses: actions/setup-node@v4
         with:

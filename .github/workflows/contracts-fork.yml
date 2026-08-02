@@ -1,0 +1,67 @@
+name: CI â€?Contracts Fork Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "contracts/src/**"
+      - "contracts/test/fork/**"
+      - "contracts/lib/**"
+      - "contracts/foundry.toml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts-fork:
+    name: Contracts (BSC Testnet Fork)
+    runs-on: ubuntu-latest
+    environment: bsc-testnet
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: "v1.7.1"
+
+      - name: Validate fork environment
+        env:
+          FORK_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
+          FORK_BLOCK: ${{ vars.BSC_TESTNET_FORK_BLOCK }}
+        run: |
+          test -n "$FORK_URL" || {
+            echo "ERROR: BSC_TESTNET_RPC_URL secret is not configured in the bsc-testnet environment."
+            echo "Fork tests are a required gate. Configure this secret in GitHub repo Settings â†?Environments â†?bsc-testnet."
+            exit 1
+          }
+          test -n "$FORK_BLOCK" || {
+            echo "ERROR: BSC_TESTNET_FORK_BLOCK variable is not configured in the bsc-testnet environment."
+            echo "Fork tests require a fixed, approved block number from config/testnet/FORK_CONFIG.txt."
+            exit 1
+          }
+          echo "Fork URL configured."
+          echo "Fork block: $FORK_BLOCK"
+        shell: bash
+
+      - run: forge build
+
+      - name: Run fork tests
+        env:
+          FORK_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
+          FORK_BLOCK: ${{ vars.BSC_TESTNET_FORK_BLOCK }}
+        run: |
+          echo "Chain ID: $(cast chain-id --rpc-url "$FORK_URL" 2>/dev/null || echo 'unreachable')"
+          echo "Fork block: $FORK_BLOCK"
+          forge test \
+            --match-path "*/fork/*" \
+            --fork-url "$FORK_URL" \
+            --fork-block-number "$FORK_BLOCK" \
+            -vvv

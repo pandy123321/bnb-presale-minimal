@@ -2,14 +2,27 @@
 
 ```text
 Updated: 2026-08-02
-Project Phase: Baseline Stabilization (Phase 0+1 CI gate repair in progress)
-Current Commit: f8df5c35 (under review, CHANGES_REQUIRED)
-Next Gate: P1 CI fixes → re-review → merge
+Project Phase: Baseline Stabilization (CI gate repair iteration 2)
+Baseline SHA: f8df5c35 (Phase 0+1 initial CI)
+Fix SHA: <next-commit> (P1 fork gate + lockfile fix)
+Current Review: #92 (CHANGES_REQUIRED — 2 P1 remaining)
+Next Gate: Fork P1 fix → re-commit → re-review
 ```
 
-## 27-Task Completion Matrix
+## Status Definitions
 
-Rows marked `COMPLETE` have implementation code present. `FIX_BEFORE_MERGE` indicates the evidence report requires updates before the closeout gate can be signed off.
+| Label | Meaning |
+|---|---|
+| IMPLEMENTED | Source code exists and compiles |
+| TESTED | Tests exist and pass |
+| EVIDENCE_READY | Closeout evidence report written |
+| UNDER_REVIEW | Audit in progress |
+| APPROVED | Review verdict APPROVED, ready to merge |
+| CLOSED | Merged and accepted |
+
+Rows marked `COMPLETE` span IMPLEMENTED through CLOSED. `FIX_BEFORE_MERGE` indicates evidence or test gaps that block closeout.
+
+## 27-Task Completion Matrix
 
 | Task ID | Stream | Title | Status | Evidence |
 |---|---|---|---|---|
@@ -46,7 +59,7 @@ Rows marked `COMPLETE` have implementation code present. `FIX_BEFORE_MERGE` indi
 | Blocker | Affected Tasks | Resolution |
 |---|---|---|
 | F07/A05 Closeout evidence 未完成 | F07, A05 | Fix evidence reports |
-| BSC_TESTNET_RPC_URL / FORK_BLOCK secrets | I03 (Fork tests) | Configure in GitHub repo settings |
+| Fork PR Gate: secrets + approved block | Contracts fork CI | Configure GitHub Environment `bsc-testnet` with `BSC_TESTNET_RPC_URL` secret + `BSC_TESTNET_FORK_BLOCK` variable |
 | forge build + DeployPangu2.s.sol + Anvil | I03 | Local execution |
 | BSC Testnet 合约部署 | I04 | Deployment + verification |
 | I04 未完成 | I05 | Wait for I04 |
@@ -55,7 +68,7 @@ Rows marked `COMPLETE` have implementation code present. `FIX_BEFORE_MERGE` indi
 ## Next Actions
 
 1. Fix F07/A05 closeout evidence
-2. Configure `BSC_TESTNET_RPC_URL` and `BSC_TESTNET_FORK_BLOCK` GitHub secrets
+2. Configure GitHub Environment `bsc-testnet` with required secrets/variables
 3. `forge script script/DeployPangu2.s.sol --rpc-url http://localhost:8545 --broadcast` → I03
 4. BSC Testnet deployment → I04
 5. I04 complete → I05
