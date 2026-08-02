@@ -1,0 +1,32 @@
+$ forge fmt --check
+bash: line 1: forge: command not found
+EXIT_STATUS=127
+
+$ forge clean
+bash: line 1: forge: command not found
+EXIT_STATUS=127
+
+$ forge build --sizes
+bash: line 1: forge: command not found
+EXIT_STATUS=127
+
+$ forge test -vvv
+bash: line 1: forge: command not found
+EXIT_STATUS=127
+
+$ forge test --fuzz-runs 50000 -vvv
+bash: line 1: forge: command not found
+EXIT_STATUS=127
+
+$ forge test --match-path 'test/invariant/**' -vvv
+bash: line 1: forge: command not found
+EXIT_STATUS=127
+
+$ forge snapshot
+bash: line 1: forge: command not found
+EXIT_STATUS=127
+
+$ BSC_TESTNET_RPC_URL='' BSC_TESTNET_FORK_BLOCK='' forge test --match-path 'test/fork/**' -vvv
+bash: line 1: forge: command not found
+EXIT_STATUS=127
+
