@@ -1,0 +1,769 @@
+openapi: "3.1.0"
+info:
+  title: PANGU2 API
+  description: |
+    PANGU2 前后端共享 API 契约。
+    Admin control panel and user DApp share this schema.
+    Backend MUST implement; frontend MUST consume via generated client.
+    No duplicate DTOs or business formulas in frontend.
+  version: "1.0.0"
+  contact:
+    name: PANGU2 Team
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: LOCAL development
+  - url: https://testnet.pangu2.io/api/v1
+    description: BSC TESTNET
+
+tags:
+  - name: System
+    description: Environment, contract registry, system status
+  - name: Auth
+    description: Wallet nonce-based authentication
+  - name: Wallet
+    description: User wallet summary and history
+  - name: Quote
+    description: Buy/Sell preview (proxy to contract, never replicate tax formulas)
+  - name: Dividend
+    description: Epoch, ranking, proof, claim
+  - name: Support
+    description: Buyback, locker, support pool
+  - name: Admin
+    description: Admin dashboard, RBAC, jobs, audit
+
+paths:
+  # ── System ──
+  /projects/pangu2/config:
+    get:
+      tags: [System]
+      operationId: getConfig
+      summary: Project environment and chain configuration
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope_Config"
+
+  /projects/pangu2/system-status:
+    get:
+      tags: [System]
+      operationId: getSystemStatus
+      summary: System health, sync status, RPC status
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope_SystemStatus"
+
+  /projects/pangu2/contracts:
+    get:
+      tags: [System]
+      operationId: getContracts
+      summary: Contract registry with addresses, ABI versions, deployment blocks
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope_ContractList"
+
+  # ── Auth ──
+  /projects/pangu2/auth/nonce:
+    post:
+      tags: [Auth]
+      operationId: requestNonce
+      summary: Request a one-time nonce for wallet signature
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [wallet_address]
+              properties:
+                wallet_address:
+                  $ref: "#/components/schemas/EvmAddress"
+      responses:
+        "200":
+          description: Nonce issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope_Nonce"
+
+  /projects/pangu2/auth/verify:
+    post:
+      tags: [Auth]
+      operationId: verifySignature
+      summary: Verify wallet signature and create session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [wallet_address, signature]
+              properties:
+                wallet_address:
+                  $ref: "#/components/schemas/EvmAddress"
+                signature:
+                  type: string
+                  description: EIP-191 signed message
+      responses:
+        "200":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope_Session"
+
+  /projects/pangu2/auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Revoke current session
+      responses:
+        "200":
+          description: Logged out
+
+  # ── Wallet ──
+  /projects/pangu2/wallets/{address}/summary:
+    get:
+      tags: [Wallet]
+      operationId: getWalletSummary
+      summary: Wallet balance, cost basis, current sell rate
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/EvmAddress"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope_WalletSummary"
+
+  /projects/pangu2/wallets/{address}/transactions:
+    get:
+      tags: [Wallet]
+      operationId: getWalletTransactions
+      summary: Wallet transaction history
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/EvmAddress"
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope_TxList"
+
+  # ── Quote ──
+  /projects/pangu2/quotes/buy:
+    post:
+      tags: [Quote]
+      operationId: previewBuy
+      summary: Preview buy quote (proxy to contract, MOCK or UNAVAILABLE without ABI)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount_bnb_wei]
+              properties:
+                amount_bnb_wei:
+                  type: string
+                  pattern: "^[0-9]+$"
+                  description: BNB amount in wei
+      responses:
+        "200":
+          description: Quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope_BuyQuote"
+
+  /projects/pangu2/quotes/sell:
+    post:
+      tags: [Quote]
+      operationId: previewSell
+      summary: Preview sell quote (proxy to contract, returns current tax rate)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount_token_raw, wallet_address]
+              properties:
+                amount_token_raw:
+                  type: string
+                  pattern: "^[0-9]+$"
+                wallet_address:
+                  $ref: "#/components/schemas/EvmAddress"
+      responses:
+        "200":
+          description: Quote with tax rate from contract
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope_SellQuote"
+
+  # ── Dividend ──
+  /projects/pangu2/dividend/epochs/current:
+    get:
+      tags: [Dividend]
+      operationId: getCurrentEpoch
+      summary: Current dividend epoch
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope_Epoch"
+
+  /projects/pangu2/dividend/epochs/{epochId}:
+    get:
+      tags: [Dividend]
+      operationId: getEpoch
+      summary: Specific dividend epoch
+      parameters:
+        - name: epochId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+
+  /projects/pangu2/dividend/epochs/{epochId}/proof/{address}:
+    get:
+      tags: [Dividend]
+      operationId: getProof
+      summary: Merkle proof for a wallet in an epoch
+      parameters:
+        - name: epochId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: address
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/EvmAddress"
+      responses:
+        "200":
+          description: OK
+
+  # ── Support ──
+  /projects/pangu2/buybacks:
+    get:
+      tags: [Support]
+      operationId: getBuybacks
+      summary: Buyback batches
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+
+  /projects/pangu2/locker/batches:
+    get:
+      tags: [Support]
+      operationId: getLockerBatches
+      summary: Locker batches
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+
+  # ── Admin ──
+  /admin-api/v1/projects/pangu2/auth/login:
+    post:
+      tags: [Admin]
+      operationId: adminLogin
+      summary: Admin email/password login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        "200":
+          description: OK
+
+  /admin-api/v1/projects/pangu2/dashboard:
+    get:
+      tags: [Admin]
+      operationId: getAdminDashboard
+      summary: Admin dashboard KPIs
+      responses:
+        "200":
+          description: OK
+
+  /admin-api/v1/projects/pangu2/contracts:
+    get:
+      tags: [Admin]
+      operationId: adminGetContracts
+      summary: Contract registry (admin view)
+      responses:
+        "200":
+          description: OK
+
+  /admin-api/v1/projects/pangu2/jobs:
+    get:
+      tags: [Admin]
+      operationId: getJobs
+      summary: Job/task status list
+      responses:
+        "200":
+          description: OK
+
+  /admin-api/v1/projects/pangu2/audit-logs:
+    get:
+      tags: [Admin]
+      operationId: getAuditLogs
+      summary: Audit log list
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: administrator
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+components:
+  schemas:
+    # ── Primitives ──
+    EvmAddress:
+      type: string
+      pattern: "^0x[0-9a-fA-F]{40}$"
+      description: Normalized lowercase EVM address
+
+    TxHash:
+      type: string
+      pattern: "^0x[0-9a-fA-F]{64}$"
+
+    BlockNumber:
+      type: string
+      pattern: "^[0-9]+$"
+      description: Decimal string to avoid JS precision loss
+
+    WeiAmount:
+      type: string
+      pattern: "^[0-9]+$"
+      description: Unsigned integer string in wei / smallest token unit
+
+    IsoTimestamp:
+      type: string
+      format: date-time
+      description: RFC 3339 UTC
+
+    DataStatus:
+      type: string
+      enum:
+        - MOCK_DATA
+        - SYNCING
+        - LIVE
+        - STALE
+        - DEGRADED
+        - UNAVAILABLE
+
+    # ── Envelope ──
+    EnvelopeMeta:
+      type: object
+      properties:
+        project:
+          type: string
+          example: "PANGU2"
+        environment:
+          type: string
+          example: "LOCAL"
+        chain_id:
+          type: integer
+          example: 31337
+        data_status:
+          $ref: "#/components/schemas/DataStatus"
+        block_number:
+          $ref: "#/components/schemas/BlockNumber"
+          nullable: true
+        generated_at:
+          $ref: "#/components/schemas/IsoTimestamp"
+        schema_version:
+          type: string
+          example: "1.0.0"
+
+    EnvelopeError:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code
+        message:
+          type: string
+        retryable:
+          type: boolean
+        details:
+          type: object
+
+    # ── Domain ──
+    EnvironmentConfig:
+      type: object
+      properties:
+        project:
+          type: string
+        environment:
+          type: string
+        chain_id:
+          type: integer
+        chain_name:
+          type: string
+        rpc_status:
+          type: string
+          enum: [OK, DEGRADED, DOWN]
+        supported_networks:
+          type: array
+          items:
+            type: integer
+
+    ContractInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        address:
+          $ref: "#/components/schemas/EvmAddress"
+        abi_version:
+          type: string
+        deployment_block:
+          $ref: "#/components/schemas/BlockNumber"
+        status:
+          type: string
+          enum: [ACTIVE, PAUSED, FINALIZED, UNKNOWN]
+
+    SystemStatus:
+      type: object
+      properties:
+        latest_chain_block:
+          $ref: "#/components/schemas/BlockNumber"
+        last_scanned_block:
+          $ref: "#/components/schemas/BlockNumber"
+        block_lag:
+          type: integer
+        rpc_status:
+          type: string
+        queue_status:
+          type: string
+        open_anomalies:
+          type: integer
+
+    WalletSummary:
+      type: object
+      properties:
+        address:
+          $ref: "#/components/schemas/EvmAddress"
+        balance_token_raw:
+          $ref: "#/components/schemas/WeiAmount"
+        balance_token_formatted:
+          type: string
+        cost_basis:
+          type: string
+          description: "Recorded cost basis from contract, not computed here"
+        current_sell_tax_rate:
+          type: string
+          description: "4% or 10%, from contract previewSell"
+        rank:
+          type: integer
+          nullable: true
+          description: "Current estimated rank (null if not in top 100)"
+        claimable_amount_raw:
+          $ref: "#/components/schemas/WeiAmount"
+          nullable: true
+
+    BuyQuote:
+      type: object
+      properties:
+        amount_in_wei:
+          $ref: "#/components/schemas/WeiAmount"
+        gross_tokens_raw:
+          $ref: "#/components/schemas/WeiAmount"
+        tax_rate:
+          type: string
+          description: "Always 4% for buy"
+        tax_tokens_raw:
+          $ref: "#/components/schemas/WeiAmount"
+        net_tokens_raw:
+          $ref: "#/components/schemas/WeiAmount"
+        min_receive_raw:
+          $ref: "#/components/schemas/WeiAmount"
+        quote_block:
+          $ref: "#/components/schemas/BlockNumber"
+        expires_at:
+          $ref: "#/components/schemas/IsoTimestamp"
+        source:
+          type: string
+          enum: [contract_preview, mock, unavailable]
+
+    SellQuote:
+      type: object
+      properties:
+        amount_in_raw:
+          $ref: "#/components/schemas/WeiAmount"
+        gross_bnb_wei:
+          $ref: "#/components/schemas/WeiAmount"
+        tax_rate:
+          type: string
+          description: "4% or 10%, returned by contract"
+        tax_tokens_raw:
+          $ref: "#/components/schemas/WeiAmount"
+        tax_destination:
+          type: string
+          description: "4%→SupportPool, 10%→9%SupportPool+1%Burn"
+        net_bnb_wei:
+          $ref: "#/components/schemas/WeiAmount"
+        min_receive_wei:
+          $ref: "#/components/schemas/WeiAmount"
+        quote_block:
+          $ref: "#/components/schemas/BlockNumber"
+        expires_at:
+          $ref: "#/components/schemas/IsoTimestamp"
+        source:
+          type: string
+          enum: [contract_preview, mock, unavailable]
+
+    EpochInfo:
+      type: object
+      properties:
+        epoch_id:
+          type: integer
+        snapshot_block:
+          $ref: "#/components/schemas/BlockNumber"
+        total_dividend_raw:
+          $ref: "#/components/schemas/WeiAmount"
+        merkle_root:
+          type: string
+        tiers:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              rank_range:
+                type: string
+              share_percent:
+                type: integer
+        status:
+          type: string
+          enum: [pending, snapshot_complete, proof_generated, claim_open, closed]
+
+    TransactionInfo:
+      type: object
+      properties:
+        tx_hash:
+          $ref: "#/components/schemas/TxHash"
+        block_number:
+          $ref: "#/components/schemas/BlockNumber"
+        type:
+          type: string
+          enum: [buy, sell, claim, buyback, other]
+        amount_in:
+          type: string
+        amount_out:
+          type: string
+        status:
+          type: string
+          enum: [pending, confirmed, failed, replaced, dropped, reorged]
+        timestamp:
+          $ref: "#/components/schemas/IsoTimestamp"
+
+    NonceResponse:
+      type: object
+      properties:
+        nonce:
+          type: string
+          description: "One-time nonce for signing"
+        message:
+          type: string
+          description: "Full message to be signed"
+        expires_at:
+          $ref: "#/components/schemas/IsoTimestamp"
+
+    SessionInfo:
+      type: object
+      properties:
+        token:
+          type: string
+        wallet_address:
+          $ref: "#/components/schemas/EvmAddress"
+        expires_at:
+          $ref: "#/components/schemas/IsoTimestamp"
+
+    # ── Paginated List ──
+    PaginationMeta:
+      type: object
+      properties:
+        current_page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+        last_page:
+          type: integer
+
+    # ── Envelope Responses ──
+    Envelope_Config:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/EnvironmentConfig"
+        meta:
+          $ref: "#/components/schemas/EnvelopeMeta"
+        error:
+          nullable: true
+
+    Envelope_SystemStatus:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/SystemStatus"
+        meta:
+          $ref: "#/components/schemas/EnvelopeMeta"
+        error:
+          nullable: true
+
+    Envelope_ContractList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContractInfo"
+        meta:
+          $ref: "#/components/schemas/EnvelopeMeta"
+        error:
+          nullable: true
+
+    Envelope_Nonce:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/NonceResponse"
+        meta:
+          $ref: "#/components/schemas/EnvelopeMeta"
+        error:
+          nullable: true
+
+    Envelope_Session:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/SessionInfo"
+        meta:
+          $ref: "#/components/schemas/EnvelopeMeta"
+        error:
+          nullable: true
+
+    Envelope_WalletSummary:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/WalletSummary"
+        meta:
+          $ref: "#/components/schemas/EnvelopeMeta"
+        error:
+          nullable: true
+
+    Envelope_TxList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransactionInfo"
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/EnvelopeMeta"
+            - $ref: "#/components/schemas/PaginationMeta"
+        error:
+          nullable: true
+
+    Envelope_BuyQuote:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/BuyQuote"
+        meta:
+          $ref: "#/components/schemas/EnvelopeMeta"
+        error:
+          nullable: true
+
+    Envelope_SellQuote:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/SellQuote"
+        meta:
+          $ref: "#/components/schemas/EnvelopeMeta"
+        error:
+          nullable: true
+
+    Envelope_Epoch:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/EpochInfo"
+        meta:
+          $ref: "#/components/schemas/EnvelopeMeta"
+        error:
+          nullable: true

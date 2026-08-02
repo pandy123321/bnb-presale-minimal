@@ -1,0 +1,24 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Pangu2\Dividend\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class DividendEpoch extends Model
+{
+    protected $fillable = [
+        'chain_id', 'epoch_id', 'snapshot_block',
+        'total_dividend_raw', 'merkle_root', 'artifact_checksum',
+        'status', 'published_at', 'snapshot_at',
+    ];
+
+    protected $casts = [
+        'chain_id'       => 'integer',
+        'epoch_id'       => 'integer',
+        'snapshot_block' => 'integer',
+        'published_at'   => 'datetime',
+        'snapshot_at'    => 'datetime',
+    ];
+}

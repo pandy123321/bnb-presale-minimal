@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use App\Http\ApiEnvelope;
 use App\Modules\Core\Auth\Controllers\WalletAuthController;
-use App\Modules\Core\Chain\Controllers\SystemController;
-use App\Modules\Core\Wallet\Middleware\WalletAuthMiddleware;
+use App\Http\Controllers\SystemController;
+use App\Http\Controllers\TradeController;
+use App\Modules\Pangu2\Dividend\Controllers\DividendController;
+use App\Modules\Pangu2\Buyback\Controllers\BuybackController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1/projects/pangu2')->group(function () {
@@ -14,25 +16,26 @@ Route::prefix('v1/projects/pangu2')->group(function () {
     Route::get('/system-status', [SystemController::class, 'systemStatus']);
     Route::get('/contracts',     [SystemController::class, 'contracts']);
 
+    // ── Auth ──
     Route::get('/auth/csrf', function () {
-        return ApiEnvelope::success(['csrf_initialized' => true], 'LIVE');
+        return ApiEnvelope::success(['csrf_initialized' => true], 'MOCK_DATA');
     });
 
-    Route::post('/auth/nonce', [WalletAuthController::class, 'nonce']);
+    Route::post('/auth/nonce',  [WalletAuthController::class, 'nonce']);
     Route::post('/auth/verify', [WalletAuthController::class, 'verify']);
+    Route::post('/auth/logout', [WalletAuthController::class, 'logout']);
 
-    Route::middleware(WalletAuthMiddleware::class)->group(function () {
-        Route::post('/auth/logout', [WalletAuthController::class, 'logout']);
+    // ── Trade (public, return MOCK_DATA until ABI available) ──
+    Route::post('/quotes/buy',                     [TradeController::class, 'buyQuote']);
+    Route::post('/quotes/sell',                    [TradeController::class, 'sellQuote']);
+    Route::get('/wallets/{address}/transactions',  [TradeController::class, 'transactions']);
 
-        Route::get('/auth/session', function (\Illuminate\Http\Request $request) {
-            return ApiEnvelope::success([
-                'auth_status'      => 'SESSION_ACTIVE',
-                'wallet_address'   => $request->session()->get('auth.wallet_address'),
-                'chain_id'         => $request->session()->get('auth.chain_id'),
-                'domain'           => $request->session()->get('auth.domain'),
-                'authenticated_at' => $request->session()->get('auth.authenticated_at'),
-                'expires_at'       => $request->session()->get('auth.expires_at'),
-            ], 'LIVE');
-        });
-    });
+    // ── Dividend (public) ──
+    Route::get('/dividend/epochs/current',                        [DividendController::class, 'current']);
+    Route::get('/dividend/epochs/{epochId}',                      [DividendController::class, 'show']);
+    Route::get('/dividend/epochs/{epochId}/proof/{address}',      [DividendController::class, 'proof']);
+
+    // ── Support (public) ──
+    Route::get('/buybacks',                      [BuybackController::class, 'index']);
+    Route::get('/locker/batches',                [BuybackController::class, 'lockerBatches']);
 });

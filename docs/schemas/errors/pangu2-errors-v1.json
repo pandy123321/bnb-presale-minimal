@@ -1,0 +1,172 @@
+{
+  "version": "1.0.0",
+  "project": "PANGU2",
+  "description": "Unified error code catalog. Backend MUST return these codes. Frontend MUST use generated enums.",
+  "categories": {
+    "AUTH": "Authentication and authorization",
+    "VALIDATION": "Input validation",
+    "QUOTE": "Quote/preview errors",
+    "CONTRACT": "Contract interaction errors",
+    "CHAIN": "Blockchain RPC errors",
+    "SYSTEM": "Internal system errors",
+    "RATE_LIMIT": "Rate limiting"
+  },
+  "errors": {
+    "AUTH_NONCE_EXPIRED": {
+      "category": "AUTH",
+      "message": "Nonce has expired",
+      "retryable": true,
+      "http_status": 401
+    },
+    "AUTH_INVALID_SIGNATURE": {
+      "category": "AUTH",
+      "message": "Signature verification failed",
+      "retryable": true,
+      "http_status": 401
+    },
+    "AUTH_REPLAY_DETECTED": {
+      "category": "AUTH",
+      "message": "Nonce already used",
+      "retryable": false,
+      "http_status": 401
+    },
+    "AUTH_WRONG_DOMAIN": {
+      "category": "AUTH",
+      "message": "Nonce was issued for a different domain",
+      "retryable": true,
+      "http_status": 401
+    },
+    "AUTH_WRONG_CHAIN": {
+      "category": "AUTH",
+      "message": "Nonce was issued for a different chain",
+      "retryable": true,
+      "http_status": 401
+    },
+    "AUTH_SESSION_EXPIRED": {
+      "category": "AUTH",
+      "message": "Session has expired",
+      "retryable": true,
+      "http_status": 401
+    },
+    "AUTH_UNAUTHORIZED": {
+      "category": "AUTH",
+      "message": "Not authenticated",
+      "retryable": false,
+      "http_status": 401
+    },
+    "AUTH_FORBIDDEN": {
+      "category": "AUTH",
+      "message": "Insufficient permissions",
+      "retryable": false,
+      "http_status": 403
+    },
+    "VALIDATION_INVALID_ADDRESS": {
+      "category": "VALIDATION",
+      "message": "Invalid EVM address format",
+      "retryable": false,
+      "http_status": 422
+    },
+    "VALIDATION_INVALID_AMOUNT": {
+      "category": "VALIDATION",
+      "message": "Amount must be a positive integer string",
+      "retryable": false,
+      "http_status": 422
+    },
+    "VALIDATION_AMOUNT_BELOW_MIN": {
+      "category": "VALIDATION",
+      "message": "Amount below minimum",
+      "retryable": false,
+      "http_status": 422
+    },
+    "VALIDATION_AMOUNT_ABOVE_MAX": {
+      "category": "VALIDATION",
+      "message": "Amount above maximum",
+      "retryable": false,
+      "http_status": 422
+    },
+    "QUOTE_UNAVAILABLE": {
+      "category": "QUOTE",
+      "message": "Quote is unavailable",
+      "retryable": true,
+      "http_status": 503
+    },
+    "QUOTE_EXPIRED": {
+      "category": "QUOTE",
+      "message": "Quote has expired, request a new one",
+      "retryable": true,
+      "http_status": 422
+    },
+    "QUOTE_INSUFFICIENT_LIQUIDITY": {
+      "category": "QUOTE",
+      "message": "Insufficient liquidity for quote",
+      "retryable": true,
+      "http_status": 422
+    },
+    "CONTRACT_NOT_CONFIGURED": {
+      "category": "CONTRACT",
+      "message": "Contract not configured for this environment",
+      "retryable": false,
+      "http_status": 503
+    },
+    "CONTRACT_ABI_UNAVAILABLE": {
+      "category": "CONTRACT",
+      "message": "Contract ABI not available",
+      "retryable": false,
+      "http_status": 503
+    },
+    "CONTRACT_CALL_FAILED": {
+      "category": "CONTRACT",
+      "message": "Contract call reverted or failed",
+      "retryable": true,
+      "http_status": 502
+    },
+    "CHAIN_RPC_UNAVAILABLE": {
+      "category": "CHAIN",
+      "message": "Blockchain RPC is unavailable",
+      "retryable": true,
+      "http_status": 503
+    },
+    "CHAIN_NETWORK_MISMATCH": {
+      "category": "CHAIN",
+      "message": "Configured chain ID does not match RPC",
+      "retryable": false,
+      "http_status": 503
+    },
+    "CHAIN_OWNER_MISMATCH": {
+      "category": "CHAIN",
+      "message": "Contract owner does not match operator address, writes disabled",
+      "retryable": false,
+      "http_status": 503
+    },
+    "CHAIN_SYNC_BEHIND": {
+      "category": "CHAIN",
+      "message": "Blockchain sync is behind",
+      "retryable": true,
+      "http_status": 503
+    },
+    "SYSTEM_INTERNAL_ERROR": {
+      "category": "SYSTEM",
+      "message": "Internal server error",
+      "retryable": true,
+      "http_status": 500
+    },
+    "SYSTEM_DATABASE_ERROR": {
+      "category": "SYSTEM",
+      "message": "Database error",
+      "retryable": true,
+      "http_status": 500
+    },
+    "SYSTEM_NOT_IMPLEMENTED": {
+      "category": "SYSTEM",
+      "message": "Not yet implemented",
+      "retryable": false,
+      "http_status": 501
+    },
+    "RATE_LIMIT_EXCEEDED": {
+      "category": "RATE_LIMIT",
+      "message": "Rate limit exceeded",
+      "retryable": true,
+      "http_status": 429
+    }
+  }
+}

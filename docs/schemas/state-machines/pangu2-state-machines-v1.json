@@ -1,0 +1,112 @@
+{
+  "version": "1.0.0",
+  "project": "PANGU2",
+  "description": "Formal state machine definitions shared by backend and frontend. All UI state management MUST follow these transitions.",
+  "machines": {
+    "wallet": {
+      "states": ["DISCONNECTED", "CONNECTING", "CONNECTED", "ERROR"],
+      "initial": "DISCONNECTED",
+      "transitions": [
+        {"from": "DISCONNECTED", "to": "CONNECTING", "trigger": "user_connect"},
+        {"from": "CONNECTING", "to": "CONNECTED", "trigger": "wallet_approved"},
+        {"from": "CONNECTING", "to": "DISCONNECTED", "trigger": "user_rejected"},
+        {"from": "CONNECTING", "to": "ERROR", "trigger": "provider_error"},
+        {"from": "CONNECTED", "to": "DISCONNECTED", "trigger": "user_disconnect"},
+        {"from": "CONNECTED", "to": "ERROR", "trigger": "provider_lost"},
+        {"from": "ERROR", "to": "CONNECTING", "trigger": "retry"},
+        {"from": "ERROR", "to": "DISCONNECTED", "trigger": "reset"}
+      ]
+    },
+    "network": {
+      "states": ["UNKNOWN", "SUPPORTED", "UNSUPPORTED", "SWITCHING", "ERROR"],
+      "initial": "UNKNOWN",
+      "transitions": [
+        {"from": "UNKNOWN", "to": "SUPPORTED", "trigger": "chain_detected"},
+        {"from": "UNKNOWN", "to": "UNSUPPORTED", "trigger": "chain_detected"},
+        {"from": "UNSUPPORTED", "to": "SWITCHING", "trigger": "user_switch"},
+        {"from": "SWITCHING", "to": "SUPPORTED", "trigger": "switch_success"},
+        {"from": "SWITCHING", "to": "UNSUPPORTED", "trigger": "switch_rejected"},
+        {"from": "SWITCHING", "to": "ERROR", "trigger": "switch_failed"},
+        {"from": "SUPPORTED", "to": "UNSUPPORTED", "trigger": "chain_changed"},
+        {"from": "any", "to": "ERROR", "trigger": "rpc_failure"}
+      ]
+    },
+    "quote": {
+      "states": ["IDLE", "LOADING", "READY", "EXPIRED", "FAILED"],
+      "initial": "IDLE",
+      "transitions": [
+        {"from": "IDLE", "to": "LOADING", "trigger": "amount_input"},
+        {"from": "LOADING", "to": "READY", "trigger": "quote_received"},
+        {"from": "LOADING", "to": "FAILED", "trigger": "quote_error"},
+        {"from": "READY", "to": "LOADING", "trigger": "amount_changed"},
+        {"from": "READY", "to": "EXPIRED", "trigger": "expiry_timeout"},
+        {"from": "EXPIRED", "to": "LOADING", "trigger": "amount_changed"},
+        {"from": "FAILED", "to": "LOADING", "trigger": "retry"}
+      ],
+      "rules": {
+        "expiry_seconds": 30,
+        "max_retries": 3,
+        "submit_blocked_in": ["IDLE", "LOADING", "EXPIRED", "FAILED"]
+      }
+    },
+    "approval": {
+      "states": ["NOT_REQUIRED", "REQUIRED", "SIGNATURE_PENDING", "SUBMITTED", "CONFIRMED", "FAILED", "REJECTED"],
+      "initial": "NOT_REQUIRED",
+      "transitions": [
+        {"from": "NOT_REQUIRED", "to": "REQUIRED", "trigger": "check_allowance"},
+        {"from": "REQUIRED", "to": "SIGNATURE_PENDING", "trigger": "request_approval"},
+        {"from": "SIGNATURE_PENDING", "to": "SUBMITTED", "trigger": "tx_broadcast"},
+        {"from": "SIGNATURE_PENDING", "to": "REJECTED", "trigger": "user_rejected"},
+        {"from": "SUBMITTED", "to": "CONFIRMED", "trigger": "receipt_confirmed"},
+        {"from": "SUBMITTED", "to": "FAILED", "trigger": "receipt_failed"}
+      ],
+      "rules": {
+        "sell_requires_approval": true,
+        "approval_is_separate_tx": true,
+        "do_not_hide_approval_step": true
+      }
+    },
+    "chain_transaction": {
+      "states": ["CREATED", "SUBMITTED", "PENDING", "CONFIRMED", "FAILED", "REPLACED", "DROPPED", "REORGED"],
+      "initial": "CREATED",
+      "transitions": [
+        {"from": "CREATED", "to": "SUBMITTED", "trigger": "broadcast"},
+        {"from": "SUBMITTED", "to": "PENDING", "trigger": "mempool_visible"},
+        {"from": "PENDING", "to": "CONFIRMED", "trigger": "block_confirmed"},
+        {"from": "PENDING", "to": "FAILED", "trigger": "execution_reverted"},
+        {"from": "PENDING", "to": "REPLACED", "trigger": "same_nonce_replaced"},
+        {"from": "PENDING", "to": "DROPPED", "trigger": "timeout_no_mempool"},
+        {"from": "CONFIRMED", "to": "REORGED", "trigger": "chain_reorg"}
+      ],
+      "terminal": ["CONFIRMED", "FAILED", "REPLACED", "DROPPED", "REORGED"]
+    },
+    "claim": {
+      "states": ["NOT_AVAILABLE", "AVAILABLE", "SIGNATURE_PENDING", "SUBMITTED", "CLAIMED", "FAILED", "REORG_RECHECK"],
+      "initial": "NOT_AVAILABLE",
+      "transitions": [
+        {"from": "NOT_AVAILABLE", "to": "AVAILABLE", "trigger": "epoch_claim_open"},
+        {"from": "AVAILABLE", "to": "SIGNATURE_PENDING", "trigger": "user_claim"},
+        {"from": "SIGNATURE_PENDING", "to": "SUBMITTED", "trigger": "tx_broadcast"},
+        {"from": "SUBMITTED", "to": "CLAIMED", "trigger": "receipt_confirmed"},
+        {"from": "SUBMITTED", "to": "FAILED", "trigger": "receipt_failed"},
+        {"from": "CLAIMED", "to": "REORG_RECHECK", "trigger": "chain_reorg"}
+      ]
+    },
+    "data_status": {
+      "states": ["MOCK_DATA", "SYNCING", "LIVE", "STALE", "DEGRADED", "UNAVAILABLE"],
+      "transitions": [
+        {"from": "MOCK_DATA", "to": "SYNCING", "trigger": "backend_ready"},
+        {"from": "SYNCING", "to": "LIVE", "trigger": "sync_complete"},
+        {"from": "LIVE", "to": "STALE", "trigger": "timeout_no_update"},
+        {"from": "LIVE", "to": "DEGRADED", "trigger": "partial_failure"},
+        {"from": "DEGRADED", "to": "LIVE", "trigger": "recovery"},
+        {"from": "LIVE", "to": "UNAVAILABLE", "trigger": "full_outage"},
+        {"from": "any", "to": "UNAVAILABLE", "trigger": "critical_failure"}
+      ],
+      "rules": {
+        "frontend_must_show_non_live": true,
+        "never_show_stale_as_live": true
+      }
+    }
+  }
+}

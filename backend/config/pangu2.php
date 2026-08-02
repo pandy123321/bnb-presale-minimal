@@ -16,8 +16,6 @@ return [
     'deployment_block' => env('PANGU2_DEPLOYMENT_BLOCK', '0'),
     'token_decimals' => 18,
     'token_symbol' => 'PANGU2',
-    'buy_tax_percent' => 4,
-    'sell_tax_tiers' => [4, 10],
 
     /*
     |--------------------------------------------------------------------------

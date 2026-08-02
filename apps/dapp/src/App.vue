@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useWalletStore } from "@/stores/useWallet";
+import { useDataStatusStore } from "@/stores/data/useDataStatus";
 import BottomNav from "@/components/BottomNav.vue";
 import ConnectSheet from "@/components/ConnectSheet.vue";
 import NetworkBanner from "@/components/NetworkBanner.vue";
+import DataStatusBanner from "@/components/common/DataStatusBanner.vue";
+import ErrorBoundary from "@/components/common/ErrorBoundary.vue";
+
+const dataStatus = useDataStatusStore();
 
 const wallet = useWalletStore();
 const connectSheetRef = ref<InstanceType<typeof ConnectSheet> | null>(null);
@@ -41,8 +46,6 @@ function walletBtnClass(): Record<string, boolean> {
         </div>
       </div>
       <div class="top-actions">
-        <!-- MOCK_DATA badge — remove when live data is wired -->
-        <span class="mock-badge">MOCK DATA</span>
         <button
           class="wallet-btn"
           :class="walletBtnClass()"
@@ -55,11 +58,20 @@ function walletBtnClass(): Record<string, boolean> {
       </div>
     </header>
 
+    <!-- Dynamic data status banner (replaces hardcoded MOCK DATA badge) -->
+    <DataStatusBanner
+      :data-status="dataStatus.status"
+      :block-number="dataStatus.blockNumber"
+      :age-formatted="dataStatus.ageFormatted"
+    />
+
     <!-- Network mismatch warning -->
     <NetworkBanner />
 
     <main>
-      <router-view />
+      <ErrorBoundary fallback-message="页面渲染失败，请刷新重试。">
+        <router-view />
+      </ErrorBoundary>
     </main>
 
     <BottomNav />
@@ -115,17 +127,6 @@ function walletBtnClass(): Record<string, boolean> {
 .brand small { display: block; font-size: 9px; color: var(--muted); margin-top: 2px; }
 
 .top-actions { display: flex; gap: 7px; align-items: center; }
-
-.mock-badge {
-  font-size: 8px;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  padding: 3px 7px;
-  border-radius: 6px;
-  color: var(--orange);
-  background: rgba(243, 163, 75, 0.1);
-  border: 1px solid rgba(243, 163, 75, 0.22);
-}
 
 .wallet-btn {
   height: 36px;
