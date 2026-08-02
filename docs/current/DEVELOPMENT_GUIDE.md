@@ -45,14 +45,24 @@ cd contracts
 forge build
 forge test --no-match-path "*/fork/*"
 
-# BSC Testnet fork tests (requires RPC URL + approved block)
-export BSC_TESTNET_RPC_URL="<url>"
-export BSC_TESTNET_FORK_BLOCK="<approved_block>"
+# BSC Testnet 分叉测试
+export FORK_RPC="<testnet_archive_url>"
+export FORK_BLOCK="122688000"
 
 forge test \
   --match-path "*/fork/*" \
-  --fork-url "$BSC_TESTNET_RPC_URL" \
-  --fork-block-number "$BSC_TESTNET_FORK_BLOCK"
+  --fork-url "$FORK_RPC" \
+  --fork-block-number "$FORK_BLOCK"
+
+# BSC Mainnet 分叉测试 (部署 NO-GO 但分叉测试允许)
+export FORK_RPC="<mainnet_archive_url>"
+export FORK_BLOCK="<approved_mainnet_block>"
+
+forge test \
+  --match-path "*/fork/*" \
+  --fork-url "$FORK_RPC" \
+  --fork-block-number "$FORK_BLOCK" \
+  --chain-id 56
 ```
 
 ## 后端
@@ -104,6 +114,5 @@ backend/.env.example → backend/.env
 
 ## 禁止事项
 
-- 不部署至 BSC Mainnet
-- 不提交 `.env` 或生产密钥
+- 不将生产 Secret 提交至仓库
 - 不直接在 `packages/api-types/src/` 手工编辑（由 OpenAPI 生成）

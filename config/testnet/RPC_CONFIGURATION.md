@@ -1,9 +1,10 @@
-# PANGU2 BSC Testnet RPC Configuration
+# PANGU2 — BSC Testnet + Mainnet RPC Configuration
 
-> This file contains ONLY publicly accessible BSC Testnet RPC endpoints.
-> DO NOT add private API keys, mainnet URLs, or credentials.
+> Testnet + Mainnet Fork testing. Deployment to Mainnet: NO-GO.
 
-## Public RPC Nodes (BSC Testnet — Chain ID 97)
+## Public RPC Nodes
+
+### BSC Testnet (Chain ID 97)
 
 ### Primary
 ```
@@ -42,6 +43,22 @@ Currency:      BNB
 Block Time:    ~3 seconds
 Confirmations: 12 (recommended for finality)
 ```
+
+### BSC Mainnet (Chain ID 56) — Fork Testing Only
+
+| Provider | URL |
+|---|---|
+| Binance Official | https://bsc-dataseed1.binance.org |
+| Binance Official | https://bsc-dataseed2.binance.org |
+
+```
+Chain ID:      56
+Currency:      BNB
+Block Time:    ~3 seconds
+Confirmations: 21 (recommended for finality)
+```
+
+> ⚠️  BSC Mainnet deployment remains NO-GO. These endpoints are for fork testing only.
 
 ## Environment Variable Template
 

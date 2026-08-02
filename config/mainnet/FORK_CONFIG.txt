@@ -1,0 +1,17 @@
+# BSC Mainnet Fork Configuration
+# Single authoritative source for all fork test parameters.
+# CI reads this file directly; no GitHub Secret or Variable overrides any value.
+#
+# FORK_RPC:        BSC Mainnet RPC endpoint.
+#                  (BSC Mainnet fork testing requires an archive node.)
+# FORK_CHAIN_ID:   Chain ID (56 = BSC Mainnet).
+# FORK_BLOCK:      Fixed, approved block for deterministic fork testing.
+# FORK_BLOCK_HASH: Expected hash at that block. CI fails on mismatch.
+#                  (Verify at https://bscscan.com/block/<FORK_BLOCK>)
+#
+# ⚠️  BSC_MAINNET deployment: NO-GO (fork testing ONLY)
+
+FORK_RPC=
+FORK_CHAIN_ID=56
+FORK_BLOCK=
+FORK_BLOCK_HASH=

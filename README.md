@@ -2,10 +2,13 @@
 
 链上代币发行与分红治理平台。智能合约 + Laravel API + Chain Worker + 用户 DApp + 运营 Admin。
 
-**当前阶段：** 核心模块实现完成，Integration Gate 与 Closeout 证据修复中。
+**当前阶段：** 核心模块实现完成，Fork CI Gate 待 RPC 就位。
+
+**支持网络：** BSC Testnet (Chain 97) / BSC Mainnet (Chain 56, Fork 测试)
 
 ```
-BSC_MAINNET: NO-GO
+BSC_MAINNET_DEPLOYMENT: NO-GO
+BSC_MAINNET_FORK_TESTING: ALLOWED
 Automatic Merge: FORBIDDEN
 Automatic Deployment: FORBIDDEN
 ```
@@ -31,7 +34,9 @@ bnb-presale-minimal/
 │   ├── schemas/      OpenAPI / 状态机 / 错误码
 │   └── evidence/     各阶段验收证据
 ├── infra/local/     本地全栈 Docker 编排
-├── config/testnet/  BSC Testnet 部署配置
+├── config/
+│   ├── testnet/     BSC Testnet 部署配置
+│   └── mainnet/     BSC Mainnet Fork 配置 (部署 NO-GO)
 └── reports/         WP-01 证据输出
 ```
 

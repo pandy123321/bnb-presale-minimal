@@ -63,7 +63,7 @@ Audit #94: 81ca79f — 4 P1/5 P2 (RPC secret + external PR + state model)
 | forge build + DeployPangu2.s.sol + Anvil | I03 | Local execution |
 | BSC Testnet contract deployment | I04 | Deployment + verification |
 | I04 not complete | I05 | Wait for I04 |
-| **BSC_MAINNET** | **All** | **Permanently NO-GO** |
+| **BSC_MAINNET_DEPLOYMENT** | **All** | **Permanently NO-GO** (Fork testing ALLOWED) |
 
 ## Next Actions
 

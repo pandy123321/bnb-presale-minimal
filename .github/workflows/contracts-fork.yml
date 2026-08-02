@@ -6,12 +6,14 @@ on:
     paths:
       - "contracts/**"
       - "config/testnet/FORK_CONFIG.txt"
+      - "config/mainnet/FORK_CONFIG.txt"
       - ".github/workflows/contracts-fork.yml"
   push:
     branches: [main]
     paths:
       - "contracts/**"
       - "config/testnet/FORK_CONFIG.txt"
+      - "config/mainnet/FORK_CONFIG.txt"
       - ".github/workflows/contracts-fork.yml"
   workflow_dispatch:
 

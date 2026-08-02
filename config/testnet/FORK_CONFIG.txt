@@ -2,13 +2,15 @@
 # Single authoritative source for all fork test parameters.
 # CI reads this file directly; no GitHub Secret or Variable overrides any value.
 #
-# FORK_RPC:        Public BSC Testnet RPC endpoint.
+# FORK_RPC:        BSC Testnet RPC endpoint.
+#                  Non-archive nodes return "missing trie node" for historical state.
+#                  Recommended: Ankr free archive RPC (https://www.ankr.com/rpc/bsc/).
 # FORK_CHAIN_ID:   Chain ID (97 = BSC Testnet).
 # FORK_BLOCK:      Fixed, approved block for deterministic fork testing.
 # FORK_BLOCK_HASH: Expected hash at that block. CI fails on mismatch.
-#                  (Verified via https://testnet.bscscan.com/block/122688154)
+#                  (Verify at https://testnet.bscscan.com/block/<FORK_BLOCK>)
 
 FORK_RPC=https://data-seed-prebsc-1-s1.binance.org:8545
 FORK_CHAIN_ID=97
-FORK_BLOCK=122688154
-FORK_BLOCK_HASH=0x6ef4d5abb439a93b92deab7aaf4c5756af95268a342e8ae4cdb07447cb112052
+FORK_BLOCK=122688000
+FORK_BLOCK_HASH=
