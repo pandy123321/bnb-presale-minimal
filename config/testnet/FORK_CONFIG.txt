@@ -1,12 +1,13 @@
 # BSC Testnet Fork Configuration
-# This file is the single authoritative source for all fork test parameters.
-# The CI workflow reads this file directly. No GitHub Secret or Variable overrides any value here.
+# Single authoritative source for all fork test parameters.
+# CI reads this file directly; no GitHub Secret or Variable overrides any value.
 #
-# FORK_RPC: Public BSC Testnet RPC endpoint (no API key required).
-#   External fork PRs and Dependabot PRs use the same public endpoint.
-# FORK_BLOCK: Fixed, approved block number for deterministic fork testing.
-# FORK_BLOCK_HASH: Expected hash at that block. CI will fail if the RPC returns a different hash.
+# FORK_RPC:       Public BSC Testnet RPC (no API key needed).
+# FORK_CHAIN_ID:  Chain ID (97 = BSC Testnet).
+# FORK_BLOCK:     Fixed, approved block for deterministic fork testing.
+# FORK_BLOCK_HASH:Expected hash at that block. CI fails on mismatch.
 
 FORK_RPC=https://bsc-testnet-rpc.publicnode.com
+FORK_CHAIN_ID=97
 FORK_BLOCK=44780000
 FORK_BLOCK_HASH=

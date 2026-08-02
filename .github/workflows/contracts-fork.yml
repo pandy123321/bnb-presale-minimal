@@ -38,24 +38,35 @@ jobs:
       - name: Read fork config
         id: config
         run: |
-          FORK_BLOCK="$(sed -n 's/^FORK_BLOCK=//p' ../config/testnet/FORK_CONFIG.txt)"
           FORK_RPC="$(sed -n 's/^FORK_RPC=//p' ../config/testnet/FORK_CONFIG.txt)"
+          FORK_CHAIN_ID="$(sed -n 's/^FORK_CHAIN_ID=//p' ../config/testnet/FORK_CONFIG.txt)"
+          FORK_BLOCK="$(sed -n 's/^FORK_BLOCK=//p' ../config/testnet/FORK_CONFIG.txt)"
+          EXPECTED_HASH="$(sed -n 's/^FORK_BLOCK_HASH=//p' ../config/testnet/FORK_CONFIG.txt)"
 
-          test -n "$FORK_BLOCK" || { echo "ERROR: FORK_BLOCK not found in config/testnet/FORK_CONFIG.txt"; exit 1; }
+          test -n "$FORK_RPC" || { echo "ERROR: FORK_RPC not found in config/testnet/FORK_CONFIG.txt"; exit 1; }
+          test -n "$FORK_CHAIN_ID" || { echo "ERROR: FORK_CHAIN_ID not found"; exit 1; }
+          test -n "$FORK_BLOCK" || { echo "ERROR: FORK_BLOCK not found"; exit 1; }
+          test -n "$EXPECTED_HASH" || { echo "ERROR: FORK_BLOCK_HASH is not configured in config/testnet/FORK_CONFIG.txt"; exit 1; }
+
           case "$FORK_BLOCK" in
             ''|*[!0-9]*) echo "ERROR: FORK_BLOCK is not a valid integer"; exit 1 ;;
           esac
-          echo "fork_block=$FORK_BLOCK" >> "$GITHUB_OUTPUT"
+          case "$FORK_CHAIN_ID" in
+            ''|*[!0-9]*) echo "ERROR: FORK_CHAIN_ID is not a valid integer"; exit 1 ;;
+          esac
 
-          test -n "$FORK_RPC" || { echo "ERROR: FORK_RPC not found in config/testnet/FORK_CONFIG.txt"; exit 1; }
           echo "fork_rpc=$FORK_RPC" >> "$GITHUB_OUTPUT"
-
-          echo "Config fork block: $FORK_BLOCK"
+          echo "fork_chain_id=$FORK_CHAIN_ID" >> "$GITHUB_OUTPUT"
+          echo "fork_block=$FORK_BLOCK" >> "$GITHUB_OUTPUT"
+          echo "expected_hash=$EXPECTED_HASH" >> "$GITHUB_OUTPUT"
 
       - name: Verify chain and block
+        id: verify
         env:
           FORK_RPC: ${{ steps.config.outputs.fork_rpc }}
+          FORK_CHAIN_ID: ${{ steps.config.outputs.fork_chain_id }}
           FORK_BLOCK: ${{ steps.config.outputs.fork_block }}
+          EXPECTED_HASH: ${{ steps.config.outputs.expected_hash }}
         run: |
           echo "=== Fork Verification ==="
           echo "PR commit: ${{ github.event.pull_request.head.sha || github.sha }}"
@@ -65,32 +76,47 @@ jobs:
             echo "ERROR: RPC unreachable: $CHAIN_ID"
             exit 1
           fi
-          test "$CHAIN_ID" = "97" || {
-            echo "ERROR: Expected chain 97 (BSC Testnet), got: $CHAIN_ID"
+          test "$CHAIN_ID" = "$FORK_CHAIN_ID" || {
+            echo "ERROR: Expected chain $FORK_CHAIN_ID, got: $CHAIN_ID"
             exit 1
           }
-          echo "Chain ID: $CHAIN_ID (BSC Testnet)"
+          echo "Chain ID: $CHAIN_ID"
 
           if ! BLOCK_INFO="$(cast block "$FORK_BLOCK" --rpc-url "$FORK_RPC" --json 2>&1)"; then
             echo "ERROR: Failed to read block $FORK_BLOCK: $BLOCK_INFO"
             exit 1
           fi
-          BLOCK_HASH="$(printf '%s' "$BLOCK_INFO" | jq -er '.hash')" || {
+          ACTUAL_HASH="$(printf '%s' "$BLOCK_INFO" | jq -er '.hash')" || {
             echo "ERROR: Block $FORK_BLOCK not found or JSON parse failed"
             exit 1
           }
-          test -n "$BLOCK_HASH" || {
+          test -n "$ACTUAL_HASH" || {
             echo "ERROR: Block hash is empty for block $FORK_BLOCK"
             exit 1
           }
+
+          ACTUAL_LOWER="$(printf '%s' "$ACTUAL_HASH" | tr '[:upper:]' '[:lower:]')"
+          EXPECTED_LOWER="$(printf '%s' "$EXPECTED_HASH" | tr '[:upper:]' '[:lower:]')"
+
+          test "$ACTUAL_LOWER" = "$EXPECTED_LOWER" || {
+            echo "ERROR: Fork block hash mismatch"
+            echo "Expected: $EXPECTED_HASH"
+            echo "Actual:   $ACTUAL_HASH"
+            exit 1
+          }
+
           echo "Fork block: $FORK_BLOCK"
-          echo "Block hash: $BLOCK_HASH"
+          echo "Block hash: $ACTUAL_HASH (matches expected)"
 
-          echo "fork_block_hash=$BLOCK_HASH" >> "$GITHUB_OUTPUT"
+          echo "actual_hash=$ACTUAL_HASH" >> "$GITHUB_OUTPUT"
+          echo "verified=1" >> "$GITHUB_OUTPUT"
 
-      - run: forge build
+      - name: Build contracts
+        id: build
+        run: forge build
 
       - name: Run fork tests
+        id: fork_tests
         env:
           FORK_RPC: ${{ steps.config.outputs.fork_rpc }}
           FORK_BLOCK: ${{ steps.config.outputs.fork_block }}
@@ -104,34 +130,70 @@ jobs:
       - name: Upload fork evidence
         if: always()
         env:
+          EVENT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_HASH: ${{ steps.config.outputs.expected_hash }}
+          ACTUAL_HASH: ${{ steps.verify.outputs.actual_hash }}
           FORK_BLOCK: ${{ steps.config.outputs.fork_block }}
-          FORK_BLOCK_HASH: ${{ steps.config.outputs.fork_block_hash }}
+          FORK_CHAIN_ID: ${{ steps.config.outputs.fork_chain_id }}
+          VERIFY_OUTCOME: ${{ steps.verify.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          TEST_OUTCOME: ${{ steps.fork_tests.outcome }}
+          JOB_STATUS: ${{ job.status }}
         run: |
           mkdir -p ../docs/evidence/PB-S6/P2-I03/
 
+          FOUNDRY_VER="$(forge --version 2>/dev/null || echo 'unknown')"
+
+          CHECKOUT_SHA="$(git rev-parse HEAD)"
+
+          HASH_MATCH="false"
+          if [ "${VERIFY_OUTCOME:-}" = "success" ]; then
+            HASH_MATCH="true"
+          fi
+
+          ALL_PASS="false"
+          if [ "${VERIFY_OUTCOME:-}" = "success" ] && [ "${BUILD_OUTCOME:-}" = "success" ] && [ "${TEST_OUTCOME:-}" = "success" ]; then
+            ALL_PASS="true"
+          fi
+
           jq -n \
-            --arg eventSha "${{ github.event.pull_request.head.sha || github.sha }}" \
-            --arg checkoutSha "$(git rev-parse HEAD)" \
-            --arg chainId "97" \
-            --arg forkBlock "$FORK_BLOCK" \
-            --arg forkBlockHash "${FORK_BLOCK_HASH:-}" \
-            --arg foundryVersion "v1.7.1" \
+            --arg expectedHash "${EXPECTED_HASH:-}" \
+            --arg actualHash "${ACTUAL_HASH:-}" \
+            --arg hashMatch "$HASH_MATCH" \
+            --arg chainId "${FORK_CHAIN_ID:-97}" \
+            --arg forkBlock "${FORK_BLOCK:-}" \
+            --arg foundryVersion "$FOUNDRY_VER" \
+            --arg eventSha "$EVENT_SHA" \
+            --arg checkoutSha "$CHECKOUT_SHA" \
+            --arg verifyOutcome "${VERIFY_OUTCOME:-skipped}" \
+            --arg buildOutcome "${BUILD_OUTCOME:-skipped}" \
+            --arg testOutcome "${TEST_OUTCOME:-skipped}" \
+            --arg jobStatus "${JOB_STATUS:-unknown}" \
             --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg runId "${{ github.run_id }}" \
             '{
-              event_sha: $eventSha,
-              checkout_sha: $checkoutSha,
+              expected_fork_block_hash: $expectedHash,
+              actual_fork_block_hash: $actualHash,
+              hash_match: ($hashMatch == "true"),
               chain_id: $chainId,
               fork_block: $forkBlock,
-              fork_block_hash: $forkBlockHash,
               foundry_version: $foundryVersion,
+              event_sha: $eventSha,
+              checkout_sha: $checkoutSha,
+              verify_status: $verifyOutcome,
+              build_status: $buildOutcome,
+              test_status: $testOutcome,
+              all_pass: ($allPass == "true"),
+              job_status: $jobStatus,
+              run_id: $runId,
               timestamp: $timestamp
             }' > ../docs/evidence/PB-S6/P2-I03/fork-evidence.json
 
-          echo "Evidence written."
+          echo "Evidence written. all_pass=$ALL_PASS, verify=$VERIFY_OUTCOME, build=$BUILD_OUTCOME, test=$TEST_OUTCOME"
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: fork-evidence
+          name: ${{ job.status == 'success' && 'fork-evidence-pass' || 'fork-evidence-failed' }}
           path: docs/evidence/PB-S6/P2-I03/fork-evidence.json
           retention-days: 90
