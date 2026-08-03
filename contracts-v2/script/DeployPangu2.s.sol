@@ -12,6 +12,7 @@ import { FeeVault } from "../src/FeeVault.sol";
 import { BuybackLocker } from "../src/BuybackLocker.sol";
 import { DividendDistributor } from "../src/DividendDistributor.sol";
 import { Pangu2TradeRouter } from "../src/Pangu2TradeRouter.sol";
+import { Pangu2Staking } from "../src/Pangu2Staking.sol";
 import { IPancakeFactory, IPancakePair } from "../src/interfaces/IPancakeV2.sol";
 import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
 import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
@@ -131,12 +132,15 @@ contract DeployPangu2 is Script {
             releaseRecipient
         );
 
-        // 6. Distributor + TradeRouter
+        // 6. Distributor + TradeRouter + Staking
         DividendDistributor distributor =
             new DividendDistributor(address(token), address(costBasis), deployer, rootPublisher, emergencyAccount);
         Pangu2TradeRouter tradeRouter = new Pangu2TradeRouter(
             address(token), WBNB, address(costBasis), address(adapter), address(oracle), deployer, emergencyAccount
         );
+
+        // 6b. Staking
+        Pangu2Staking staking = new Pangu2Staking(address(token), deployer);
 
         // 7. Configure system contracts
         token.configureCore(address(costBasis), address(feeVault));
@@ -146,6 +150,7 @@ contract DeployPangu2 is Script {
         token.setSystemAddress(address(supportPool), true);
         token.setSystemAddress(address(locker), true);
         token.setSystemAddress(address(distributor), true);
+        token.setSystemAddress(address(staking), true);
         token.grantRole(token.SETTLEMENT_ROLE(), address(tradeRouter));
 
         costBasis.configureOperators(address(tradeRouter), address(distributor));
