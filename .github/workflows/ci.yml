@@ -208,17 +208,10 @@ jobs:
           node-version: 22
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - name: Smoke-test ABI artifacts (verify Loader can read them)
+      - name: Smoke-test ABI artifacts (loads + validates via chain-worker Loader)
         run: |
           cd services/chain-worker
-          node -e "
-            const { existsSync } = require('fs');
-            const names = ['Pangu2Token','Pangu2TradeRouter','DividendDistributor','SupportPool','FeeVault','BuybackLocker','CostBasisManager'];
-            const outDir = '../../contracts-v2/out';
-            const missing = names.filter(n => !existsSync(outDir + '/' + n + '.sol/' + n + '.json'));
-            if (missing.length) { console.error('MISSING ABIs:', missing.join(', ')); process.exit(1); }
-            console.log('All ' + names.length + ' contract ABIs present');
-          "
+          pnpm run verify-abi
       - name: Chain Worker Tests
         run: |
           cd services/chain-worker

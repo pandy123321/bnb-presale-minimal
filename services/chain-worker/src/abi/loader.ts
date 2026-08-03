@@ -1,7 +1,7 @@
 // PANGU2 Chain Worker — ABI Loader
 // Loads compiled Foundry ABI files for event signature extraction.
 
-import { resolve } from "path";
+import { resolve, isAbsolute } from "path";
 import { readFileSync, existsSync } from "fs";
 
 export interface AbiEntry {
@@ -30,7 +30,30 @@ import { keccak256, toHex } from "viem";
  *     cd contracts-v2 && forge build --lib-paths ../contracts/lib
  */
 const DEFAULT_ABI_DIR = resolve(__dirname, "../../../../contracts-v2/out");
-const ABI_DIR = process.env.PANGU2_ABI_DIR ?? DEFAULT_ABI_DIR;
+
+const configuredDir = process.env.PANGU2_ABI_DIR?.trim();
+let ABI_DIR: string;
+if (configuredDir) {
+  if (!isAbsolute(configuredDir)) {
+    throw new Error(
+      `PANGU2_ABI_DIR must be an absolute path, got: ${configuredDir}`,
+    );
+  }
+  ABI_DIR = configuredDir;
+} else {
+  ABI_DIR = DEFAULT_ABI_DIR;
+}
+
+/** List of contracts whose ABIs the chain-worker depends on. Single source of truth. */
+export const REQUIRED_ABI_NAMES = [
+  "Pangu2TradeRouter",
+  "DividendDistributor",
+  "SupportPool",
+  "BuybackLocker",
+  "FeeVault",
+  "Pangu2Token",
+  "CostBasisManager",
+] as const;
 
 /**
  * Load a Foundry-compiled ABI JSON file.
@@ -80,17 +103,7 @@ export function getAllEventSignatures(): {
   const topicToName = new Map<string, string>();
   const nameToContract = new Map<string, string>();
 
-  const contracts = [
-    "Pangu2TradeRouter",
-    "DividendDistributor",
-    "SupportPool",
-    "BuybackLocker",
-    "FeeVault",
-    "Pangu2Token",
-    "CostBasisManager",
-  ];
-
-  for (const name of contracts) {
+  for (const name of REQUIRED_ABI_NAMES) {
     const abi = loadAbi(name);
     if (!abi) continue;
 
