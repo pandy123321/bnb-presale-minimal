@@ -21,7 +21,11 @@ export const useAdminAuthStore = defineStore("adminAuth", () => {
     loading.value = true; error.value = null;
     try {
       // Fetch CSRF cookie first (required by Laravel Sanctum web guard)
-      await fetch("/sanctum/csrf-cookie", { credentials: "include" });
+      const csrfRes = await fetch("/sanctum/csrf-cookie", { credentials: "include" });
+      if (!csrfRes.ok) {
+        error.value = "CSRF cookie initialization failed. Is Laravel Sanctum configured?";
+        return false;
+      }
       const res = await fetch(`${ADMIN_API}/auth/login`, {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
         body: JSON.stringify({ email, password }),

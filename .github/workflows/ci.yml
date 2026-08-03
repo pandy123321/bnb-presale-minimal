@@ -168,13 +168,14 @@ jobs:
           node-version: 22
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - name: Mock API Contract Test
+      - name: Mock API + Schema Validator (server start → contract test → schema validation → stop)
         run: |
           cd packages/mock-api
           pnpm run dev &
           SERVER_PID=$!
           cleanup() { kill "$SERVER_PID" 2>/dev/null || true; }
           trap cleanup EXIT
+
           ready=false
           for i in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:4000/health 2>/dev/null; then ready=true; break; fi
@@ -182,11 +183,11 @@ jobs:
           done
           if [ "$ready" != "true" ]; then echo "ERROR: Mock API did not start"; exit 1; fi
           pnpm run test
-        shell: bash
-      - name: Schema Validator
-        run: |
-          cd packages/schema-validator
+
+          # Schema validation (must run while Mock API is alive)
+          cd ../schema-validator
           pnpm run validate
+        shell: bash
 
   # --- Chain Worker ---
 

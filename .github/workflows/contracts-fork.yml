@@ -292,11 +292,13 @@ jobs:
             echo "Fork config missing required fields"; exit 1;
           }
           echo "fork_rpc=$FORK_RPC" >> "$GITHUB_OUTPUT"
+          echo "fork_chain_id=$FORK_CHAIN_ID" >> "$GITHUB_OUTPUT"
           echo "fork_block=$FORK_BLOCK" >> "$GITHUB_OUTPUT"
           echo "expected_hash=$EXPECTED_HASH" >> "$GITHUB_OUTPUT"
       - name: Verify V2 chain and block
         env:
           FORK_RPC: ${{ steps.v2-config.outputs.fork_rpc }}
+          FORK_CHAIN_ID: ${{ steps.v2-config.outputs.fork_chain_id }}
           FORK_BLOCK: ${{ steps.v2-config.outputs.fork_block }}
           EXPECTED_HASH: ${{ steps.v2-config.outputs.expected_hash }}
         run: |
@@ -307,7 +309,7 @@ jobs:
       - run: forge build --lib-paths ../contracts/lib
       - name: Run V2 fork tests
         env:
-          FORK_RPC: ${{ steps.v2-config.outputs.fork_rpc }}
-          FORK_BLOCK: ${{ steps.v2-config.outputs.fork_block }}
+          BSC_TESTNET_RPC_URL: ${{ steps.v2-config.outputs.fork_rpc }}
+          BSC_TESTNET_FORK_BLOCK: ${{ steps.v2-config.outputs.fork_block }}
         run: |
-          forge test --match-path "*/fork/*" --fork-url "$FORK_RPC" --fork-block-number "$FORK_BLOCK" --lib-paths ../contracts/lib -vvv
+          forge test --match-path "*/fork/*" --fork-url "$BSC_TESTNET_RPC_URL" --fork-block-number "$BSC_TESTNET_FORK_BLOCK" --lib-paths ../contracts/lib -vvv

@@ -29,38 +29,45 @@ import {
   insertRawEvents,
   type RawEventRow,
 } from "../db/client";
-import { getAllEventSignatures } from "../abi/loader";
+import { loadRequiredAbis } from "../abi/loader";
 
 // ── Config ─────────────────────────────────
 
 const CHAIN_ID = parseInt(process.env.CHAIN_ID ?? "31337");
-const RPC_URL = process.env.RPC_URL ?? "http://localhost:8545";
+const RPC_URL = process.env.CHAIN_WORKER_RPC_URL ?? process.env.RPC_URL ?? "http://localhost:8545";
 const SCAN_BATCH_SIZE = parseInt(process.env.SCAN_BATCH_SIZE ?? "1000");
 const CONFIRMATION_BLOCKS = parseInt(process.env.CONFIRMATION_BLOCKS ?? "12");
 const REORG_DEPTH = parseInt(process.env.REORG_DEPTH ?? "20");
 const SCAN_INTERVAL_SECONDS = parseInt(process.env.SCAN_INTERVAL_SECONDS ?? "15");
 const WORKER_ID = process.env.WORKER_ID ?? "worker-default";
 const LEASE_TTL_SECONDS = parseInt(process.env.LEASE_TTL_SECONDS ?? "120");
+const TRADE_ROUTER_ADDRESS = (process.env.CHAIN_WORKER_TRADE_ROUTER_ADDRESS ?? "").toLowerCase();
+const DIVIDEND_DISTRIBUTOR_ADDRESS = (process.env.CHAIN_WORKER_DIVIDEND_ADDRESS ?? "").toLowerCase();
+const DEPLOYMENT_BLOCK = parseInt(process.env.DEPLOYMENT_BLOCK ?? "0");
+
+// ── Load ABIs at module init (fail-fast) ───
+
+const REQUIRED_ABIS = loadRequiredAbis();
 
 // ── Stream Definitions ─────────────────────
 
 const STREAMS: Array<{
   name: string;
   contractAddress: string;
-  abiName: string;
+  abi: readonly unknown[];
   startBlock: number;
 }> = [
   {
     name: "TRADE_EVENTS",
-    contractAddress: process.env.TRADE_ROUTER_ADDRESS ?? "0x0000000000000000000000000000000000000000",
-    abiName: "Pangu2TradeRouter",
-    startBlock: parseInt(process.env.DEPLOYMENT_BLOCK ?? "0"),
+    contractAddress: TRADE_ROUTER_ADDRESS,
+    abi: REQUIRED_ABIS["Pangu2TradeRouter"] ?? [],
+    startBlock: DEPLOYMENT_BLOCK,
   },
   {
     name: "DIVIDEND_EVENTS",
-    contractAddress: process.env.DIVIDEND_ADDRESS ?? "0x0000000000000000000000000000000000000000",
-    abiName: "DividendDistributor",
-    startBlock: parseInt(process.env.DEPLOYMENT_BLOCK ?? "0"),
+    contractAddress: DIVIDEND_DISTRIBUTOR_ADDRESS,
+    abi: REQUIRED_ABIS["DividendDistributor"] ?? [],
+    startBlock: DEPLOYMENT_BLOCK,
   },
 ];
 
@@ -87,16 +94,16 @@ function getPp(): Pool {
 
 export async function start(): Promise<void> {
   // Validate required environment
-  if (!RPC_URL || RPC_URL === "http://localhost:8545") {
-    console.error("[Chain Worker] FATAL: RPC_URL is not configured or is default. Set CHAIN_WORKER_RPC_URL.");
-    process.exit(1);
-  }
   if (!TRADE_ROUTER_ADDRESS || TRADE_ROUTER_ADDRESS === "0x0000000000000000000000000000000000000000") {
-    console.error("[Chain Worker] FATAL: TRADE_ROUTER_ADDRESS is zero or not configured.");
+    console.error("[Chain Worker] FATAL: CHAIN_WORKER_TRADE_ROUTER_ADDRESS is zero or not configured.");
     process.exit(1);
   }
   if (!DIVIDEND_DISTRIBUTOR_ADDRESS || DIVIDEND_DISTRIBUTOR_ADDRESS === "0x0000000000000000000000000000000000000000") {
-    console.error("[Chain Worker] FATAL: DIVIDEND_DISTRIBUTOR_ADDRESS is zero or not configured.");
+    console.error("[Chain Worker] FATAL: CHAIN_WORKER_DIVIDEND_ADDRESS is zero or not configured.");
+    process.exit(1);
+  }
+  if (!RPC_URL || RPC_URL === "http://localhost:8545") {
+    console.error("[Chain Worker] FATAL: RPC is not configured (default localhost). Set CHAIN_WORKER_RPC_URL.");
     process.exit(1);
   }
 
@@ -107,9 +114,8 @@ export async function start(): Promise<void> {
   console.log(`  Confirmation blocks: ${CONFIRMATION_BLOCKS}`);
   console.log(`  Worker ID: ${WORKER_ID}`);
 
-  // Load event signatures for decoding — fails closed: worker exits if required ABIs are missing
-  getAllEventSignatures();
-  console.log("  Event signatures loaded");
+  // ABI validation done at module init via loadRequiredAbis() — fails closed
+  console.log("  ABIs loaded and bound to streams");
 
   running = true;
   await scanAllStreams();
@@ -212,7 +218,12 @@ async function scanStream(stream: {
             topics: log.topics as `0x${string}`[],
           });
           eventName = decodedLog.eventName ?? eventName;
-          decoded = { ...(decodedLog.args as Record<string, unknown>) };
+          // Convert BigInt values to decimal strings for JSON serialization
+          const args = decodedLog.args as Record<string, unknown>;
+          decoded = {};
+          for (const [k, v] of Object.entries(args)) {
+            decoded[k] = typeof v === "bigint" ? v.toString() : v;
+          }
         }
       } catch {
         // Keep raw data if decoding fails (unknown event or ABI mismatch)

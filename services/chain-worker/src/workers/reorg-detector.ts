@@ -49,7 +49,10 @@ async function checkReorgs(): Promise<void> {
           // Signal scanner to re-process the affected range
           console.log(`[Reorg] Cursor rewound to block ${s.blockNumber - 1} — rescan required`);
         }
-      } catch (e) { console.error(`[Reorg] Block #${s.blockNumber} check failed`, e); }
+      } catch (e) {
+        console.error(`[Reorg] Block #${s.blockNumber} check failed`, e);
+        try { await db.query("ROLLBACK"); } catch {}
+      }
     }
   } finally { db.release(); }
 }

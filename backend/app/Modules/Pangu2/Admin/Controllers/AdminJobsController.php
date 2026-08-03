@@ -124,7 +124,7 @@ class AdminJobsController extends Controller
             ]);
 
             if (!$inserted) {
-                return false;
+                return ['consumed' => false];
             }
 
             DB::table('admin_audit_logs')->insert([
