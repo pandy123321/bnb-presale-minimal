@@ -96,11 +96,22 @@ class DividendController extends Controller
             return ApiEnvelope::error('NOT_FOUND', 'Epoch not found.', false, [], 404);
         }
 
-        // Rebuild the tree deterministically to generate proof
-        // Uses Solidity Leaf Schema V1: keccak256(abi.encode(chainId, distributor, epochId, rewardToken, account, amount))
-        $chainId    = $this->chainId();
-        $tokenAddr  = (string) config('pangu2.token_address', '0x0000000000000000000000000000000000000000');
-        $distAddr   = (string) config('pangu2.dividend_distributor_address', '0x0000000000000000000000000000000000000000');
+        // Rebuild with epoch-immutable params (NOT current config).
+        // These were frozen when the Epoch Root was published on-chain.
+        $chainId   = (int) $epoch->chain_id;
+        $tokenAddr = (string) ($epoch->reward_token_address ?: '0x0000000000000000000000000000000000000000');
+        $distAddr  = (string) ($epoch->distributor_address ?: '0x0000000000000000000000000000000000000000');
+
+        if ($tokenAddr === '0x0000000000000000000000000000000000000000' ||
+            $distAddr === '0x0000000000000000000000000000000000000000') {
+            return ApiEnvelope::error(
+                'EPOCH_NOT_CONFIGURED',
+                'Epoch is missing immutable distributor or reward token address. Proofs are unavailable.',
+                false,
+                [],
+                503,
+            );
+        }
         $allAllocations = DividendAllocation::where('chain_id', $chainId)
             ->where('epoch_id', $epochId)
             ->orderBy('rank')

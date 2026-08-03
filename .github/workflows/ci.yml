@@ -44,8 +44,12 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: "v1.7.1"
+      - run: forge fmt --check
       - run: forge build --lib-paths ../contracts/lib
-      - run: forge test --no-match-path "*/fork/*" --lib-paths ../contracts/lib
+      - run: |
+          TEST_COUNT=$(forge test --no-match-path "*/fork/*" --lib-paths ../contracts/lib -vvv 2>&1 | grep -c "\[PASS\]")
+          echo "V2 non-fork tests passed: $TEST_COUNT"
+          if [ "$TEST_COUNT" -eq 0 ]; then echo "ERROR: 0 non-fork tests"; exit 1; fi
 
   # --- Laravel Backend ---
 

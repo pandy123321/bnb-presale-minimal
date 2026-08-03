@@ -25,6 +25,7 @@ import {
 import type { SellQuote, EnvelopeMeta } from "@pangu2/api-types";
 import { fetchPost } from "@/api";
 import { useWalletStore } from "@/stores/useWallet";
+import { isAddress, zeroAddress, getBytecode } from "viem";
 import {
   writeContract,
   waitForTransactionReceipt,
@@ -42,10 +43,15 @@ const ROUTER_ABI = parseAbi([
   "function sell(uint256 tokenIn, uint256 minBnbOut, uint256 deadline) payable",
 ]);
 
-// Known addresses — injected from deployment manifest or contract registry at build time.
-// NEVER commit real addresses here. Set via process.env or deploy-time replacement.
-const TRADE_ROUTER_ADDRESS = (typeof process !== 'undefined' && process.env?.VITE_TRADE_ROUTER_ADDRESS as `0x${string}`) || "0x0000000000000000000000000000000000000000" as `0x${string}`;
-const TOKEN_ADDRESS        = (typeof process !== 'undefined' && process.env?.VITE_TOKEN_ADDRESS as `0x${string}`)        || "0x0000000000000000000000000000000000000000" as `0x${string}`;
+// Known addresses — injected from Deployment Manifest at build time via Vite env.
+// Addresses are PUBLIC. Missing or invalid addresses will throw at startup (fail-closed).
+function requireContractAddress(v: string | undefined, name: string): `0x${string}` {
+  if (!v || !isAddress(v)) throw new Error(`${name} missing or invalid.`);
+  if (v.toLowerCase() === zeroAddress.toLowerCase()) throw new Error(`${name} is zero address.`);
+  return v as `0x${string}`;
+}
+const TRADE_ROUTER_ADDRESS = requireContractAddress(import.meta.env.VITE_TRADE_ROUTER_ADDRESS as string | undefined, "TRADE_ROUTER_ADDRESS");
+const TOKEN_ADDRESS = requireContractAddress(import.meta.env.VITE_TOKEN_ADDRESS as string | undefined, "TOKEN_ADDRESS");
 
 // ── Transaction State ──────────────────────
 

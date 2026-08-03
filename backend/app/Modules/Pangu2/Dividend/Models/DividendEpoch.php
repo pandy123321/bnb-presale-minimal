@@ -12,6 +12,7 @@ class DividendEpoch extends Model
         'chain_id', 'epoch_id', 'snapshot_block',
         'total_dividend_raw', 'merkle_root', 'artifact_checksum',
         'status', 'published_at', 'snapshot_at',
+        'reward_token_address', 'distributor_address',
     ];
 
     protected $casts = [
