@@ -43,15 +43,14 @@ export function getAbiDir(): string {
   return resolve(configuredDir);
 }
 
-/** List of contracts whose ABIs the chain-worker depends on. Single source of truth. */
+/**
+ * Contracts whose ABIs the chain-worker requires at startup.
+ * Derived from STREAMS in event-scanner.ts — only contracts with active scan streams.
+ * Add entries here when a new scan stream is added.
+ */
 export const REQUIRED_ABI_NAMES = [
   "Pangu2TradeRouter",
   "DividendDistributor",
-  "SupportPool",
-  "BuybackLocker",
-  "FeeVault",
-  "Pangu2Token",
-  "CostBasisManager",
 ] as const;
 
 /**
