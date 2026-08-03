@@ -14,16 +14,22 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
     uint16 public immutable maximumSpotTwapDeviationBps;
 
     uint16 public constant BPS_DENOMINATOR = 10_000;
+    uint256 private constant Q112 = 2**112;
 
-    Observation public lastObservation;
+    struct Observation { uint32 timestamp; uint256 price0CumulativeLast; uint256 price1CumulativeLast; }
+
+    Observation public anchor;
+    bool public anchored;
 
     error ZeroAddress();
     error AddressHasNoCode(address account);
     error InvalidPair();
     error InvalidAmount();
     error ZeroQuote();
+    error ZeroReserves();
     error ExcessiveSpotTwapDeviation(uint256 spot, uint256 twap, uint16 deviationBps);
-    error ObservationWindowTooShort(uint256 elapsed, uint32 required);
+    error OracleNotReady(uint256 elapsed, uint32 required);
+    error NoAnchor();
 
     constructor(
         address token_, address wbnb_, address factory_, address pair_, uint32 twapWindow_,
@@ -39,21 +45,21 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
             revert InvalidPair();
         }
         if (IPancakeFactory(factory_).getPair(token_, wbnb_) != pair_) revert InvalidPair();
-        // Seed first observation
-        (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast) = pair.getReserves();
-        lastObservation = Observation({
-            timestamp: blockTimestampLast,
-            price0CumulativeLast: IUniswapV2Pair(address(pair)).price0CumulativeLast(),
-            price1CumulativeLast: IUniswapV2Pair(address(pair)).price1CumulativeLast()
-        });
     }
 
     function update() external override {
-        (,, uint32 ts) = pair.getReserves();
-        uint p0 = IUniswapV2Pair(address(pair)).price0CumulativeLast();
-        uint p1 = IUniswapV2Pair(address(pair)).price1CumulativeLast();
-        if (ts > lastObservation.timestamp) {
-            lastObservation = Observation({timestamp: ts, price0CumulativeLast: p0, price1CumulativeLast: p1});
+        (uint112 r0, uint112 r1, uint32 ts) = pair.getReserves();
+        if (r0 == 0 || r1 == 0) { anchored = false; return; }
+        uint256 p0 = IUniswapV2Pair(address(pair)).price0CumulativeLast();
+        uint256 p1 = IUniswapV2Pair(address(pair)).price1CumulativeLast();
+        if (!anchored) {
+            anchor = Observation({timestamp: ts, price0CumulativeLast: p0, price1CumulativeLast: p1});
+            anchored = true;
+            return;
+        }
+        // Only advance anchor after full twapWindow; prevents frequent resets
+        if (ts >= anchor.timestamp && ts - anchor.timestamp >= twapWindow) {
+            anchor = Observation({timestamp: ts, price0CumulativeLast: p0, price1CumulativeLast: p1});
         }
     }
 
@@ -63,12 +69,13 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
         if (!((baseToken == token && quoteToken == wbnb) || (baseToken == wbnb && quoteToken == token)))
             revert InvalidPair();
         if (baseAmount == 0) revert InvalidAmount();
+        if (!anchored) revert NoAnchor();
 
         (uint112 r0, uint112 r1,) = pair.getReserves();
-        bool t0 = token < wbnb;
-        uint256 tRes = t0 ? uint256(r0) : uint256(r1);
-        uint256 wRes = t0 ? uint256(r1) : uint256(r0);
-        if (tRes == 0 || wRes == 0) revert ZeroQuote();
+        if (r0 == 0 || r1 == 0) revert ZeroReserves();
+        bool tokenIsToken0 = token < wbnb;
+        uint256 tRes = tokenIsToken0 ? uint256(r0) : uint256(r1);
+        uint256 wRes = tokenIsToken0 ? uint256(r1) : uint256(r0);
 
         // Spot
         uint256 spotOut = baseToken == token
@@ -76,37 +83,47 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
             : FullMath.mulDiv(uint256(baseAmount), tRes, wRes);
         if (spotOut == 0) revert ZeroQuote();
 
-        // TWAP from cumulative deltas
-        uint256 twapOut = spotOut;
-        (,, uint32 ts) = pair.getReserves();
-        uint p0c = IUniswapV2Pair(address(pair)).price0CumulativeLast();
-        uint p1c = IUniswapV2Pair(address(pair)).price1CumulativeLast();
-        uint256 elapsed = ts >= lastObservation.timestamp ? ts - lastObservation.timestamp : 0;
+        // Counterfactual cumulative (extrapolate to current block)
+        uint256 p0c = _cfPrice0(); uint256 p1c = _cfPrice1();
+        uint256 elapsed = block.timestamp >= anchor.timestamp ? block.timestamp - anchor.timestamp : 0;
+        if (elapsed < twapWindow) revert OracleNotReady(elapsed, twapWindow);
 
-        if (elapsed >= twapWindow && lastObservation.price0CumulativeLast > 0 && p0c > lastObservation.price0CumulativeLast) {
-            uint256 avgR0 = (p0c - lastObservation.price0CumulativeLast) / elapsed;
-            uint256 avgR1 = (p1c - lastObservation.price1CumulativeLast) / elapsed;
-            if (avgR0 > 0 && avgR1 > 0) {
-                twapOut = baseToken == token
-                    ? FullMath.mulDiv(uint256(baseAmount), avgR1, avgR0)
-                    : FullMath.mulDiv(uint256(baseAmount), avgR0, avgR1);
-            }
-            // Validate deviation
-            if (maximumSpotTwapDeviationBps < BPS_DENOMINATOR) {
-                uint256 dev;
-                if (spotOut > twapOut) {
-                    dev = ((spotOut - twapOut) * BPS_DENOMINATOR) / twapOut;
-                } else {
-                    dev = ((twapOut - spotOut) * BPS_DENOMINATOR) / spotOut;
-                }
-                if (dev > maximumSpotTwapDeviationBps)
-                    revert ExcessiveSpotTwapDeviation(spotOut, twapOut, uint16(dev));
-            }
-        } else if (maximumSpotTwapDeviationBps == 0 && elapsed < twapWindow) {
-            revert ObservationWindowTooShort(elapsed, twapWindow);
+        // avg price0 = (reserve1/reserve0) in Q112; avg price1 = (reserve0/reserve1) in Q112
+        uint256 p0Delta = p0c - anchor.price0CumulativeLast;
+        uint256 p1Delta = p1c - anchor.price1CumulativeLast;
+
+        // quotePerBaseQ112 = TWAP of quoteToken per baseToken in Q112
+        // tokenIsToken0: price0 = wbnb/token, price1 = token/wbnb
+        uint256 qpb = tokenIsToken0
+            ? (baseToken == token ? p0Delta / elapsed : p1Delta / elapsed)
+            : (baseToken == token ? p1Delta / elapsed : p0Delta / elapsed);
+
+        uint256 twapOut = FullMath.mulDiv(uint256(baseAmount), qpb, Q112);
+        if (twapOut == 0) revert ZeroQuote();
+
+        if (maximumSpotTwapDeviationBps < BPS_DENOMINATOR) {
+            uint256 dev = spotOut > twapOut
+                ? ((spotOut - twapOut) * BPS_DENOMINATOR) / twapOut
+                : ((twapOut - spotOut) * BPS_DENOMINATOR) / spotOut;
+            if (dev > maximumSpotTwapDeviationBps)
+                revert ExcessiveSpotTwapDeviation(spotOut, twapOut, uint16(dev));
         }
 
         quote = Quote({amountOut: twapOut, arithmeticMeanTick: 0, spotTick: 0, harmonicMeanLiquidity: 0, observedAtBlock: uint40(block.number)});
+    }
+
+    function _cfPrice0() private view returns (uint256) {
+        (uint112 r0, uint112 r1, uint32 lastTs) = pair.getReserves();
+        uint256 s = IUniswapV2Pair(address(pair)).price0CumulativeLast();
+        if (lastTs >= block.timestamp) return s;
+        return s + FullMath.mulDiv(uint256(r1) * (block.timestamp - lastTs), Q112, uint256(r0));
+    }
+
+    function _cfPrice1() private view returns (uint256) {
+        (uint112 r0, uint112 r1, uint32 lastTs) = pair.getReserves();
+        uint256 s = IUniswapV2Pair(address(pair)).price1CumulativeLast();
+        if (lastTs >= block.timestamp) return s;
+        return s + FullMath.mulDiv(uint256(r0) * (block.timestamp - lastTs), Q112, uint256(r1));
     }
 
     function _requireContract(address account) private view {

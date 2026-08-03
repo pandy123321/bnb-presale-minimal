@@ -3,7 +3,8 @@ pragma solidity 0.8.24;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
-import {IPancakeFactory} from "../src/interfaces/IPancakeV2.sol";
+import {IPancakeFactory, IPancakeRouter01} from "../src/interfaces/IPancakeV2.sol";
+import {TransferContext} from "../src/libraries/TransferContext.sol";
 import {Pangu2Token} from "../src/Pangu2Token.sol";
 import {CostBasisManager} from "../src/CostBasisManager.sol";
 import {PancakeV2Adapter} from "../src/adapters/PancakeV2Adapter.sol";
@@ -35,10 +36,12 @@ contract DeployPangu2 is Script {
         keeper = vm.envAddress("KEEPER_ADDRESS");
         releaseRecipient = vm.envAddress("RELEASE_RECIPIENT_ADDRESS");
 
-        if (block.chainid != 97 && block.chainid != 56) revert("Unsupported chain");
+        if (block.chainid != 97) revert(string(abi.encodePacked("chainId ", vm.toString(block.chainid), " unsupported — only BSC Testnet (97) allowed")));
         require(WBNB.code.length > 0, "WBNB not deployed");
         require(FACTORY.code.length > 0, "Factory not deployed");
         require(ROUTER.code.length > 0, "Router not deployed");
+        // Validate Factory->Pair association proactively
+        require(FACTORY == IPancakeRouter01(ROUTER).factory(), "Factory-Router mismatch");
 
         address[] memory roles = new address[](4);
         roles[0] = governance; roles[1] = emergencyAccount; roles[2] = keeper; roles[3] = releaseRecipient;
@@ -83,14 +86,13 @@ contract DeployPangu2 is Script {
         token.grantRole(token.SETTLEMENT_ROLE(), address(tradeRouter));
 
         costBasis.configureOperators(address(tradeRouter), address(distributor));
-        costBasis.configureLiquidityGateway(address(adapter));
 
-        // Sync CostBasisManager system addresses with Token
-        costBasis.setSystemAddress(address(tradeRouter), true);
-        costBasis.setSystemAddress(address(adapter), true);
-        costBasis.setSystemAddress(address(supportPool), true);
-        costBasis.setSystemAddress(address(locker), true);
-        costBasis.setSystemAddress(address(distributor), true);
+        // System addresses on CostBasisManager are set through Token (onlyToken gated)
+        // The Token contract internally calls costBasis.setSystemAddress when token.setSystemAddress is called
+        // Lines 78-82 below already register these as system addresses on Token
+
+        // V2 has no LiquidityGateway — use configureLiquidityGateway if a real gateway is deployed later
+        // costBasis.configureLiquidityGateway(...) — not yet configured
 
         adapter.setCaller(address(tradeRouter), true);
         adapter.setCaller(address(feeVault), true);
@@ -99,6 +101,17 @@ contract DeployPangu2 is Script {
         supportPool.configureFeeVault(address(feeVault));
         supportPool.configureLocker(address(locker));
         feeVault.configureDividendDistributor(address(distributor));
+
+        // ── Governance handover: deployer renounces residual admin ──
+        // Token DEFAULT_ADMIN_ROLE + GOVERNANCE_ROLE already granted to governance in constructor.
+        // All other contracts grant DEFAULT_ADMIN_ROLE + GOVERNANCE_ROLE to governance address.
+        // Deployer should not retain any administrative roles.
+        _renounceDeployerRoles(token, costBasis, tradeRouter, distributor, supportPool, feeVault, locker, adapter, oracle);
+
+        console.log("Chain:", block.chainid);
+        console.log("Governance:", governance);
+        console.log("Deployer:", msg.sender);
+        console.log("Note: Deployer has renounced all admin roles.");
 
         vm.stopBroadcast();
 
@@ -130,4 +143,51 @@ contract DeployPangu2 is Script {
         require(IPancakeFactory(FACTORY).getPair(token, WBNB) == pair, "getPair mismatch");
         return pair;
     }
+
+    function _renounceDeployerRoles(
+        Pangu2Token token,
+        CostBasisManager costBasis,
+        Pangu2TradeRouter tradeRouter,
+        DividendDistributor distributor,
+        SupportPool supportPool,
+        FeeVault feeVault,
+        BuybackLocker locker,
+        PancakeV2Adapter adapter,
+        PancakeV2TwapOracle oracle
+    ) internal {
+        // Only renounce if deployer actually holds the role (not already transferred to governance)
+        bytes32 DEFAULT_ADMIN = 0x00;
+        address deployer = msg.sender;
+
+        // Token: DEFAULT_ADMIN_ROLE + GOVERNANCE_ROLE already granted to governance in constructor.
+        // CostBasis: same.
+        // TradeRouter: DEFAULT_ADMIN + GOVERNANCE already to governance.
+        // Other contracts: already set governance in constructor.
+
+        // Use try/catch for each renounce in case role was already transferred.
+        _tryRenounce(token, DEFAULT_ADMIN, deployer);
+        _tryRenounce(token, token.GOVERNANCE_ROLE(), deployer);
+        _tryRenounce(costBasis, DEFAULT_ADMIN, deployer);
+        _tryRenounce(costBasis, costBasis.GOVERNANCE_ROLE(), deployer);
+        _tryRenounce(tradeRouter, DEFAULT_ADMIN, deployer);
+        _tryRenounce(tradeRouter, tradeRouter.GOVERNANCE_ROLE(), deployer);
+        _tryRenounce(distributor, DEFAULT_ADMIN, deployer);
+        _tryRenounce(distributor, distributor.GOVERNANCE_ROLE(), deployer);
+        _tryRenounce(supportPool, DEFAULT_ADMIN, deployer);
+        _tryRenounce(supportPool, supportPool.GOVERNANCE_ROLE(), deployer);
+        _tryRenounce(feeVault, DEFAULT_ADMIN, deployer);
+        _tryRenounce(feeVault, feeVault.GOVERNANCE_ROLE(), deployer);
+        _tryRenounce(locker, DEFAULT_ADMIN, deployer);
+        _tryRenounce(locker, locker.GOVERNANCE_ROLE(), deployer);
+        _tryRenounce(adapter, DEFAULT_ADMIN, deployer);
+        _tryRenounce(adapter, adapter.GOVERNANCE_ROLE(), deployer);
+    }
+
+    function _tryRenounce(AccessControl target, bytes32 role, address deployer) internal {
+        if (target.hasRole(role, deployer)) {
+            target.renounceRole(role, deployer);
+        }
+    }
 }
+
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
