@@ -140,7 +140,7 @@ contract DeployPangu2 is Script {
         );
 
         // 6b. Staking
-        Pangu2Staking staking = new Pangu2Staking(address(token), deployer);
+        Pangu2Staking staking = new Pangu2Staking(address(token), governance);
 
         // 7. Configure system contracts
         token.configureCore(address(costBasis), address(feeVault));
