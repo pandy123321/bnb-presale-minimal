@@ -313,7 +313,7 @@ export function useTransaction() {
     state.value.phase = "SIGNING";
     state.value.chainTxState = ChainTxState.CREATED;
 
-    const deadline = BigInt(Math.floor(Date.now() / 1000) + 600); // 10 min
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 240); // 4 min (contract max is 5 min)
 
     try {
       const txHash = await writeContract(wagmiConfig, {

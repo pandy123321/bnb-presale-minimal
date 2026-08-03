@@ -113,7 +113,7 @@ class AdminJobsController extends Controller
         $adminId = $request->user()?->id;
         $now     = now();
 
-        $consumed = DB::transaction(function () use ($taskName, $idempotencyKey, $adminId, $request, $now): bool {
+        $result = DB::transaction(function () use ($taskName, $idempotencyKey, $adminId, $request, $now): array {
             $inserted = DB::table('job_retry_tokens')->insertOrIgnore([
                 'task_name'       => $taskName,
                 'idempotency_key' => $idempotencyKey,
@@ -194,3 +194,4 @@ class AdminJobsController extends Controller
     }
 
     // ── Helpers writer removed — audit is now inline in the transaction ──
+}

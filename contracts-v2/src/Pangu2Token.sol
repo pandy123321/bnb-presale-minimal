@@ -276,6 +276,15 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
                 && (isPair[from] || isPair[to] || isSystemAddress[from] || isSystemAddress[to])
         ) revert EnforcedPause();
 
+        // Block unregistered contracts — prevents AMM pairs from being treated as
+        // users and bypassing tax, burn, fee vault, and cost basis settlement.
+        if (from != address(0) && from.code.length > 0 && !isSystemAddress[from] && !isPair[from]) {
+            revert("unregistered contract sender");
+        }
+        if (to != address(0) && to.code.length > 0 && !isSystemAddress[to] && !isPair[to]) {
+            revert("unregistered contract receiver");
+        }
+
         bool liquidityDeposit;
         bool sellEntry;
         bool fromUser = _isUser(from);

@@ -34,7 +34,7 @@ final class TradeController extends Controller
             'amount_bnb_wei' => ['required', 'string', 'regex:/^[1-9][0-9]*$/'],
         ]);
 
-        $data = $this->quote->buildBuyQuote($validated['amount_bnb_wei']);
+        $data = $this->quote->getBuyQuote($validated['amount_bnb_wei']);
 
         return ApiEnvelope::success($data, 'MOCK_DATA', $data['quote_block']);
     }
@@ -51,7 +51,7 @@ final class TradeController extends Controller
             'wallet_address'   => ['required', 'string', 'max:42'],
         ]);
 
-        $data = $this->quote->buildSellQuote($validated['amount_token_raw']);
+        $data = $this->quote->getSellQuote($validated['amount_token_raw'], $validated['wallet_address']);
 
         return ApiEnvelope::success($data, 'MOCK_DATA', $data['quote_block']);
     }

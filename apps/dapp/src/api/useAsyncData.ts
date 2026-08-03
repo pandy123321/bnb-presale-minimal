@@ -179,7 +179,7 @@ export async function fetchGet<T>(
 export async function fetchPost<T>(
   path: string,
   body: unknown,
-  signal: AbortSignal,
+  signal?: AbortSignal,
 ): Promise<{ data: T; meta: EnvelopeMeta }> {
   return apiClient.post<T>(path, body, signal);
 }

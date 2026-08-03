@@ -11,6 +11,7 @@ import { useAppStore } from "@/stores/useApp";
 import type { EnvironmentConfig, SystemStatus, ContractInfo, Envelope } from "@pangu2/api-types";
 
 const API_BASE = "/api/v1/projects/pangu2";
+const ADMIN_API = "/admin-api/v1/projects/pangu2";
 const REFRESH_INTERVAL = 30_000;
 
 // ── Fetch helper (returns full Envelope) ─────

@@ -90,6 +90,15 @@ export async function acquireLease(
   workerId: string,
   ttlSeconds: number,
 ): Promise<boolean> {
+  // Upsert: insert the stream row if it doesn't exist, then attempt lease acquisition.
+  // This fixes the cold-start deadlock where a fresh database has no cursor rows.
+  await getPool().query(
+    `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status)
+     VALUES ($1, $2, 0, 'PENDING')
+     ON CONFLICT (chain_id, stream) DO NOTHING`,
+    [chainId, stream],
+  );
+
   const { rowCount } = await getPool().query(
     `UPDATE chain_cursors
      SET lease_holder = $3, lease_expires_at = NOW() + ($4 || ' seconds')::INTERVAL

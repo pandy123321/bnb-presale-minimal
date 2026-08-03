@@ -20,6 +20,8 @@ export const useAdminAuthStore = defineStore("adminAuth", () => {
   async function login(email: string, password: string): Promise<boolean> {
     loading.value = true; error.value = null;
     try {
+      // Fetch CSRF cookie first (required by Laravel Sanctum web guard)
+      await fetch("/sanctum/csrf-cookie", { credentials: "include" });
       const res = await fetch(`${ADMIN_API}/auth/login`, {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
         body: JSON.stringify({ email, password }),

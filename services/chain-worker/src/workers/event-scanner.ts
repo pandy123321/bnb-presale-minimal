@@ -86,9 +86,23 @@ function getPp(): Pool {
 }
 
 export async function start(): Promise<void> {
+  // Validate required environment
+  if (!RPC_URL || RPC_URL === "http://localhost:8545") {
+    console.error("[Chain Worker] FATAL: RPC_URL is not configured or is default. Set CHAIN_WORKER_RPC_URL.");
+    process.exit(1);
+  }
+  if (!TRADE_ROUTER_ADDRESS || TRADE_ROUTER_ADDRESS === "0x0000000000000000000000000000000000000000") {
+    console.error("[Chain Worker] FATAL: TRADE_ROUTER_ADDRESS is zero or not configured.");
+    process.exit(1);
+  }
+  if (!DIVIDEND_DISTRIBUTOR_ADDRESS || DIVIDEND_DISTRIBUTOR_ADDRESS === "0x0000000000000000000000000000000000000000") {
+    console.error("[Chain Worker] FATAL: DIVIDEND_DISTRIBUTOR_ADDRESS is zero or not configured.");
+    process.exit(1);
+  }
+
   console.log("[Chain Worker] Starting...");
   console.log(`  Chain ID: ${CHAIN_ID}`);
-  console.log(`  RPC: ${RPC_URL}`);
+  console.log(`  RPC: ${RPC_URL.replace(/\/\/.*@/, "//***@")}`); // Redact credentials
   console.log(`  Batch size: ${SCAN_BATCH_SIZE}`);
   console.log(`  Confirmation blocks: ${CONFIRMATION_BLOCKS}`);
   console.log(`  Worker ID: ${WORKER_ID}`);
@@ -187,17 +201,34 @@ async function scanStream(stream: {
     for (const log of logs) {
       const block = await c.getBlock({ blockNumber: log.blockNumber! });
 
+      // Decode event using ABI — produces human-readable event_name and named params
+      let eventName = log.topics[0] ?? null;
+      let decoded: Record<string, unknown> = { topics: log.topics, data: log.data };
+      try {
+        if (stream.abi) {
+          const decodedLog = decodeEventLog({
+            abi: stream.abi,
+            data: log.data as `0x${string}`,
+            topics: log.topics as `0x${string}`[],
+          });
+          eventName = decodedLog.eventName ?? eventName;
+          decoded = { ...(decodedLog.args as Record<string, unknown>) };
+        }
+      } catch {
+        // Keep raw data if decoding fails (unknown event or ABI mismatch)
+      }
+
       rawEvents.push({
         chain_id: CHAIN_ID,
         contract_address: (log.address as string).toLowerCase(),
-        event_name: log.topics[0] ?? null,
+        event_name: eventName,
         transaction_hash: (log.transactionHash as string).toLowerCase(),
         log_index: log.logIndex ?? 0,
         block_number: Number(log.blockNumber),
         block_hash: (log.blockHash as string).toLowerCase(),
         transaction_index: log.transactionIndex ?? null,
         block_timestamp: new Date(Number(block.timestamp) * 1000).toISOString(),
-        decoded_data: { topics: log.topics, data: log.data },
+        decoded_data: decoded,
         topics: log.topics as string[],
         raw_data: log.data,
         status: "PENDING_CONFIRMATION",

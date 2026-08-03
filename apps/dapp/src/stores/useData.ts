@@ -7,12 +7,17 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { DataStatus } from "@pangu2/api-types";
-import { systemApi } from "@/api/client";
-import type { EnvironmentConfig, SystemStatus, ContractInfo } from "@pangu2/api-types";
+import type { EnvironmentConfig, SystemStatus, ContractInfo, Envelope } from "@pangu2/api-types";
+
+const BASE = "/api/v1/projects/pangu2";
+
+async function get<T>(path: string): Promise<Envelope<T>> {
+  const res = await fetch(`${BASE}${path}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
 
 export const useDataStore = defineStore("data", () => {
-  // ── State ──
-
   const dataStatus = ref<DataStatus>(DataStatus.MOCK_DATA);
   const blockNumber = ref<string | null>(null);
   const config = ref<EnvironmentConfig | null>(null);
@@ -20,8 +25,6 @@ export const useDataStore = defineStore("data", () => {
   const contracts = ref<ContractInfo[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
-
-  // ── Computed ──
 
   const isLive = computed(() => dataStatus.value === DataStatus.LIVE);
   const isMocked = computed(() => dataStatus.value === DataStatus.MOCK_DATA);
@@ -31,72 +34,38 @@ export const useDataStore = defineStore("data", () => {
   const isSyncing = computed(() => dataStatus.value === DataStatus.SYNCING);
   const needsWarning = computed(() => !isLive.value && !isSyncing.value);
 
-  // ── Actions ──
-
   async function fetchConfig(): Promise<void> {
-    loading.value = true;
-    error.value = null;
+    loading.value = true; error.value = null;
     try {
-      const env = await systemApi.getConfig();
+      const env = await get<EnvironmentConfig>("/config");
       config.value = env.data;
       dataStatus.value = env.meta.data_status;
       blockNumber.value = env.meta.block_number;
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to load config";
-      error.value = msg;
+      error.value = e instanceof Error ? e.message : "Failed to load config";
       dataStatus.value = DataStatus.UNAVAILABLE;
-    } finally {
-      loading.value = false;
-    }
+    } finally { loading.value = false; }
   }
 
   async function fetchSystemStatus(): Promise<void> {
     try {
-      const env = await systemApi.getSystemStatus();
+      const env = await get<SystemStatus>("/system-status");
       systemStatus.value = env.data;
       dataStatus.value = env.meta.data_status;
       blockNumber.value = env.meta.block_number;
-    } catch {
-      dataStatus.value = DataStatus.DEGRADED;
-    }
+    } catch { dataStatus.value = DataStatus.DEGRADED; }
   }
 
   async function fetchContracts(): Promise<void> {
     try {
-      const env = await systemApi.getContracts();
+      const env = await get<ContractInfo[]>("/contracts");
       contracts.value = env.data;
-    } catch {
-      // Non-critical
-    }
+    } catch {}
   }
 
-  /** Load all system data on app start. */
   async function init(): Promise<void> {
-    await Promise.allSettled([
-      fetchConfig(),
-      fetchSystemStatus(),
-      fetchContracts(),
-    ]);
+    await Promise.allSettled([fetchConfig(), fetchSystemStatus(), fetchContracts()]);
   }
 
-  return {
-    dataStatus,
-    blockNumber,
-    config,
-    systemStatus,
-    contracts,
-    loading,
-    error,
-    isLive,
-    isMocked,
-    isDegraded,
-    isStale,
-    isUnavailable,
-    isSyncing,
-    needsWarning,
-    fetchConfig,
-    fetchSystemStatus,
-    fetchContracts,
-    init,
-  };
+  return { dataStatus, blockNumber, config, systemStatus, contracts, loading, error, isLive, isMocked, isDegraded, isStale, isUnavailable, isSyncing, needsWarning, fetchConfig, fetchSystemStatus, fetchContracts, init };
 });

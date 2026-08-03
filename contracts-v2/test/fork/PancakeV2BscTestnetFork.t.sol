@@ -58,7 +58,7 @@ contract PancakeV2BscTestnetForkTest is Test {
         pair = IPancakeFactory(FACTORY).createPair(address(token), WBNB);
 
         adapter = new PancakeV2Adapter(address(token), WBNB, FACTORY, pair, ROUTER, address(this));
-        oracle = new PancakeV2TwapOracle(address(token), WBNB, FACTORY, pair, 30 minutes, 300);
+        oracle = new PancakeV2TwapOracle(address(token), WBNB, FACTORY, pair, 30 minutes, 300, 1, 1);
         supportPool = new SupportPool(address(token), WBNB, address(adapter), address(oracle), 300, 5 minutes, address(this), EMERGENCY);
         feeVault = new FeeVault(address(token), WBNB, address(adapter), address(oracle), payable(address(supportPool)), 1_000_000 ether, 300, address(this), KEEPER, EMERGENCY);
         locker = new BuybackLocker(address(token), address(supportPool), BuybackLocker.LockMode.FIXED_DURATION, TEST_FIXTURE_LOCK_DURATION, RELEASE_RECIPIENT);

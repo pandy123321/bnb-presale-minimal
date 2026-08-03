@@ -121,19 +121,20 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
             return;
         }
 
-        // Liquidity recovered from LOW_LIQUIDITY — resume from last anchor
-        if (status == WindowStatus.LIQUIDITY_LOW) {
-            // Keep existing anchor (the window continues accumulating from where it left off)
-            // But only if a full new window completes can we re-enter READY.
-            // This prevents an attacker from repeatedly entering/exiting low liquidity
-            // to perpetually reset the window. If reserves are restored, the window
-            // just needs to re-complete from the last anchor.
-            status = WindowStatus.ACCUMULATING;
-            emit OracleRecovered();
-        }
-
         uint256 p0 = pair.price0CumulativeLast();
         uint256 p1 = pair.price1CumulativeLast();
+
+        // Liquidity recovered from LOW_LIQUIDITY — discard old anchor and start fresh
+        if (status == WindowStatus.LIQUIDITY_LOW) {
+            // The old anchor may include prices from the low-liquidity (manipulated)
+            // period. Start a fresh anchor at the recovery point so a full new
+            // twapWindow must complete before becoming READY.
+            anchor = Observation({ timestamp: ts, price0CumulativeLast: p0, price1CumulativeLast: p1 });
+            status = WindowStatus.ACCUMULATING;
+            emit OracleRecovered();
+            emit OracleAnchored(ts, p0, p1);
+            return;
+        }
 
         if (status == WindowStatus.UNINITIALIZED) {
             anchor = Observation({ timestamp: ts, price0CumulativeLast: p0, price1CumulativeLast: p1 });

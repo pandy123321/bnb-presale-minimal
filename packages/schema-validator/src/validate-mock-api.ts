@@ -141,7 +141,7 @@ const ENDPOINTS: Array<{
   { label: "GET /dividend/epochs/current", method: "GET", url: `${MOCK_BASE_URL}/dividend/epochs/current` },
   { label: "GET /buybacks",     method: "GET", url: `${MOCK_BASE_URL}/buybacks` },
   { label: "GET /locker/batches", method: "GET", url: `${MOCK_BASE_URL}/locker/batches` },
-  { label: "POST /admin/auth/login",   method: "POST", url: `${ADMIN_BASE_URL}/auth/login`, postBody: { email: "admin@pangu2.io", password: "test" } },
+  { label: "POST /admin/auth/login",   method: "POST", url: `${ADMIN_BASE_URL}/auth/login`, postBody: { email: "admin@pangu2.io", password: "password" } },
   { label: "GET /admin/dashboard",     method: "GET", url: `${ADMIN_BASE_URL}/dashboard` },
   { label: "GET /admin/contracts",     method: "GET", url: `${ADMIN_BASE_URL}/contracts` },
   { label: "GET /admin/jobs",          method: "GET", url: `${ADMIN_BASE_URL}/jobs` },
@@ -246,7 +246,7 @@ async function main() {
   } catch {
     console.log("  Mock API server NOT running. Please start it first:");
     console.log("    cd packages/mock-api && npx tsx src/server.ts\n");
-    return;
+    process.exit(1);
   }
 
   // Validate all endpoints
@@ -352,6 +352,12 @@ async function main() {
 
   console.log(`\n───────────────────────────────────────────`);
   console.log(`  Total: ${results.length} | Passed: ${passed} | Failed: ${failed}`);
+
+  if (results.length === 0) {
+    console.error(`  FATAL: Zero endpoints validated. CI gate fails closed.`);
+    process.exit(1);
+  }
+
   console.log(`  ${failed === 0 ? "ALL PASSED ✓" : `${failed} FAILED ✗`}`);
   console.log("═══════════════════════════════════════════\n");
 

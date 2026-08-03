@@ -38,7 +38,16 @@ async function checkReorgs(): Promise<void> {
           console.log(`[Reorg] Block #${s.blockNumber} reorged`);
           await db.query("BEGIN");
           await markBlockReorged(db, CHAIN_ID, s.blockNumber);
+
+          // Rewind cursor to reorg point so canonical chain is rescanned
+          await db.query(
+            `UPDATE chain_cursors SET last_scanned_block = $1 - 1 WHERE chain_id = $2 AND last_scanned_block >= $1`,
+            [s.blockNumber, CHAIN_ID],
+          );
           await db.query("COMMIT");
+
+          // Signal scanner to re-process the affected range
+          console.log(`[Reorg] Cursor rewound to block ${s.blockNumber - 1} — rescan required`);
         }
       } catch (e) { console.error(`[Reorg] Block #${s.blockNumber} check failed`, e); }
     }

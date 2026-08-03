@@ -264,3 +264,50 @@ jobs:
             docs/evidence/PB-S6/P2-I03/fork-evidence.json
             contracts/fork-test.log
           retention-days: 90
+
+  # ═══ V2 Fork Tests (PancakeSwap V2) ═══
+
+  contracts-v2-fork:
+    name: Contracts V2 (BSC Testnet Fork)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: contracts-v2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: "v1.7.1"
+      - name: Read fork config
+        id: v2-config
+        run: |
+          FORK_RPC="$(sed -n 's/^FORK_RPC=//p' ../config/testnet/FORK_CONFIG.txt)"
+          FORK_CHAIN_ID="$(sed -n 's/^FORK_CHAIN_ID=//p' ../config/testnet/FORK_CONFIG.txt)"
+          FORK_BLOCK="$(sed -n 's/^FORK_BLOCK=//p' ../config/testnet/FORK_CONFIG.txt)"
+          EXPECTED_HASH="$(sed -n 's/^FORK_BLOCK_HASH=//p' ../config/testnet/FORK_CONFIG.txt)"
+          test -n "$FORK_RPC" && test -n "$FORK_BLOCK" && test -n "$EXPECTED_HASH" || {
+            echo "Fork config missing required fields"; exit 1;
+          }
+          echo "fork_rpc=$FORK_RPC" >> "$GITHUB_OUTPUT"
+          echo "fork_block=$FORK_BLOCK" >> "$GITHUB_OUTPUT"
+          echo "expected_hash=$EXPECTED_HASH" >> "$GITHUB_OUTPUT"
+      - name: Verify V2 chain and block
+        env:
+          FORK_RPC: ${{ steps.v2-config.outputs.fork_rpc }}
+          FORK_BLOCK: ${{ steps.v2-config.outputs.fork_block }}
+          EXPECTED_HASH: ${{ steps.v2-config.outputs.expected_hash }}
+        run: |
+          CHAIN_ID="$(cast chain-id --rpc-url "$FORK_RPC")"
+          test "$CHAIN_ID" = "$FORK_CHAIN_ID" || { echo "Bad chain $CHAIN_ID"; exit 1; }
+          ACTUAL="$(cast block "$FORK_BLOCK" --rpc-url "$FORK_RPC" --json | jq -r '.hash')"
+          test "${ACTUAL,,}" = "${EXPECTED_HASH,,}" || { echo "Hash mismatch"; exit 1; }
+      - run: forge build --lib-paths ../contracts/lib
+      - name: Run V2 fork tests
+        env:
+          FORK_RPC: ${{ steps.v2-config.outputs.fork_rpc }}
+          FORK_BLOCK: ${{ steps.v2-config.outputs.fork_block }}
+        run: |
+          forge test --match-path "*/fork/*" --fork-url "$FORK_RPC" --fork-block-number "$FORK_BLOCK" --lib-paths ../contracts/lib -vvv
