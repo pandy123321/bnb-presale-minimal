@@ -163,6 +163,9 @@ contract Pangu2LiquidityGateway is AccessControl, Pausable, ReentrancyGuard, IER
             LpTokenInfo storage info = lpInfo[p.tokenId];
             costBasisManager.consumeLpTokenId(msg.sender, p.tokenId, tokenPrincipal);
             info.active = false;
+        } else {
+            // Partial exit — scale per-tokenId position proportionally
+            costBasisManager.scaleLpTokenIdProportionally(msg.sender, p.tokenId, tokenPrincipal);
         }
 
         emit LiquidityRemoved(msg.sender, p.tokenId, p.liquidity, tokenPrincipal, wbnbPrincipal);

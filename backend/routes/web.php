@@ -16,9 +16,18 @@ Route::middleware('auth:web')->group(function () {
     Route::get('/admin/dashboard', fn () => view('admin.dashboard'))->name('admin.dashboard');
 });
 
-Route::prefix('admin-api/v1/projects/pangu2')->middleware(['auth:web'])->group(function () {
+Route::prefix('admin-api/v1/projects/pangu2')->group(function () {
+    // Auth — JSON endpoints (no RBAC, guest for login, web guard for me/logout)
+    Route::post('/auth/login', [AuthController::class, 'apiLogin']);
+    Route::middleware('auth:web')->group(function () {
+        Route::get('/auth/me', fn (\Illuminate\Http\Request $r) => \App\Http\ApiEnvelope::success([
+            'admin' => ['id' => $r->user()->id, 'name' => $r->user()->name, 'email' => $r->user()->email, 'role' => $r->user()->role],
+        ], 'LIVE'));
+        Route::post('/auth/logout', [AuthController::class, 'logout']);
+    });
+
     // Dashboard + Contracts — all admin roles
-    Route::middleware('rbac:dashboard.read')->group(function () {
+    Route::middleware(['auth:web', 'rbac:dashboard.read'])->group(function () {
         Route::get('/dashboard', [AdminDashboardController::class, 'dashboard']);
     });
     Route::middleware('rbac:contracts.read')->group(function () {

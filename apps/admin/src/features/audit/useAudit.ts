@@ -1,6 +1,5 @@
 // PANGU2 Admin — Audit API
 import { ref, onMounted, onUnmounted } from "vue";
-import { useAdminAuthStore } from "@/stores/useAdminAuth";
 
 const ADMIN_API = "/admin-api/v1/projects/pangu2";
 
@@ -19,11 +18,10 @@ export function useAudit() {
   async function fetch() {
     loading.value = true; error.value = null;
     try {
-      const auth = useAdminAuthStore();
       const params = new URLSearchParams({ per_page: "25", page: String(page.value) });
       if (filterAction.value) params.set("action", filterAction.value);
       if (filterAdmin.value) params.set("administrator", filterAdmin.value);
-      const res = await fetch(`${ADMIN_API}/audit-logs?${params}`, { headers: { Authorization: `Bearer ${auth.token}` } });
+      const res = await fetch(`${ADMIN_API}/audit-logs?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = await res.json();
       logs.value = (body.data ?? []) as AuditEntry[];

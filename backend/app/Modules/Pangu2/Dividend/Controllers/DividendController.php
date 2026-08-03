@@ -116,25 +116,49 @@ class DividendController extends Controller
             ->where('epoch_id', $epochId)
             ->orderBy('rank')
             ->get()
-            ->map(fn ($a) => ['wallet_address' => $a->wallet_address, 'balance_raw' => $a->balance_raw])
+            ->map(fn ($a) => ['wallet_address' => $a->wallet_address, 'balance_raw' => $a->allocated_raw])
             ->toArray();
 
         $tree = $this->merkle->buildTree($allAllocations, $chainId, $distAddr, $epochId, $tokenAddr);
 
+        // Verify rebuilt root matches stored root
+        if ($tree['root'] !== $epoch->merkle_root) {
+            return ApiEnvelope::error(
+                'ROOT_MISMATCH',
+                'Rebuilt Merkle root does not match the stored epoch root. Proof is unavailable.',
+                false,
+                [],
+                503,
+            );
+        }
+
         // Find the leaf index for this address
         $leafIndex = null;
+        $leafHash = null;
         foreach ($tree['leaves'] as $i => $leaf) {
             if ($leaf['wallet_address'] === $addr) {
                 $leafIndex = $i;
+                $leafHash = $leaf['leaf_hash'];
                 break;
             }
         }
 
-        if ($leafIndex === null) {
+        if ($leafIndex === null || $leafHash === null) {
             return ApiEnvelope::error('INTERNAL_ERROR', 'Leaf not found in rebuilt tree.', false, [], 500);
         }
 
         $proof = $this->merkle->generateProof($tree['tree'], $leafIndex);
+
+        // Verify the proof against the stored root before returning
+        if (!$this->merkle->verifyProof($leafHash, $proof, $epoch->merkle_root)) {
+            return ApiEnvelope::error(
+                'PROOF_VERIFICATION_FAILED',
+                'Generated proof does not verify against the stored root.',
+                false,
+                [],
+                503,
+            );
+        }
 
         return ApiEnvelope::success([
             'epoch_id'   => $epochId,
@@ -142,7 +166,7 @@ class DividendController extends Controller
             'amount_raw' => $allocation->allocated_raw,
             'proof'      => $proof,
             'claimed'    => $allocation->claimed,
-        ], 'MOCK_DATA');
+        ], $epoch->status === 'claim_open' ? 'LIVE' : 'MOCK_DATA');
     }
 
     // ── Helpers ──────────────────────────────

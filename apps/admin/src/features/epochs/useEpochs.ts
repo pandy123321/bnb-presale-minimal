@@ -7,9 +7,8 @@ const ADMIN_API = "/admin-api/v1/projects/pangu2";
 const API_BASE = "/api/v1/projects/pangu2";
 
 async function adminFetch<T>(path: string): Promise<Envelope<T>> {
-  const auth = useAdminAuthStore();
   const res = await fetch(`${ADMIN_API}${path}`, {
-    headers: { Authorization: `Bearer ${auth.token}`, "Content-Type": "application/json" },
+    credentials: "include", headers: { "Content-Type": "application/json" },
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json() as Promise<Envelope<T>>;

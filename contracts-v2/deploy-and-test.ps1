@@ -35,6 +35,20 @@ Write-Host @"
 
 "@ -ForegroundColor Yellow
 
+# ── Load .env if exists ────────────────────────────────────────────
+$envFile = "$PSScriptRoot\.env"
+if (Test-Path $envFile) {
+    Write-Info "Loading $envFile..."
+    Get-Content $envFile | Where-Object { $_ -notmatch '^\s*#' -and $_ -match '=' } | ForEach-Object {
+        $parts = $_ -split '=', 2
+        $k = $parts[0].Trim(); $v = $parts[1].Trim()
+        if ($k -and $v -and -not (Test-Path "env:$k")) {
+            Set-Item "env:$k" $v
+        }
+    }
+    Write-Pass ".env loaded"
+}
+
 # ── Pre-flight ─────────────────────────────────────────────────────
 Write-Step "Pre-flight Checks"
 
@@ -45,7 +59,7 @@ if (-not (Test-Path $FORGE)) {
 }
 Write-Pass "Foundry found"
 
-$rpc = if ($RpcUrl) { $RpcUrl } else { $env:BSC_TESTNET_RPC ?? "https://data-seed-prebsc-1-s1.binance.org:8545" }
+$rpc = if ($RpcUrl) { $RpcUrl } elseif ($env:BSC_TESTNET_RPC) { $env:BSC_TESTNET_RPC } else { "https://data-seed-prebsc-1-s1.binance.org:8545" }
 $key  = $env:PRIVATE_KEY
 $gov  = $env:GOVERNANCE_ADDRESS
 $emer = $env:EMERGENCY_ADDRESS
@@ -90,6 +104,7 @@ if (-not $SkipDeploy) {
         --broadcast `
         --private-key $key `
         --lib-paths ../contracts/lib `
+        --gas-price 5000000000 `
         -vvvv 2>&1 | Tee-Object -Variable deployOutput | Out-Host
 
     Pop-Location

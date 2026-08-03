@@ -158,8 +158,11 @@ async function scanStream(stream: {
   const dbClient = await p.connect();
 
   try {
-    // 1. Read cursor
-    const fromBlock = await getCursor(CHAIN_ID, stream.name);
+    // 1. Read cursor (fallback to stream-specific startBlock if no cursor exists)
+    const fromBlock = Math.max(
+      await getCursor(CHAIN_ID, stream.name),
+      stream.startBlock,
+    );
 
     // 2. Get current chain height (stop before confirmation depth)
     const currentBlock = Number(await c.getBlockNumber());
@@ -219,13 +222,15 @@ async function scanStream(stream: {
         );
       }
 
-      // 6. Update cursor
+      // 6. Update cursor with block hash
+      const hashBlock = Math.min(toBlock, safeToBlock);
+      const block = await c.getBlock({ blockNumber: BigInt(hashBlock) });
       await dbClient.query(
         `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, last_scanned_block_hash, status, updated_at)
-         VALUES ($1, $2, $3, NULL, 'HEALTHY', NOW())
+         VALUES ($1, $2, $3, $4, 'HEALTHY', NOW())
          ON CONFLICT (chain_id, stream)
-         DO UPDATE SET last_scanned_block = $3, last_run_completed_at = NOW(), status = 'HEALTHY', updated_at = NOW()`,
-        [CHAIN_ID, stream.name, toBlock],
+         DO UPDATE SET last_scanned_block = $3, last_scanned_block_hash = $4, last_run_completed_at = NOW(), status = 'HEALTHY', updated_at = NOW()`,
+        [CHAIN_ID, stream.name, toBlock, (block.hash as string).toLowerCase()],
       );
 
       await dbClient.query("COMMIT");

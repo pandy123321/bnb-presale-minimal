@@ -452,6 +452,32 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         emit LpPositionChanged(account, tokenId, lpPos.costWbnbWei, 0, lpPos.trackedBalance, 0, lpPos.status, PositionStatus.NONE, REASON_LIQUIDITY_WITHDRAWAL);
     }
 
+    /// @dev After partial exit, scale the per-tokenId tracked and cost to match actual token returned.
+    ///      Aggregate totals are already handled by onLiquidityWithdrawal. This keeps per-tokenId consistent.
+    function scaleLpTokenIdProportionally(address account, uint256 tokenId, uint256 actualTokenPrincipal)
+        external onlyLiquidityGateway
+    {
+        Position memory lpPos = _lpPositions[account][tokenId];
+        if (lpPos.trackedBalance == 0) return;
+
+        uint256 newTracked = lpPos.trackedBalance > actualTokenPrincipal
+            ? lpPos.trackedBalance - actualTokenPrincipal : 0;
+
+        if (newTracked == 0) {
+            delete _lpPositions[account][tokenId];
+        } else {
+            uint256 newCost = CostMath.proportionalFloor(lpPos.costWbnbWei, newTracked, lpPos.trackedBalance);
+            _lpPositions[account][tokenId] = Position({
+                costWbnbWei: newCost, trackedBalance: newTracked, status: PositionStatus.KNOWN
+            });
+        }
+        emit LpPositionChanged(account, tokenId, lpPos.costWbnbWei,
+            newTracked == 0 ? 0 : _lpPositions[account][tokenId].costWbnbWei,
+            lpPos.trackedBalance, newTracked,
+            lpPos.status, newTracked == 0 ? PositionStatus.NONE : PositionStatus.KNOWN,
+            REASON_LIQUIDITY_WITHDRAWAL);
+    }
+
     /// @dev Migrate LP cost when NFT ownership transfers.
     function migrateLpCost(address from, address to, uint256 tokenId)
         external onlyLiquidityGateway

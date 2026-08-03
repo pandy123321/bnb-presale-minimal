@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#080a0e">
+<title>盘古2 · 移动端 DApp V4</title>
+<style>
+:root{
+  --bg:#080a0e;--panel:#11141a;--panel2:#171b22;--line:#272c36;
+  --text:#f6f3ea;--muted:#9298a5;--gold:#d8aa51;--gold2:#f1d28f;
+  --green:#43cf8b;--red:#ff747d;--orange:#f3a34b;--blue:#6aa9ff;
+  --radius:18px;--nav:70px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;background:#040507;color:var(--text);font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+button,input,select{font:inherit}button{color:inherit;cursor:pointer}.hidden{display:none!important}
+body{display:flex;justify-content:center}.app{width:100%;max-width:430px;min-height:100vh;position:relative;overflow-x:hidden;background:radial-gradient(circle at 95% 0,rgba(216,170,81,.11),transparent 29%),var(--bg)}
+.topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;padding:calc(11px + env(safe-area-inset-top)) 14px 10px;background:rgba(8,10,14,.93);backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.04)}
+.brand{display:flex;gap:9px;align-items:center}.logo{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;font-weight:950;color:var(--gold2);border:1px solid rgba(216,170,81,.48);background:rgba(216,170,81,.08)}
+.brand b{font-size:15px}.brand small{display:block;font-size:9px;color:var(--muted);margin-top:2px}.top-actions{display:flex;gap:7px}.icon-btn,.wallet-btn{height:36px;border-radius:11px}.icon-btn{width:36px;border:1px solid var(--line);background:var(--panel)}.wallet-btn{border:0;background:var(--gold);color:#181108;font-size:11px;font-weight:900;padding:0 11px}.wallet-btn.connected{background:var(--panel);color:var(--gold2);border:1px solid rgba(216,170,81,.4)}
+main{padding:14px 14px calc(var(--nav) + 22px + env(safe-area-inset-bottom))}.view{display:none;animation:fade .2s ease}.view.active{display:block}@keyframes fade{from{opacity:.45;transform:translateY(4px)}to{opacity:1;transform:none}}
+.card,.hero{border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(145deg,var(--panel),#0e1116)}.hero{padding:18px;background:linear-gradient(145deg,rgba(216,170,81,.12),rgba(17,20,26,.96) 48%,#0e1116);border-color:rgba(216,170,81,.18)}
+.live{display:flex;align-items:center;gap:7px;font-size:10px;color:var(--muted)}.dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(67,207,139,.08)}.price-label{font-size:10px;color:var(--muted);margin-top:17px}.price{font-size:36px;line-height:1.1;font-weight:950;letter-spacing:-1.3px;margin-top:4px}.change{font-size:10px;color:var(--green);font-weight:850;margin-top:5px}.hero-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}
+.primary,.secondary,.full-btn{height:46px;border-radius:14px;font-weight:900}.primary,.full-btn{border:0;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#171108}.secondary{border:1px solid var(--line);background:rgba(255,255,255,.035)}.full-btn{width:100%}.full-btn:disabled{opacity:.45;filter:grayscale(1)}
+.card{padding:15px;margin-top:11px}.card-head,.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.card-head h3,.section-head h2{margin:0;font-size:14px}.section-head{margin:18px 2px 9px}.section-head button,.text-btn{border:0;background:none;color:var(--gold);font-size:10px;padding:4px}.sub{font-size:10px;line-height:1.55;color:var(--muted);margin-top:4px}.tag{padding:5px 8px;border-radius:99px;font-size:9px;color:var(--green);border:1px solid rgba(67,207,139,.22);background:rgba(67,207,139,.05);white-space:nowrap}
+.wallet-grid{display:grid;grid-template-columns:1.25fr .8fr .9fr;gap:8px;margin-top:12px}.metric small{display:block;color:var(--muted);font-size:9px}.metric b{display:block;font-size:15px;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.metric em{display:block;font-style:normal;color:var(--muted);font-size:8px;margin-top:3px}
+.notice{display:flex;align-items:center;gap:11px}.notice-icon{width:40px;height:40px;flex:0 0 40px;border-radius:13px;display:grid;place-items:center;background:rgba(216,170,81,.1);color:var(--gold2);font-weight:950}.notice-copy{flex:1;min-width:0}.notice-copy b{font-size:12px}.notice-copy span{display:block;color:var(--muted);font-size:9px;line-height:1.45;margin-top:4px}.mini-action{border:0;border-radius:11px;background:rgba(216,170,81,.1);color:var(--gold2);font-size:9px;font-weight:850;padding:9px 10px;white-space:nowrap}
+.rule-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.rule{padding:11px 5px;border-radius:13px;text-align:center;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.045)}.rule b{display:block;color:var(--gold2);font-size:16px}.rule span{display:block;color:var(--muted);font-size:8px;line-height:1.4;margin-top:4px}
+.pool-pulse{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}.countdown{font-size:27px;font-weight:950;margin-top:3px}.pool-right{text-align:right}.pool-right b{font-size:13px;color:var(--gold2)}.pool-right span{display:block;color:var(--muted);font-size:8px;margin-top:3px}.progress{height:6px;background:#252932;border-radius:99px;overflow:hidden;margin-top:10px}.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:inherit;transition:.3s}
+.activity{display:flex;align-items:center;gap:10px;padding:9px 0}.activity+.activity{border-top:1px solid rgba(255,255,255,.05)}.activity-icon{width:31px;height:31px;border-radius:10px;display:grid;place-items:center;background:#20242c;color:var(--gold2);font-size:11px}.activity-copy{flex:1;min-width:0}.activity-copy b{display:block;font-size:10px}.activity-copy span{display:block;color:var(--muted);font-size:8px;margin-top:3px}.activity-value{text-align:right;font-size:9px}.activity-value small{display:block;color:var(--muted);margin-top:3px}
+.page-title{margin:4px 2px 14px}.page-title h1{font-size:23px;margin:0}.page-title p{font-size:10px;color:var(--muted);line-height:1.5;margin:6px 0 0}.seg{display:grid;grid-template-columns:1fr 1fr;padding:4px;border:1px solid var(--line);border-radius:14px;background:var(--panel);margin-bottom:10px}.seg button{height:39px;border:0;border-radius:10px;background:none;color:var(--muted);font-weight:850}.seg button.active{background:#252a33;color:var(--text)}
+.input-card{padding:13px;border-radius:16px;border:1px solid var(--line);background:var(--panel)}.input-card+.input-card{margin-top:8px}.input-top{display:flex;justify-content:space-between;color:var(--muted);font-size:9px}.input-row{display:flex;gap:9px;align-items:center;margin-top:11px}.input-row input{flex:1;min-width:0;border:0;outline:0;background:none;color:var(--text);font-size:27px;font-weight:900}.max{border:0;background:none;color:var(--gold);font-size:9px}.token{display:flex;align-items:center;gap:6px;padding:7px 9px;border-radius:11px;background:#222730;font-size:11px;font-weight:850}.coin{width:21px;height:21px;border-radius:50%;display:grid;place-items:center;background:var(--gold);color:#171108;font-size:9px}.swap-arrow{width:34px;height:34px;margin:-4px auto;border:4px solid var(--bg);border-radius:11px;background:#222730;display:grid;place-items:center;position:relative;z-index:2}.chips{display:flex;gap:6px;margin:9px 0}.chips button{flex:1;height:31px;border-radius:10px;border:1px solid var(--line);background:none;color:var(--muted);font-size:9px}.chips button.active{color:var(--gold2);border-color:rgba(216,170,81,.42);background:rgba(216,170,81,.06)}
+.quote-card{margin-top:10px}.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;font-size:11px}.row+.row{border-top:1px solid rgba(255,255,255,.05)}.row span{color:var(--muted)}.row b{text-align:right}.tax-value{font-size:18px!important;color:var(--gold2)}.quote-note{display:flex;gap:10px;align-items:center;padding:11px;border-radius:13px;background:rgba(216,170,81,.055);border:1px solid rgba(216,170,81,.13);margin-top:10px}.quote-note i{width:31px;height:31px;border-radius:10px;display:grid;place-items:center;background:rgba(216,170,81,.1);font-style:normal}.quote-note b{font-size:10px}.quote-note span{display:block;color:var(--muted);font-size:9px;line-height:1.4;margin-top:3px}.quote-source{font-size:8px;color:#676d79;text-align:center;padding-top:8px}.trade-spacer{height:65px}#tradeView.active #tradeBtn{position:fixed;left:50%;bottom:calc(var(--nav) + 10px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(calc(100% - 28px),402px);z-index:38;box-shadow:0 14px 34px rgba(0,0,0,.62)}
+.rank-card{text-align:center;padding:18px}.rank-top{display:flex;justify-content:space-between;align-items:flex-start;text-align:left}.rank-number small,.claim-box small{display:block;color:var(--muted);font-size:9px}.rank-number b{display:block;color:var(--gold2);font-size:31px;margin-top:3px}.claim-box{text-align:right}.claim-box b{display:block;font-size:17px;margin-top:5px}.rank-goal{margin-top:14px;text-align:left}.rank-goal-top{display:flex;justify-content:space-between;color:var(--muted);font-size:9px}.rank-goal-top b{font-size:10px;color:var(--text)}.rank-labels{display:flex;justify-content:space-between;color:#676d79;font-size:8px;margin-top:5px}.tiers{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.tier{padding:10px 4px;border-radius:12px;border:1px solid var(--line);text-align:center}.tier.active{border-color:rgba(216,170,81,.4);background:rgba(216,170,81,.06)}.tier b{display:block;font-size:13px;color:var(--gold2)}.tier span{font-size:8px;color:var(--muted)}
+.leader{display:flex;align-items:center;gap:9px;padding:9px 0}.leader+.leader{border-top:1px solid rgba(255,255,255,.05)}.place{width:24px;color:var(--muted);font-size:9px}.avatar{width:30px;height:30px;border-radius:10px;background:#222730;display:grid;place-items:center;font-size:8px}.leader-info{flex:1;min-width:0}.leader-info b{display:block;font-size:9px}.leader-info span{display:block;color:var(--muted);font-size:8px;margin-top:3px}.leader-value{text-align:right}.leader-value b{font-size:9px}.leader-value span{display:block;color:var(--muted);font-size:8px;margin-top:3px}.my-row{background:rgba(216,170,81,.045);margin:0 -8px;padding-left:8px;padding-right:8px;border-radius:12px}
+.profile{display:flex;align-items:center;gap:10px}.profile-avatar{width:42px;height:42px;border-radius:14px;background:rgba(216,170,81,.1);color:var(--gold2);display:grid;place-items:center;font-weight:950}.profile b{font-size:12px}.profile p{margin:4px 0 0;color:var(--muted);font-size:9px}.asset-main{font-size:27px;font-weight:950;margin-top:17px}.asset-sub{font-size:10px;color:var(--muted);margin-top:4px}.status-line{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}.status-chip{padding:5px 7px;border-radius:99px;font-size:8px;color:var(--muted);border:1px solid var(--line)}.status-chip.on{color:var(--green);border-color:rgba(67,207,139,.22);background:rgba(67,207,139,.04)}
+.menu{padding:5px 14px}.menu button{width:100%;display:grid;grid-template-columns:30px 1fr auto;align-items:center;text-align:left;border:0;background:none;padding:12px 0}.menu button+button{border-top:1px solid rgba(255,255,255,.05)}.menu-icon{width:26px;height:26px;border-radius:9px;background:#20242c;display:grid;place-items:center;color:var(--gold2)}.menu button>span:nth-child(2){font-size:11px}.menu button>span:last-child{color:var(--muted)}
+.bottom-nav{position:fixed;left:50%;bottom:0;z-index:36;transform:translateX(-50%);width:min(100%,430px);height:calc(var(--nav) + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(4,1fr);padding:8px 8px env(safe-area-inset-bottom);border-top:1px solid rgba(255,255,255,.06);background:rgba(10,12,16,.95);backdrop-filter:blur(18px)}.bottom-nav button{position:relative;border:0;background:none;color:#6e7480;font-size:8px}.bottom-nav button.active{color:var(--gold2)}.nav-icon{display:block;font-size:19px;line-height:23px}.nav-badge{position:absolute;top:0;left:56%;min-width:14px;height:14px;border-radius:99px;background:var(--red);color:#fff;font-style:normal;font-size:8px;display:grid;place-items:center}
+.detail-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.detail-stat{padding:11px;border-radius:13px;border:1px solid rgba(255,255,255,.045);background:rgba(255,255,255,.025)}.detail-stat span{display:block;color:var(--muted);font-size:8px}.detail-stat b{display:block;margin-top:5px;font-size:13px}.flow{display:flex;align-items:center;gap:7px;overflow-x:auto;padding:4px 0 2px}.flow-box{flex:0 0 auto;padding:9px 10px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);font-size:9px}.flow-arrow{color:var(--gold)}
+.timeline-item{display:flex;gap:10px;padding:10px 0}.timeline-item+.timeline-item{border-top:1px solid rgba(255,255,255,.05)}.timeline-dot{width:30px;height:30px;border-radius:10px;background:rgba(67,207,139,.08);color:var(--green);display:grid;place-items:center}.timeline-copy b{display:block;font-size:10px}.timeline-copy span{display:block;color:var(--muted);font-size:8px;margin-top:3px}.back-btn{border:0;background:none;color:var(--gold);font-size:11px;padding:0;margin-bottom:10px}
+.sheet-wrap{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.58);display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:.2s}.sheet-wrap.show{opacity:1;pointer-events:auto}.sheet{width:min(100%,430px);max-height:86vh;overflow:auto;border-radius:24px 24px 0 0;padding:8px 15px calc(18px + env(safe-area-inset-bottom));background:#11141a;border:1px solid var(--line);transform:translateY(20px);transition:.2s}.sheet-wrap.show .sheet{transform:none}.grab{width:38px;height:4px;border-radius:99px;background:#363b46;margin:2px auto 11px}.sheet-head{display:flex;justify-content:space-between;align-items:center}.sheet-head h2{font-size:17px;margin:0}.close{width:32px;height:32px;border-radius:10px;border:1px solid var(--line);background:#1b1f27}.detail{padding:12px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.02);margin-top:10px}.detail h3{font-size:11px;margin:0 0 7px}.wallet-option{width:100%;display:flex;align-items:center;gap:10px;text-align:left;padding:12px;border-radius:14px;border:1px solid var(--line);background:var(--panel2);margin-top:9px}.wallet-logo{width:34px;height:34px;border-radius:11px;background:rgba(216,170,81,.1);color:var(--gold2);display:grid;place-items:center;font-weight:950}.wallet-option b{display:block;font-size:11px}.wallet-option span span{display:block;color:var(--muted);font-size:8px;margin-top:3px}.test-options{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.test-options button{height:42px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);font-size:10px}.test-options button.active{border-color:rgba(216,170,81,.45);color:var(--gold2);background:rgba(216,170,81,.06)}
+.toast{position:fixed;z-index:90;left:50%;bottom:calc(var(--nav) + 18px + env(safe-area-inset-bottom));transform:translate(-50%,15px);max-width:370px;width:calc(100% - 34px);padding:11px 13px;border-radius:13px;background:#f3eee2;color:#19130a;font-size:10px;font-weight:800;opacity:0;pointer-events:none;transition:.22s}.toast.show{opacity:1;transform:translate(-50%,0)}.disclaimer{text-align:center;color:#686e79;font-size:8px;line-height:1.55;padding:9px 8px 0}
+@media(min-width:431px){.app{box-shadow:0 0 70px rgba(0,0,0,.55)}}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="topbar">
+  <div class="brand"><div class="logo">盘</div><div><b>盘古2</b><small>BSC TESTNET · 原型</small></div></div>
+  <div class="top-actions"><button class="icon-btn" data-sheet="rules">i</button><button class="wallet-btn" id="walletBtn">连接钱包</button></div>
+</header>
+<main>
+<section class="view active" id="homeView">
+  <div class="hero">
+    <div class="live"><i class="dot"></i><span>链上数据已同步 · 区块 42,814,982</span></div>
+    <div class="price-label">PANGU2 / USDT 参考价</div><div class="price">$0.001284</div><div class="change">+3.18% · 24H</div>
+    <div class="hero-actions"><button class="primary" data-go-trade="buy">买入</button><button class="secondary" data-go-trade="sell">卖出</button></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3 id="summaryTitle">连接钱包查看个人数据</h3><span class="tag">公开可验证</span></div>
+    <div class="sub" id="summarySub">余额、排名、分红和当前协议税率均从合约读取。</div>
+    <div class="wallet-grid">
+      <div class="metric"><small>我的持仓</small><b id="homeBalance">—</b><em id="homeBalanceUsd">约 $—</em></div>
+      <div class="metric"><small>当前排名</small><b id="homeRank">—</b><em>前100名分红</em></div>
+      <div class="metric"><small>可领取</small><b id="homeReward">—</b><em>PANGU2</em></div>
+    </div>
+    <button class="full-btn" id="homeWalletCta" style="margin-top:13px">连接钱包</button>
+  </div>
+
+  <div class="section-head"><h2>当前协议规则</h2><button data-sheet="rules">查看详情</button></div>
+  <div class="rule-grid">
+    <div class="rule"><b>4%</b><span>买入税<br>前100名分红</span></div>
+    <div class="rule"><b id="homeSellRate">—</b><span>当前卖出税<br>合约实时返回</span></div>
+    <div class="rule"><b>0.01</b><span>BNB / 次<br>回购后锁仓</span></div>
+  </div>
+
+  <div class="section-head"><h2>托底池</h2><button data-nav="support">查看全部</button></div>
+  <div class="card">
+    <div class="pool-pulse"><div><div class="sub">下一次允许回购</div><div class="countdown" id="homeCountdown">00:37</div></div><div class="pool-right"><b>18.42 BNB</b><span>可执行约1,842次</span></div></div>
+    <div class="progress"><i id="homeProgress" style="width:38%"></i></div>
+    <div class="sub" style="margin-top:10px">税费代币达到门槛后兑换为BNB，再按每次0.01 BNB执行回购。</div>
+  </div>
+
+  <div class="section-head"><h2>最近链上动态</h2><button data-sheet="contract">合约</button></div>
+  <div class="card">
+    <div class="activity"><div class="activity-icon">⌁</div><div class="activity-copy"><b>回购并锁仓</b><span>锁仓批次 #1247 · 2分钟前</span></div><div class="activity-value">4,612 P2<small>0.01 BNB</small></div></div>
+    <div class="activity"><div class="activity-icon">◇</div><div class="activity-copy"><b>分红领取</b><span>Epoch 028 · 5分钟前</span></div><div class="activity-value">8,240 P2<small>0x81B...7A2</small></div></div>
+    <div class="activity"><div class="activity-icon">🔥</div><div class="activity-copy"><b>黑洞销毁</b><span>动态卖出税 · 7分钟前</span></div><div class="activity-value">1,284 P2<small>永久销毁</small></div></div>
+  </div>
+</section>
+
+<section class="view" id="tradeView">
+  <div class="page-title"><h1>交易</h1><p>交易前由合约返回当前税率和最低预计到账。</p></div>
+  <div class="seg"><button class="active" data-mode="buy">买入</button><button data-mode="sell">卖出</button></div>
+  <div class="input-card"><div class="input-top"><span>支付</span><span id="payBalance">余额 3.284 BNB</span></div><div class="input-row"><input id="payInput" inputmode="decimal" value="0.10"><button class="max" id="maxBtn">MAX</button><div class="token"><i class="coin" id="payCoin">B</i><span id="payToken">BNB</span></div></div></div>
+  <div class="chips" id="amountChips"><button data-amount="0.05">0.05</button><button class="active" data-amount="0.10">0.10</button><button data-amount="0.50">0.50</button><button data-amount="max">MAX</button></div>
+  <div class="swap-arrow">↓</div>
+  <div class="input-card"><div class="input-top"><span>预计获得</span><span>报价已更新</span></div><div class="input-row"><input id="receiveInput" readonly><div class="token"><i class="coin" id="receiveCoin">P</i><span id="receiveToken">PANGU2</span></div></div></div>
+  <div class="card quote-card">
+    <div class="row"><span>当前协议税率</span><b class="tax-value" id="taxRow">4.00%</b></div>
+    <div class="row"><span>税费数量</span><b id="taxAmount">—</b></div>
+    <div class="row"><span>资金去向</span><b id="taxDestination">前100名分红池</b></div>
+    <div class="row"><span>最低预计到账</span><b id="minReceive">—</b></div>
+    <div class="row"><span>预计 Gas</span><b>≈ 0.00021 BNB</b></div>
+    <div class="quote-note"><i id="quoteIcon">✓</i><div><b id="quoteTitle">合约报价检查通过</b><span id="quoteText">买入税4%，税后数量已计入报价。</span></div></div>
+    <div class="quote-source">原型模拟：正式版通过 previewBuy / previewSell 读取链上结果</div>
+  </div>
+  <div class="trade-spacer"></div><button class="full-btn" id="tradeBtn">连接钱包后买入</button>
+</section>
+
+<section class="view" id="dividendView">
+  <div class="page-title"><h1>前100名分红</h1><p>买入税4%进入分红池，排名按公开快照计算。</p></div>
+  <div class="card rank-card">
+    <div class="rank-top"><div class="rank-number"><small>我的排名</small><b id="rankValue">—</b></div><div class="claim-box"><small>本周期可领取</small><b id="claimAmount">—</b></div></div>
+    <div class="rank-goal"><div class="rank-goal-top"><b id="rankGoalTitle">连接钱包查看排名</b><span id="rankGoalGap">—</span></div><div class="progress"><i id="rankProgress" style="width:5%"></i></div><div class="rank-labels"><span>#100</span><span>#60</span><span>#30</span><span>#10</span></div></div>
+    <button class="full-btn" id="claimBtn" style="margin-top:14px">连接钱包</button>
+  </div>
+  <div class="section-head"><h2>分红档位</h2><button data-sheet="snapshot">快照规则</button></div>
+  <div class="tiers"><div class="tier"><b>35%</b><span>第1–10名</span></div><div class="tier"><b>25%</b><span>第11–30名</span></div><div class="tier active"><b>25%</b><span>第31–60名</span></div><div class="tier"><b>15%</b><span>第61–100名</span></div></div>
+  <div class="section-head"><h2>当前排名</h2><button data-sheet="leaderboard">完整排行榜</button></div>
+  <div class="card">
+    <div class="leader"><div class="place">01</div><div class="avatar">7A</div><div class="leader-info"><b>0x7A91...F2B8</b><span>21,820,000 PANGU2</span></div><div class="leader-value"><b>8.42%</b><span>权重</span></div></div>
+    <div class="leader"><div class="place">02</div><div class="avatar">42</div><div class="leader-info"><b>0x42DE...71AC</b><span>18,440,000 PANGU2</span></div><div class="leader-value"><b>7.11%</b><span>权重</span></div></div>
+    <div class="leader my-row"><div class="place">36</div><div class="avatar">ME</div><div class="leader-info"><b>0x7c4E...A91F</b><span>126,840 PANGU2 · 距#30差18,160</span></div><div class="leader-value"><b>0.18%</b><span>权重</span></div></div>
+  </div>
+</section>
+
+<section class="view" id="supportView">
+  <button class="back-btn" data-nav="home">‹ 返回首页</button>
+  <div class="page-title"><h1>托底池</h1><p>卖出税费先累计为PANGU2，达到门槛后兑换为BNB，再分批回购并锁仓。</p></div>
+  <div class="detail-grid">
+    <div class="detail-stat"><span>待兑换税费</span><b>2.84M P2</b></div><div class="detail-stat"><span>托底池余额</span><b>18.42 BNB</b></div>
+    <div class="detail-stat"><span>累计回购</span><b>42.8M P2</b></div><div class="detail-stat"><span>累计销毁</span><b>8.21M P2</b></div>
+  </div>
+  <div class="section-head"><h2>资金流程</h2><button data-sheet="poolDetails">规则</button></div>
+  <div class="card"><div class="flow"><div class="flow-box">卖出税费 P2</div><div class="flow-arrow">→</div><div class="flow-box">兑换 BNB</div><div class="flow-arrow">→</div><div class="flow-box">0.01 BNB 回购</div><div class="flow-arrow">→</div><div class="flow-box">锁仓365天</div></div></div>
+  <div class="section-head"><h2>下一次可执行</h2><button data-sheet="automation">执行方式</button></div>
+  <div class="card">
+    <div class="pool-pulse"><div><div class="sub">最小间隔60秒</div><div class="countdown" id="poolCountdown">00:37</div></div><div class="pool-right"><b>0.01 BNB</b><span>约回购4,607 P2</span></div></div>
+    <div class="progress"><i id="poolProgress" style="width:38%"></i></div>
+    <button class="full-btn" id="triggerBtn" style="margin-top:13px">公开触发回购</button>
+  </div>
+  <div class="section-head"><h2>最近回购</h2><button data-sheet="lock">锁仓详情</button></div>
+  <div class="card" id="buybackTimeline">
+    <div class="timeline-item"><div class="timeline-dot">✓</div><div class="timeline-copy"><b>回购4,612 PANGU2</b><span>0.01 BNB · 锁仓批次#1247 · 2分钟前</span></div></div>
+    <div class="timeline-item"><div class="timeline-dot">✓</div><div class="timeline-copy"><b>回购4,598 PANGU2</b><span>0.01 BNB · 锁仓批次#1246 · 3分钟前</span></div></div>
+  </div>
+</section>
+
+<section class="view" id="meView">
+  <div class="page-title"><h1>我的</h1><p>查看合约记录成本、当前税率和链上记录。</p></div>
+  <div class="card">
+    <div class="profile"><div class="profile-avatar" id="profileAvatar">?</div><div><b id="profileAddress">未连接钱包</b><p id="profileNetwork">连接后查看BSC Testnet资产</p></div></div>
+    <div class="asset-main" id="assetMain">— PANGU2</div><div class="asset-sub" id="assetUsd">约 $—</div>
+    <div class="status-line"><span class="status-chip" id="statusWallet">钱包未连接</span><span class="status-chip" id="statusRank">排名未解锁</span><span class="status-chip" id="statusClaim">分红未领取</span></div>
+  </div>
+  <div class="card">
+    <div class="row"><span>合约记录成本</span><b id="costBasis">—</b></div><div class="row"><span>税前卖出参考价值</span><b id="preTaxValue">—</b></div><div class="row"><span>当前卖出协议税率</span><b class="tax-value" id="meSellRate">—</b></div>
+  </div>
+  <div class="card menu">
+    <button data-nav="dividend"><span class="menu-icon">◇</span><span>我的分红</span><span>›</span></button>
+    <button data-nav="support"><span class="menu-icon">⌁</span><span>托底池与锁仓</span><span>›</span></button>
+    <button data-sheet="contract"><span class="menu-icon">⌘</span><span>合约透明度</span><span>›</span></button>
+    <button data-sheet="rules"><span class="menu-icon">i</span><span>协议税费规则</span><span>›</span></button>
+    <button data-sheet="prototype"><span class="menu-icon">⚙</span><span>原型测试设置</span><span>›</span></button>
+    <button id="disconnectBtn"><span class="menu-icon">↪</span><span>断开钱包</span><span>›</span></button>
+  </div>
+  <div class="section-head"><h2>最近记录</h2><button id="allTxBtn">全部</button></div><div class="card" id="txList"><div class="sub" style="text-align:center;padding:10px">连接钱包后查看链上记录</div></div>
+</section>
+</main>
+<nav class="bottom-nav"><button class="active" data-nav="home"><span class="nav-icon">⌂</span><span>首页</span></button><button data-nav="trade"><span class="nav-icon">⇄</span><span>交易</span></button><button data-nav="dividend"><span class="nav-icon">◇</span><span>分红</span><i class="nav-badge hidden" id="rewardBadge">1</i></button><button data-nav="me"><span class="nav-icon">○</span><span>我的</span></button></nav>
+<div class="sheet-wrap" id="sheetWrap"><div class="sheet"><div class="grab"></div><div class="sheet-head"><h2 id="sheetTitle">详情</h2><button class="close" id="sheetClose">×</button></div><div id="sheetBody"></div></div></div>
+<div class="toast" id="toast"></div>
+</div>
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const state={connected:false,mode:'buy',sellRate:10,claimed:false,countdown:37,triggered:false,everTriggered:false};
+const fmt=n=>Number(n).toLocaleString('en-US',{maximumFractionDigits:2});
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('show'),2100)}
+function navigate(name){$$('.view').forEach(v=>v.classList.remove('active'));const v=$('#'+name+'View');if(v)v.classList.add('active');$$('.bottom-nav [data-nav]').forEach(b=>b.classList.toggle('active',b.dataset.nav===name));window.scrollTo({top:0,behavior:'smooth'})}
+$$('[data-nav]').forEach(b=>b.onclick=()=>navigate(b.dataset.nav));$$('[data-go-trade]').forEach(b=>b.onclick=()=>{setTradeMode(b.dataset.goTrade);navigate('trade')});
+function refresh(){const c=state.connected,rate=state.sellRate+'%';$('#walletBtn').textContent=c?'0x7c4E...A91F':'连接钱包';$('#walletBtn').classList.toggle('connected',c);$('#summaryTitle').textContent=c?'你的链上位置':'连接钱包查看个人数据';$('#summarySub').textContent=c?'当前排名#36，本周期有可领取分红。':'余额、排名、分红和当前协议税率均从合约读取。';$('#homeBalance').textContent=c?'126,840':'—';$('#homeBalanceUsd').textContent=c?'约 $162.85':'约 $—';$('#homeRank').textContent=c?'#36':'—';$('#homeReward').textContent=c&&!state.claimed?'2,846':c?'0':'—';$('#homeWalletCta').textContent=c?'查看我的资产':'连接钱包';$('#homeSellRate').textContent=c?rate:'—';$('#rankValue').textContent=c?'#36':'—';$('#claimAmount').textContent=c&&!state.claimed?'2,846 P2':c?'0 P2':'—';$('#rankGoalTitle').textContent=c?'距离前30名还差18,160 P2':'连接钱包查看排名';$('#rankGoalGap').textContent=c?'72%':'—';$('#rankProgress').style.width=c?'72%':'5%';$('#claimBtn').textContent=!c?'连接钱包':state.claimed?'本周期已领取':'领取 2,846 PANGU2';$('#claimBtn').disabled=c&&state.claimed;$('#profileAvatar').textContent=c?'ME':'?';$('#profileAddress').textContent=c?'0x7c4E...A91F':'未连接钱包';$('#profileNetwork').textContent=c?'BSC Testnet · Chain ID 97':'连接后查看BSC Testnet资产';$('#assetMain').textContent=c?'126,840 PANGU2':'— PANGU2';$('#assetUsd').textContent=c?'约 $162.85':'约 $—';$('#statusWallet').textContent=c?'钱包已连接':'钱包未连接';$('#statusWallet').classList.toggle('on',c);$('#statusRank').textContent=c?'前100名 · #36':'排名未解锁';$('#statusRank').classList.toggle('on',c);$('#statusClaim').textContent=state.claimed?'本周期已领取':'分红未领取';$('#statusClaim').classList.toggle('on',state.claimed);$('#costBasis').textContent=c?'100.00 USDT':'—';$('#preTaxValue').textContent=c?'101.00 USDT':'—';$('#meSellRate').textContent=c?rate:'—';$('#rewardBadge').classList.toggle('hidden',!c||state.claimed);$('#tradeBtn').textContent=c?(state.mode==='buy'?'确认买入':'授权并卖出'):(state.mode==='buy'?'连接钱包后买入':'连接钱包后卖出');renderTx();updateTrade()}
+function connect(){state.connected=true;closeSheet();refresh();toast('钱包已连接（模拟）')}
+function disconnect(){state.connected=false;refresh();navigate('home');toast('钱包已断开')}
+$('#walletBtn').onclick=()=>state.connected?navigate('me'):openSheet('wallet');$('#homeWalletCta').onclick=()=>state.connected?navigate('me'):openSheet('wallet');$('#disconnectBtn').onclick=disconnect;
+function setTradeMode(mode){state.mode=mode;$$('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));$('#payToken').textContent=mode==='buy'?'BNB':'PANGU2';$('#receiveToken').textContent=mode==='buy'?'PANGU2':'BNB';$('#payCoin').textContent=mode==='buy'?'B':'P';$('#receiveCoin').textContent=mode==='buy'?'P':'B';$('#payBalance').textContent=mode==='buy'?'余额 3.284 BNB':'余额 '+(state.connected?'126,840':'0')+' PANGU2';$('#payInput').value=mode==='buy'?'0.10':'10000';$$('#amountChips button').forEach((b,i)=>b.classList.toggle('active',i===1));updateTrade()}
+$$('[data-mode]').forEach(b=>b.onclick=()=>setTradeMode(b.dataset.mode));
+function updateTrade(){const amount=Math.max(0,parseFloat($('#payInput').value)||0);if(state.mode==='buy'){const gross=amount*462350,tax=gross*.04,net=gross-tax;$('#receiveInput').value=fmt(net);$('#taxRow').textContent='4.00%';$('#taxAmount').textContent=fmt(tax)+' P2';$('#taxDestination').textContent='前100名分红池';$('#minReceive').textContent=fmt(net*.99)+' P2';$('#quoteIcon').textContent='✓';$('#quoteTitle').textContent='合约报价检查通过';$('#quoteText').textContent='买入税4%，税后数量已计入报价。'}else{const rate=state.sellRate/100,grossBnb=amount*.000002163,taxToken=amount*rate,netToken=amount-taxToken,netBnb=netToken*.000002163;$('#receiveInput').value=netBnb.toFixed(6);$('#taxRow').textContent=state.sellRate.toFixed(2)+'%';$('#taxAmount').textContent=fmt(taxToken)+' P2';$('#taxDestination').textContent=state.sellRate===4?'4%进入托底池':'9%托底池 · 1%黑洞销毁';$('#minReceive').textContent=(netBnb*.99).toFixed(6)+' BNB';$('#quoteIcon').textContent='⌁';$('#quoteTitle').textContent='当前卖出协议税率 '+state.sellRate+'%';$('#quoteText').textContent=state.sellRate===4?'税费全部进入托底池。':'其中9%进入托底池，1%直接进入黑洞地址。'}if(state.connected)$('#tradeBtn').textContent=state.mode==='buy'?'确认买入':'授权并卖出'}
+$('#payInput').oninput=()=>{$$('#amountChips button').forEach(b=>b.classList.remove('active'));updateTrade()};$('#maxBtn').onclick=()=>{$('#payInput').value=state.mode==='buy'?'3.284':(state.connected?'126840':'0');updateTrade()};$$('#amountChips button').forEach(b=>b.onclick=()=>{const v=b.dataset.amount;$('#payInput').value=v==='max'?(state.mode==='buy'?'3.284':state.connected?'126840':'0'):v;$$('#amountChips button').forEach(x=>x.classList.toggle('active',x===b));updateTrade()});
+$('#tradeBtn').onclick=()=>{if(!state.connected){openSheet('wallet');return}const label=state.mode==='buy'?'买入':'卖出';$('#tradeBtn').disabled=true;$('#tradeBtn').textContent='等待钱包确认…';setTimeout(()=>$('#tradeBtn').textContent='链上确认中…',520);setTimeout(()=>{$('#tradeBtn').disabled=false;refresh();toast(label+'交易已完成，链上记录已更新（模拟）')},1300)};
+$('#claimBtn').onclick=()=>{if(!state.connected){openSheet('wallet');return}if(state.claimed){toast('本周期分红已经领取');return}$('#claimBtn').disabled=true;$('#claimBtn').textContent='领取确认中…';setTimeout(()=>{state.claimed=true;$('#claimBtn').disabled=false;refresh();toast('2,846 PANGU2 已领取（模拟）')},1000)};
+$('#triggerBtn').onclick=()=>{if(state.countdown>0){toast('还需 '+state.countdown+' 秒才能执行');return}if(state.triggered)return;state.triggered=true;$('#triggerBtn').disabled=true;$('#triggerBtn').textContent='链上执行中…';setTimeout(()=>{const n=document.createElement('div');n.className='timeline-item';n.innerHTML='<div class="timeline-dot">✓</div><div class="timeline-copy"><b>回购4,607 PANGU2</b><span>由你的地址触发 · 锁仓批次#1248 · 刚刚</span></div>';$('#buybackTimeline').prepend(n);state.countdown=60;state.triggered=false;state.everTriggered=true;$('#triggerBtn').disabled=false;$('#triggerBtn').textContent='公开触发回购';renderTx();toast('0.01 BNB回购完成并进入锁仓（模拟）')},1100)};
+function renderTx(){if(!state.connected){$('#txList').innerHTML='<div class="sub" style="text-align:center;padding:10px">连接钱包后查看链上记录</div>';return}$('#txList').innerHTML='<div class="activity"><div class="activity-icon">↓</div><div class="activity-copy"><b>买入 PANGU2</b><span>今天 21:48 · 已确认</span></div><div class="activity-value">+44,385.6 P2<small>-0.10 BNB</small></div></div>'+(state.claimed?'<div class="activity"><div class="activity-icon">◇</div><div class="activity-copy"><b>领取分红</b><span>刚刚 · 已确认</span></div><div class="activity-value">+2,846 P2<small>Epoch 028</small></div></div>':'')+(state.everTriggered?'<div class="activity"><div class="activity-icon">⌁</div><div class="activity-copy"><b>公开触发回购</b><span>刚刚 · 已执行</span></div><div class="activity-value">4,607 P2<small>已锁仓</small></div></div>':'')}
+const sheets={
+ wallet:['连接钱包','<div class="detail"><h3>连接后解锁个人数据</h3><div class="sub">查看持仓、排名、分红、合约记录成本和当前协议税率。本原型不会调用真实钱包。</div></div><button class="wallet-option" id="mockWallet"><span class="wallet-logo">M</span><span><b>MetaMask</b><span>浏览器钱包 · 模拟连接</span></span></button><button class="wallet-option" id="wcWallet"><span class="wallet-logo">W</span><span><b>WalletConnect</b><span>移动钱包 · 模拟连接</span></span></button><div class="disclaimer">不会读取私钥或转移真实资产。</div>'],
+ rules:['协议税费规则','<div class="detail"><div class="row"><span>买入协议税</span><b>4%</b></div><div class="row"><span>买入税去向</span><b>前100名分红池</b></div><div class="row"><span>卖出协议税</span><b>4% 或 10%</b></div></div><div class="detail"><h3>卖出税率如何返回</h3><div class="sub">合约根据链上记录成本与本次税前卖出报价，返回当前4%或10%税率。10%状态下，9%进入托底池、1%进入黑洞地址。交易主页面只展示当前实际税率和预计到账。</div></div><div class="disclaimer">实际到账还会受到市场滑点、流动性和Gas影响。</div>'],
+ automation:['回购执行方式','<div class="detail"><div class="row"><span>最小间隔</span><b>60秒</b></div><div class="row"><span>单次金额</span><b>0.01 BNB</b></div><div class="row"><span>回购接收地址</span><b>锁仓合约</b></div></div><div class="sub">Keeper、运营后台或任何公开地址都可尝试触发，但不能修改金额、接收地址或绕过链上条件。</div>'],
+ snapshot:['快照规则','<div class="detail"><div class="row"><span>当前周期</span><b>Epoch 028</b></div><div class="row"><span>快照区块</span><b>42,814,660</b></div><div class="row"><span>档位内分配</span><b>按持币权重</b></div><div class="row"><span>验证方式</span><b>Merkle Root上链</b></div></div><div class="sub">排名链下计算，快照区块、分红总量、Merkle Root和领取结果在链上验证。</div>'],
+ leaderboard:['完整排行榜','<div class="detail"><div class="leader"><div class="place">01</div><div class="avatar">7A</div><div class="leader-info"><b>0x7A91...F2B8</b><span>21,820,000 P2</span></div><div class="leader-value"><b>8.42%</b></div></div><div class="leader"><div class="place">02</div><div class="avatar">42</div><div class="leader-info"><b>0x42DE...71AC</b><span>18,440,000 P2</span></div><div class="leader-value"><b>7.11%</b></div></div><div class="leader"><div class="place">03</div><div class="avatar">B9</div><div class="leader-info"><b>0xB901...9CA2</b><span>16,720,000 P2</span></div><div class="leader-value"><b>6.45%</b></div></div><div class="leader my-row"><div class="place">36</div><div class="avatar">ME</div><div class="leader-info"><b>0x7c4E...A91F</b><span>126,840 P2</span></div><div class="leader-value"><b>0.18%</b></div></div></div>'],
+ poolDetails:['托底池规则','<div class="detail"><div class="row"><span>4%卖出状态</span><b>4%进入托底池</b></div><div class="row"><span>10%卖出状态</span><b>9%托底 + 1%销毁</b></div><div class="row"><span>税费形态</span><b>PANGU2</b></div><div class="row"><span>处理方式</span><b>达到门槛后兑换BNB</b></div></div><div class="sub">税费兑换与回购分开执行，避免同一区块内大额卖出和回购互相冲击。</div>'],
+ lock:['回购锁仓','<div class="detail"><div class="row"><span>当前锁仓</span><b>42.8M PANGU2</b></div><div class="row"><span>锁仓模式</span><b>365天滚动锁仓</b></div><div class="row"><span>最近批次</span><b>#1247</b></div><div class="row"><span>接收路径</span><b>PancakeSwap → Locker</b></div></div>'],
+ contract:['合约透明度','<div class="detail"><h3>Token合约</h3><div class="sub" style="word-break:break-all;color:var(--gold2)">0xA21f7B72E9C3e40d8461B0d934Aa771E92F2B301</div></div><div class="detail"><div class="row"><span>Owner</span><b>Timelock</b></div><div class="row"><span>多签门槛</span><b>3 / 5</b></div><div class="row"><span>最短延迟</span><b>24小时</b></div><div class="row"><span>交易状态</span><b style="color:var(--green)">开启</b></div></div><div class="disclaimer">以上地址为原型占位数据。</div>'],
+ prototype:['原型测试设置','<div class="detail"><h3>模拟合约返回的卖出税率</h3><div class="sub">此设置仅用于线框原型展示，正式版由链上 previewSell 自动返回，用户不能手动选择。</div><div class="test-options"><button data-test-rate="4">模拟返回 4%</button><button data-test-rate="10">模拟返回 10%</button></div></div>']
+};
+function openSheet(type){const [title,body]=sheets[type]||['详情',''];$('#sheetTitle').textContent=title;$('#sheetBody').innerHTML=body;$('#sheetWrap').classList.add('show');setTimeout(()=>{const a=$('#mockWallet'),b=$('#wcWallet');if(a)a.onclick=connect;if(b)b.onclick=connect;$$('[data-test-rate]').forEach(btn=>{btn.classList.toggle('active',Number(btn.dataset.testRate)===state.sellRate);btn.onclick=()=>{state.sellRate=Number(btn.dataset.testRate);refresh();openSheet('prototype');toast('原型卖出税率已切换为 '+state.sellRate+'%')}})},0)}
+function closeSheet(){$('#sheetWrap').classList.remove('show')}
+$$('[data-sheet]').forEach(b=>b.onclick=()=>openSheet(b.dataset.sheet));$('#sheetClose').onclick=closeSheet;$('#sheetWrap').onclick=e=>{if(e.target===$('#sheetWrap'))closeSheet()};$('#allTxBtn').onclick=()=>state.connected?toast('已显示最近全部记录'):openSheet('wallet');
+setInterval(()=>{if(state.countdown>0)state.countdown--;const txt='00:'+String(state.countdown).padStart(2,'0');$('#homeCountdown').textContent=txt;$('#poolCountdown').textContent=txt;const w=((60-state.countdown)/60)*100;$('#homeProgress').style.width=w+'%';$('#poolProgress').style.width=w+'%';if(!state.triggered)$('#triggerBtn').textContent=state.countdown===0?'现在可公开触发':'公开触发回购'},1000);
+refresh();updateTrade();
+</script>
+</body>
+</html>

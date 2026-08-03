@@ -26,8 +26,8 @@ Route::prefix('v1/projects/pangu2')->group(function () {
     Route::post('/auth/logout', [WalletAuthController::class, 'logout']);
 
     // ── Trade (public, return MOCK_DATA until ABI available) ──
-    Route::post('/quotes/buy',                     [TradeController::class, 'buyQuote']);
-    Route::post('/quotes/sell',                    [TradeController::class, 'sellQuote']);
+    Route::post('/quotes/buy',                     [TradeController::class, 'buyQuote'])->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
+    Route::post('/quotes/sell',                    [TradeController::class, 'sellQuote'])->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
     Route::get('/wallets/{address}/transactions',  [TradeController::class, 'transactions']);
 
     // ── Dividend (public) ──

@@ -182,37 +182,28 @@ export function useAdminTransactions() {
   const error = ref<string | null>(null);
   const transactions = ref<AdminTransaction[]>([]);
   const total = ref(0);
-  const mode = ref<"mock" | "api">("mock"); // P2-B05 will switch to "api"
-
-  function generateMockTransactions(): AdminTransaction[] {
-    return [
-      { tx_hash: "0x" + "a".repeat(64), block_number: "42815125", type: "buy",  buyer: "0x7c4Ee21d...a91f", amount_bnb: "0.10",   amount_token: "44,385.6", tax_rate: "4%",  status: "confirmed", timestamp: new Date(Date.now() - 5 * 60_000).toISOString() },
-      { tx_hash: "0x" + "b".repeat(64), block_number: "42815110", type: "sell", buyer: "0x8A4241D8...b3f1", amount_bnb: "0.0214", amount_token: "10,000",   tax_rate: "4%",  status: "confirmed", timestamp: new Date(Date.now() - 2 * 3600_000).toISOString() },
-      { tx_hash: "0x" + "c".repeat(64), block_number: "42810000", type: "buy",  buyer: "0xB901d24C...d2e3", amount_bnb: "1.50",   amount_token: "665,784",  tax_rate: "4%",  status: "confirmed", timestamp: new Date(Date.now() - 6 * 3600_000).toISOString() },
-      { tx_hash: "0x" + "d".repeat(64), block_number: "42808000", type: "sell", buyer: "0xF203baE9...a7b9", amount_bnb: "0.05",   amount_token: "22,000",   tax_rate: "10%", status: "pending",   timestamp: new Date(Date.now() - 1 * 3600_000).toISOString() },
-      { tx_hash: "0x" + "e".repeat(64), block_number: "42805000", type: "buy",  buyer: "0x1A4Ba8F3...c8d2", amount_bnb: "3.00",   amount_token: "1,331,568", tax_rate: "4%",  status: "confirmed", timestamp: new Date(Date.now() - 12 * 3600_000).toISOString() },
-    ];
-  }
 
   function fetchTransactions() {
     loading.value = true;
     error.value = null;
 
-    if (mode.value === "mock") {
-      setTimeout(() => {
-        const all = generateMockTransactions();
-        transactions.value = all;
-        total.value = all.length;
+    // Fetch real transactions from API. Falls back to empty on failure.
+    fetch(`${ADMIN_API}/wallets/0x0000000000000000000000000000000000000000/transactions`)
+      .then(r => r.json())
+      .then(body => {
+        if (body?.data?.length) {
+          transactions.value = body.data;
+          total.value = body.meta?.total ?? body.data.length;
+        } else {
+          transactions.value = [];
+          total.value = 0;
+        }
         loading.value = false;
-      }, 300);
-      return;
-    }
-
-    // P2-B05: replace with real API call
-    // fetchEnvelope<AdminTransaction[]>("/wallets/{address}/transactions")
+      })
+      .catch(e => { error.value = e.message; loading.value = false; });
   }
 
   onMounted(() => fetchTransactions());
 
-  return { loading, error, transactions, total, mode, fetchTransactions };
+  return { loading, error, transactions, total, fetchTransactions };
 }

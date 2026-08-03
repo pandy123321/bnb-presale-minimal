@@ -18,11 +18,12 @@ export const wagmiConfig = createConfig({
   },
 });
 
-/** Chain IDs the DApp officially supports for trading. */
+/** Chain IDs the DApp officially supports for trading.
+ *  Chain 56 (BSC Mainnet) is explicitly excluded — trading is NO-GO.
+ *  Fork testing may reference mainnet state but never broadcasts mainnet transactions. */
 export const SUPPORTED_CHAIN_IDS: readonly number[] = [
   anvil.id,      // 31337 — local dev
   bscTestnet.id, // 97    — BSC Testnet
-  bsc.id,        // 56    — BSC Mainnet
 ] as const;
 
 /** Map chain ID → human-readable label. */

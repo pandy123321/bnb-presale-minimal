@@ -146,7 +146,8 @@ contract DividendDistributor is AccessControl, Pausable, ReentrancyGuard, IDivid
         whenNotPaused
     {
         _validateCommitment(epochId, commitment);
-        if (commitment.claimEnd < block.timestamp) revert InvalidClaimWindow();
+        if (commitment.claimStart <= block.timestamp) revert InvalidClaimWindow();
+        if (commitment.claimStart >= commitment.claimEnd) revert InvalidClaimWindow();
         if (_epochs[epochId].status != EpochStatus.NONE) revert EpochAlreadyExists(epochId);
         if (commitmentConsumed[epochId]) revert CommitmentAlreadyConsumed(epochId);
 

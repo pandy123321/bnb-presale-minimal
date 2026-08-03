@@ -17,6 +17,16 @@ use Illuminate\Support\Str;
 class AdminJobsController extends Controller
 {
     /**
+     * Task name → Queue Job class mapping. All retried tasks dispatch to the queue.
+     */
+    private const TASK_JOB_MAP = [
+        'chain-sync'          => \App\Jobs\ChainSyncJob::class,
+        'purchase_event_sync' => \App\Jobs\PurchaseEventSyncJob::class,
+        'dividend-snapshot'   => \App\Jobs\DividendSnapshotJob::class,
+        'buyback-watcher'     => \App\Jobs\BuybackWatcherJob::class,
+    ];
+
+    /**
      * Allowed task names for retry. Only known, idempotent-safe tasks can be retried.
      */
     private const RETRY_ALLOWLIST = [
@@ -129,10 +139,16 @@ class AdminJobsController extends Controller
                 'created_at'      => $now,
             ]);
 
-            return true;
+            // Read back token ID for dispatch
+            $tokenRow = DB::table('job_retry_tokens')
+                ->where('idempotency_key', $idempotencyKey)
+                ->where('task_name', $taskName)
+                ->first();
+
+            return ['consumed' => true, 'token_id' => $tokenRow?->id ?? 0];
         });
 
-        if (!$consumed) {
+        if (!$result['consumed']) {
             $retry = DB::table('job_retry_tokens')
                 ->where('task_name', $taskName)
                 ->where('idempotency_key', $idempotencyKey)
@@ -146,6 +162,11 @@ class AdminJobsController extends Controller
             ], 'LIVE');
         }
 
+        // Dispatch to queue AFTER transaction commits
+        if ($result['consumed'] ?? false) {
+            $this->dispatchRetry($taskName, (int) ($result['token_id'] ?? 0));
+        }
+
         return ApiEnvelope::success([
             'task_name'       => $taskName,
             'status'          => 'queued',
@@ -154,25 +175,22 @@ class AdminJobsController extends Controller
         ], 'LIVE');
     }
 
-    // ── Helpers ──────────────────────────────
-
-    private function writeAudit(
-        string $action,
-        string $target,
-        string $idempotencyKey,
-        Request $request,
-        ?int $adminId,
-    ): void {
-        DB::table('admin_audit_logs')->insert([
-            'admin_id'        => $adminId,
-            'action'          => $action,
-            'target_type'     => 'job',
-            'idempotency_key' => $idempotencyKey,
-            'ip_address'      => $request->ip(),
-            'user_agent'      => $request->userAgent(),
-            'after_data'      => json_encode(['task_name' => $target]),
-            'result'          => 'SUCCESS',
-            'created_at'      => now(),
-        ]);
+    private function dispatchRetry(string $taskName, int $tokenId): void
+    {
+        $jobClass = self::TASK_JOB_MAP[$taskName] ?? null;
+        if (!$jobClass || !class_exists($jobClass)) {
+            DB::table('job_retry_tokens')->where('id', $tokenId)->update([
+                'status' => 'failed', 'error_message' => "Job class not found: {$taskName}", 'updated_at' => now(),
+            ]);
+            return;
+        }
+        try {
+            dispatch(new $jobClass);
+        } catch (\Throwable $e) {
+            DB::table('job_retry_tokens')->where('id', $tokenId)->update([
+                'status' => 'failed', 'error_message' => $e->getMessage(), 'updated_at' => now(),
+            ]);
+        }
     }
-}
+
+    // ── Helpers writer removed — audit is now inline in the transaction ──

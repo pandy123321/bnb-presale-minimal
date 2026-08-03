@@ -1,6 +1,5 @@
 // PANGU2 Admin — Jobs API
 import { ref, onMounted, onUnmounted } from "vue";
-import { useAdminAuthStore } from "@/stores/useAdminAuth";
 
 const ADMIN_API = "/admin-api/v1/projects/pangu2";
 
@@ -18,8 +17,7 @@ export function useJobs() {
   async function fetch() {
     loading.value = true; error.value = null;
     try {
-      const auth = useAdminAuthStore();
-      const res = await fetch(`${ADMIN_API}/jobs`, { headers: { Authorization: `Bearer ${auth.token}` } });
+      const res = await fetch(`${ADMIN_API}/jobs`, { credentials: "include" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = await res.json();
       jobs.value = (body.data ?? []) as JobInfo[];
@@ -34,11 +32,10 @@ export function useJobs() {
     const name = retryConfirm.value; if (!name) return;
     retryConfirm.value = null; retryingJob.value = name; retryMsg.value = null;
     try {
-      const auth = useAdminAuthStore();
       const key = `p2-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       const res = await fetch(`${ADMIN_API}/jobs/${name}/retry`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${auth.token}`, "Idempotency-Key": key, "Content-Type": "application/json" },
+        method: "POST", credentials: "include",
+        headers: { "Idempotency-Key": key, "Content-Type": "application/json" },
       });
       const body = await res.json();
       if (!res.ok) { retryMsg.value = body?.error?.message ?? "Retry failed"; }

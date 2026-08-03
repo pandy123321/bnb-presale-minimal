@@ -59,7 +59,8 @@ const TOKEN_ADDRESS = requireContractAddress(import.meta.env.VITE_TOKEN_ADDRESS 
  */
 async function validateContracts(): Promise<boolean> {
   try {
-    const publicClient = wagmiConfig.getPublicClient();
+    const { getPublicClient } = await import("@wagmi/core");
+    const publicClient = getPublicClient(wagmiConfig);
     const [routerCode, tokenCode] = await Promise.all([
       publicClient.getBytecode({ address: TRADE_ROUTER_ADDRESS }),
       publicClient.getBytecode({ address: TOKEN_ADDRESS }),
