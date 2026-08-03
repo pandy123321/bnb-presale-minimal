@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {Script} from "forge-std/Script.sol";
-import {console} from "forge-std/console.sol";
-import {Pangu2Token} from "../src/Pangu2Token.sol";
-import {CostBasisManager} from "../src/CostBasisManager.sol";
-import {PancakeV2Adapter} from "../src/adapters/PancakeV2Adapter.sol";
-import {PancakeV2TwapOracle} from "../src/oracle/PancakeV2TwapOracle.sol";
-import {SupportPool} from "../src/SupportPool.sol";
-import {FeeVault} from "../src/FeeVault.sol";
-import {BuybackLocker} from "../src/BuybackLocker.sol";
-import {DividendDistributor} from "../src/DividendDistributor.sol";
-import {Pangu2TradeRouter} from "../src/Pangu2TradeRouter.sol";
-import {IPancakeFactory, IPancakePair} from "../src/interfaces/IPancakeV2.sol";
+import { Script } from "forge-std/Script.sol";
+import { console } from "forge-std/console.sol";
+import { Pangu2Token } from "../src/Pangu2Token.sol";
+import { CostBasisManager } from "../src/CostBasisManager.sol";
+import { PancakeV2Adapter } from "../src/adapters/PancakeV2Adapter.sol";
+import { PancakeV2TwapOracle } from "../src/oracle/PancakeV2TwapOracle.sol";
+import { SupportPool } from "../src/SupportPool.sol";
+import { FeeVault } from "../src/FeeVault.sol";
+import { BuybackLocker } from "../src/BuybackLocker.sol";
+import { DividendDistributor } from "../src/DividendDistributor.sol";
+import { Pangu2TradeRouter } from "../src/Pangu2TradeRouter.sol";
+import { IPancakeFactory, IPancakePair } from "../src/interfaces/IPancakeV2.sol";
+import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract DeployPangu2 is Script {
     uint256 internal constant TESTNET_LOCK_DURATION = 365 days;
@@ -36,13 +38,21 @@ contract DeployPangu2 is Script {
         require(ROUTER.code.length > 0, "Router not deployed");
 
         address[] memory roles = new address[](4);
-        roles[0] = governance; roles[1] = emergencyAccount;
-        roles[2] = keeper; roles[3] = releaseRecipient;
+        roles[0] = governance;
+        roles[1] = emergencyAccount;
+        roles[2] = keeper;
+        roles[3] = releaseRecipient;
         for (uint256 i = 0; i < roles.length; i++) {
             require(roles[i] != address(0), "zero role address");
         }
 
-        vm.startBroadcast();
+        // Read deployer key and derive address for governance handover below
+        uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        address deployer = vm.addr(deployerKey);
+        require(deployer != address(0), "invalid deployer key");
+        require(deployer != governance, "deployer must not equal governance");
+
+        vm.startBroadcast(deployerKey);
 
         // 1. Token
         Pangu2Token token = new Pangu2Token(governance, governance, emergencyAccount);
@@ -58,16 +68,39 @@ contract DeployPangu2 is Script {
 
         // 4. Adapter + Oracle
         PancakeV2Adapter adapter = new PancakeV2Adapter(address(token), WBNB, FACTORY, pair, ROUTER, governance);
-        PancakeV2TwapOracle oracle = new PancakeV2TwapOracle(address(token), WBNB, FACTORY, pair, TWAP_WINDOW, MAX_DEVIATION_BPS);
+        PancakeV2TwapOracle oracle =
+            new PancakeV2TwapOracle(address(token), WBNB, FACTORY, pair, TWAP_WINDOW, MAX_DEVIATION_BPS);
 
         // 5. SupportPool, FeeVault, Locker
-        SupportPool supportPool = new SupportPool(address(token), WBNB, address(adapter), address(oracle), 300, 5 minutes, governance, emergencyAccount);
-        FeeVault feeVault = new FeeVault(address(token), WBNB, address(adapter), address(oracle), payable(address(supportPool)), 1_000_000 ether, 300, governance, keeper, emergencyAccount);
-        BuybackLocker locker = new BuybackLocker(address(token), address(supportPool), BuybackLocker.LockMode.FIXED_DURATION, uint64(TESTNET_LOCK_DURATION), releaseRecipient);
+        SupportPool supportPool = new SupportPool(
+            address(token), WBNB, address(adapter), address(oracle), 300, 5 minutes, governance, emergencyAccount
+        );
+        FeeVault feeVault = new FeeVault(
+            address(token),
+            WBNB,
+            address(adapter),
+            address(oracle),
+            payable(address(supportPool)),
+            1_000_000 ether,
+            300,
+            governance,
+            keeper,
+            emergencyAccount
+        );
+        BuybackLocker locker = new BuybackLocker(
+            address(token),
+            address(supportPool),
+            BuybackLocker.LockMode.FIXED_DURATION,
+            uint64(TESTNET_LOCK_DURATION),
+            releaseRecipient
+        );
 
         // 6. Distributor + TradeRouter
-        DividendDistributor distributor = new DividendDistributor(address(token), address(costBasis), governance, governance, emergencyAccount);
-        Pangu2TradeRouter tradeRouter = new Pangu2TradeRouter(address(token), WBNB, address(costBasis), address(adapter), address(oracle), governance, emergencyAccount);
+        DividendDistributor distributor =
+            new DividendDistributor(address(token), address(costBasis), governance, governance, emergencyAccount);
+        Pangu2TradeRouter tradeRouter = new Pangu2TradeRouter(
+            address(token), WBNB, address(costBasis), address(adapter), address(oracle), governance, emergencyAccount
+        );
 
         // 7. Configure system
         token.configureCore(address(costBasis), address(feeVault));
@@ -90,6 +123,34 @@ contract DeployPangu2 is Script {
         supportPool.configureLocker(address(locker));
         feeVault.configureDividendDistributor(address(distributor));
 
+        // ── Governance handover ──
+        _renounceDeployerRoles(token, costBasis, tradeRouter, distributor, supportPool, feeVault, adapter, deployer);
+
+        // Assert deployer fully removed (BuybackLocker has no AccessControl, skipped)
+        bytes32 DA = 0x00;
+        address[] memory allTargets = new address[](7);
+        allTargets[0] = address(token);
+        allTargets[1] = address(costBasis);
+        allTargets[2] = address(tradeRouter);
+        allTargets[3] = address(distributor);
+        allTargets[4] = address(supportPool);
+        allTargets[5] = address(feeVault);
+        allTargets[6] = address(adapter);
+        for (uint256 i = 0; i < allTargets.length; i++) {
+            IAccessControl c = IAccessControl(allTargets[i]);
+            require(!c.hasRole(DA, deployer), "deployer retains DEFAULT_ADMIN");
+        }
+
+        // Assert governance holds DEFAULT_ADMIN on all contracts
+        for (uint256 i = 0; i < allTargets.length; i++) {
+            IAccessControl c = IAccessControl(allTargets[i]);
+            require(c.hasRole(DA, governance), "governance missing DEFAULT_ADMIN");
+        }
+
+        console.log("Governance:", governance);
+        console.log("Deployer:", deployer);
+        console.log("Governance handover verified.");
+
         vm.stopBroadcast();
 
         console.log("=== PANGU2 V2 Deployed ===");
@@ -102,5 +163,36 @@ contract DeployPangu2 is Script {
         console.log("V2Pair:", pair);
         console.log("V2Adapter:", address(adapter));
         console.log("V2Oracle:", address(oracle));
+    }
+
+    function _renounceDeployerRoles(
+        Pangu2Token token,
+        CostBasisManager costBasis,
+        Pangu2TradeRouter tradeRouter,
+        DividendDistributor distributor,
+        SupportPool supportPool,
+        FeeVault feeVault,
+        PancakeV2Adapter adapter,
+        address deployer
+    ) internal {
+        bytes32 DA = 0x00;
+        _tryRenounce(token, DA, deployer);
+        _tryRenounce(token, token.GOVERNANCE_ROLE(), deployer);
+        _tryRenounce(costBasis, DA, deployer);
+        _tryRenounce(costBasis, costBasis.GOVERNANCE_ROLE(), deployer);
+        _tryRenounce(tradeRouter, DA, deployer);
+        _tryRenounce(tradeRouter, tradeRouter.GOVERNANCE_ROLE(), deployer);
+        _tryRenounce(distributor, DA, deployer);
+        _tryRenounce(distributor, distributor.GOVERNANCE_ROLE(), deployer);
+        _tryRenounce(supportPool, DA, deployer);
+        _tryRenounce(supportPool, supportPool.GOVERNANCE_ROLE(), deployer);
+        _tryRenounce(feeVault, DA, deployer);
+        _tryRenounce(feeVault, feeVault.GOVERNANCE_ROLE(), deployer);
+        _tryRenounce(adapter, DA, deployer);
+        _tryRenounce(adapter, adapter.GOVERNANCE_ROLE(), deployer);
+    }
+
+    function _tryRenounce(AccessControl target, bytes32 role, address deployer) internal {
+        if (target.hasRole(role, deployer)) target.renounceRole(role, deployer);
     }
 }
