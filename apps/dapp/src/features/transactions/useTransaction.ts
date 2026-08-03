@@ -53,6 +53,23 @@ function requireContractAddress(v: string | undefined, name: string): `0x${strin
 const TRADE_ROUTER_ADDRESS = requireContractAddress(import.meta.env.VITE_TRADE_ROUTER_ADDRESS as string | undefined, "TRADE_ROUTER_ADDRESS");
 const TOKEN_ADDRESS = requireContractAddress(import.meta.env.VITE_TOKEN_ADDRESS as string | undefined, "TOKEN_ADDRESS");
 
+/**
+ * Validate that both contract addresses have code on the current chain.
+ * Called lazily before each transaction, not at module load (P2-03).
+ */
+async function validateContracts(): Promise<boolean> {
+  try {
+    const publicClient = wagmiConfig.getPublicClient();
+    const [routerCode, tokenCode] = await Promise.all([
+      publicClient.getBytecode({ address: TRADE_ROUTER_ADDRESS }),
+      publicClient.getBytecode({ address: TOKEN_ADDRESS }),
+    ]);
+    return !!routerCode && routerCode !== "0x" && !!tokenCode && tokenCode !== "0x";
+  } catch {
+    return false;
+  }
+}
+
 // ── Transaction State ──────────────────────
 
 export type TxPhase =
@@ -253,6 +270,15 @@ export function useTransaction() {
     if (!wallet.canTransact) {
       state.value.error = "Wallet not connected or wrong network.";
       state.value.errorCode = "WALLET_NOT_READY";
+      state.value.errorRecoverable = false;
+      return false;
+    }
+
+    // Verify contracts are deployed on current chain before any transaction
+    const contractsOk = await validateContracts();
+    if (!contractsOk) {
+      state.value.error = "Contract not deployed on this network. Check configuration.";
+      state.value.errorCode = "CONTRACT_NOT_DEPLOYED";
       state.value.errorRecoverable = false;
       return false;
     }

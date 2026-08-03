@@ -46,10 +46,19 @@ jobs:
           version: "v1.7.1"
       - run: forge fmt --check
       - run: forge build --lib-paths ../contracts/lib
-      - run: |
-          TEST_COUNT=$(forge test --no-match-path "*/fork/*" --lib-paths ../contracts/lib -vvv 2>&1 | grep -c "\[PASS\]")
-          echo "V2 non-fork tests passed: $TEST_COUNT"
-          if [ "$TEST_COUNT" -eq 0 ]; then echo "ERROR: 0 non-fork tests"; exit 1; fi
+      - name: Run V2 non-fork tests
+        run: |
+          set +e
+          set -o pipefail
+          forge test --no-match-path "*/fork/*" --lib-paths ../contracts/lib -vvv 2>&1 | tee v2-nonfork.log
+          FORGE_EXIT=${PIPESTATUS[0]}
+          PASSED=$(grep -c '\[PASS\]' v2-nonfork.log || true)
+          FAILED=$(grep -c '\[FAIL' v2-nonfork.log || true)
+          echo "PASSED=$PASSED FAILED=$FAILED"
+          if [ "$FORGE_EXIT" -ne 0 ]; then echo "ERROR: forge test failed (exit $FORGE_EXIT)"; exit 1; fi
+          if [ "$FAILED" -ne 0 ]; then echo "ERROR: $FAILED test(s) failed"; exit 1; fi
+          if [ "$((PASSED + FAILED))" -eq 0 ]; then echo "ERROR: 0 tests discovered"; exit 1; fi
+        shell: bash
 
   # --- Laravel Backend ---
 
