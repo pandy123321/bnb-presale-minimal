@@ -1,10 +1,7 @@
-# Foundry / Solidity generated output
-contracts/cache/
-contracts/out/
-contracts/broadcast/
-contracts-v2/cache/
-contracts-v2/out/
-contracts-v2/broadcast/
+# Foundry / Solidity generated output (catch-all for contracts/, contracts-v2/, future contracts-N/)
+contracts*/cache/
+contracts*/out/
+contracts*/broadcast/
 contracts/reports/remediation-build/
 contracts/coverage/
 contracts/lcov.info

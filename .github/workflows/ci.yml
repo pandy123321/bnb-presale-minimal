@@ -195,6 +195,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: "v1.7.1"
+      - name: Build contracts ABI (chain-worker depends on contracts-v2/out/)
+        run: cd contracts-v2 && forge build --lib-paths ../contracts/lib
       - uses: pnpm/action-setup@v4
         with:
           version: "10.34.5"
