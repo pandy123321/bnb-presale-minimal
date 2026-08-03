@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Jobs;
 
 use Illuminate\Bus\Queueable;
@@ -7,27 +9,25 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class ChainSyncJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, RetryTokenJob;
 
-    public string $taskName = 'chain-sync';
+    public function __construct(public readonly int $retryTokenId) {}
 
     public function handle(): void
     {
-        Log::info('ChainSyncJob: starting sync');
-        // TODO: Implement actual chain sync logic
-        $this->markComplete();
-    }
+        $this->transition($this->retryTokenId, 'running');
 
-    private function markComplete(): void
-    {
-        DB::table('job_retry_tokens')
-            ->where('task_name', $this->taskName)
-            ->where('status', 'queued')
-            ->update(['status' => 'completed', 'error_message' => null, 'updated_at' => now()]);
+        try {
+            // TODO: call real chain sync service when implemented
+            // For now, fail-closed: this service is not yet implemented.
+            // When ready, replace with: app(ChainSyncService::class)->sync();
+            throw new \RuntimeException('ChainSyncService not yet implemented — Task marked as not_implemented');
+        } catch (\Throwable $e) {
+            $this->markFailed($this->retryTokenId, $e->getMessage());
+            throw $e;
+        }
     }
 }

@@ -185,7 +185,7 @@ class AdminJobsController extends Controller
             return;
         }
         try {
-            dispatch(new $jobClass);
+            dispatch(new $jobClass($tokenId));
         } catch (\Throwable $e) {
             DB::table('job_retry_tokens')->where('id', $tokenId)->update([
                 'status' => 'failed', 'error_message' => $e->getMessage(), 'updated_at' => now(),

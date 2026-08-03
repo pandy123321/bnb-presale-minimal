@@ -1,293 +1,196 @@
 // PANGU2 Chain Worker — Event Scanner
-//
-// Core scanning logic:
-// 1. Acquire lease
-// 2. Read cursor → determine block range
-// 3. Fetch logs via viem getLogs
-// 4. Decode events using ABIs
-// 5. Insert raw events into PostgreSQL
-// 6. Update cursor
-// 7. Release lease
 
 import {
   createPublicClient,
   http,
   type PublicClient,
-  type Log,
-  parseAbiItem,
   decodeEventLog,
-  type DecodeEventLogReturnType,
 } from "viem";
-import { anvil } from "viem/chains";
-import { Pool, type PoolClient } from "pg";
+import { loadRequiredAbis, type AbiArtifact } from "../abi/loader";
+import type { Abi } from "viem";
 import {
-  getPool,
-  getCursor,
-  upsertCursor,
-  acquireLease,
-  releaseLease,
-  insertRawEvents,
+  getPool, getCursor, upsertCursor,
+  acquireLease, releaseLease, insertRawEvents,
   type RawEventRow,
 } from "../db/client";
-import { loadRequiredAbis } from "../abi/loader";
+import { toJsonSafe } from "../utils/json-safe";
+import {
+  CHAIN_ID, RPC_URL, SCAN_BATCH_SIZE, CONFIRMATION_BLOCKS,
+  SCAN_INTERVAL_SECONDS, WORKER_ID, LEASE_TTL_SECONDS, DEPLOYMENT_BLOCK,
+  TRADE_ROUTER_ADDRESS, DIVIDEND_DISTRIBUTOR_ADDRESS, rpcLogLabel,
+} from "../config";
 
-// ── Config ─────────────────────────────────
+// ── ABI load (fail-fast) ──────────────────────
 
-const CHAIN_ID = parseInt(process.env.CHAIN_ID ?? "31337");
-const RPC_URL = process.env.CHAIN_WORKER_RPC_URL ?? process.env.RPC_URL ?? "http://localhost:8545";
-const SCAN_BATCH_SIZE = parseInt(process.env.SCAN_BATCH_SIZE ?? "1000");
-const CONFIRMATION_BLOCKS = parseInt(process.env.CONFIRMATION_BLOCKS ?? "12");
-const REORG_DEPTH = parseInt(process.env.REORG_DEPTH ?? "20");
-const SCAN_INTERVAL_SECONDS = parseInt(process.env.SCAN_INTERVAL_SECONDS ?? "15");
-const WORKER_ID = process.env.WORKER_ID ?? "worker-default";
-const LEASE_TTL_SECONDS = parseInt(process.env.LEASE_TTL_SECONDS ?? "120");
-const TRADE_ROUTER_ADDRESS = (process.env.CHAIN_WORKER_TRADE_ROUTER_ADDRESS ?? "").toLowerCase();
-const DIVIDEND_DISTRIBUTOR_ADDRESS = (process.env.CHAIN_WORKER_DIVIDEND_ADDRESS ?? "").toLowerCase();
-const DEPLOYMENT_BLOCK = parseInt(process.env.DEPLOYMENT_BLOCK ?? "0");
+const requiredAbis: Map<string, AbiArtifact> = loadRequiredAbis();
+const tradeAbi = requiredAbis.get("Pangu2TradeRouter");
+const dividendAbi = requiredAbis.get("DividendDistributor");
 
-// ── Load ABIs at module init (fail-fast) ───
+if (!tradeAbi || !dividendAbi) {
+  console.error("[Chain Worker] FATAL: Required ABIs not found");
+  process.exit(1);
+}
 
-const REQUIRED_ABIS = loadRequiredAbis();
+// ── Stream Definitions ─────────────────────────
 
-// ── Stream Definitions ─────────────────────
-
-const STREAMS: Array<{
+interface ScanStream {
   name: string;
-  contractAddress: string;
-  abi: readonly unknown[];
+  contractAddress: `0x${string}`;
+  abi: Abi;
   startBlock: number;
-}> = [
+}
+
+const STREAMS: ScanStream[] = [
   {
     name: "TRADE_EVENTS",
-    contractAddress: TRADE_ROUTER_ADDRESS,
-    abi: REQUIRED_ABIS["Pangu2TradeRouter"] ?? [],
+    contractAddress: TRADE_ROUTER_ADDRESS as `0x${string}`,
+    abi: tradeAbi.abi as Abi,
     startBlock: DEPLOYMENT_BLOCK,
   },
   {
     name: "DIVIDEND_EVENTS",
-    contractAddress: DIVIDEND_DISTRIBUTOR_ADDRESS,
-    abi: REQUIRED_ABIS["DividendDistributor"] ?? [],
+    contractAddress: DIVIDEND_DISTRIBUTOR_ADDRESS as `0x${string}`,
+    abi: dividendAbi.abi as Abi,
     startBlock: DEPLOYMENT_BLOCK,
   },
 ];
 
-// ── Main Worker ────────────────────────────
+// ── RPC ────────────────────────────────────────
 
-let client: PublicClient | null = null;
-let pool: Pool | null = null;
-let running = false;
-
-function getClient(): PublicClient {
-  if (!client) {
-    client = createPublicClient({
-      chain: { ...anvil, id: CHAIN_ID },
-      transport: http(RPC_URL),
-    });
-  }
-  return client;
+let rpc: PublicClient | null = null;
+function getRpc(): PublicClient {
+  if (!rpc) rpc = createPublicClient({ transport: http(RPC_URL) });
+  return rpc;
 }
 
-function getPp(): Pool {
-  if (!pool) pool = getPool();
-  return pool;
-}
+// ── Start ──────────────────────────────────────
 
 export async function start(): Promise<void> {
-  // Validate required environment
-  if (!TRADE_ROUTER_ADDRESS || TRADE_ROUTER_ADDRESS === "0x0000000000000000000000000000000000000000") {
-    console.error("[Chain Worker] FATAL: CHAIN_WORKER_TRADE_ROUTER_ADDRESS is zero or not configured.");
-    process.exit(1);
-  }
-  if (!DIVIDEND_DISTRIBUTOR_ADDRESS || DIVIDEND_DISTRIBUTOR_ADDRESS === "0x0000000000000000000000000000000000000000") {
-    console.error("[Chain Worker] FATAL: CHAIN_WORKER_DIVIDEND_ADDRESS is zero or not configured.");
-    process.exit(1);
-  }
-  if (!RPC_URL || RPC_URL === "http://localhost:8545") {
-    console.error("[Chain Worker] FATAL: RPC is not configured (default localhost). Set CHAIN_WORKER_RPC_URL.");
-    process.exit(1);
-  }
+  // Startup validation
+  await validateEnvironment();
 
   console.log("[Chain Worker] Starting...");
   console.log(`  Chain ID: ${CHAIN_ID}`);
-  console.log(`  RPC: ${RPC_URL.replace(/\/\/.*@/, "//***@")}`); // Redact credentials
+  console.log(`  RPC: ${rpcLogLabel()}`);
+  console.log(`  TradeRouter: ${TRADE_ROUTER_ADDRESS}`);
+  console.log(`  DividendDistributor: ${DIVIDEND_DISTRIBUTOR_ADDRESS}`);
   console.log(`  Batch size: ${SCAN_BATCH_SIZE}`);
-  console.log(`  Confirmation blocks: ${CONFIRMATION_BLOCKS}`);
   console.log(`  Worker ID: ${WORKER_ID}`);
 
-  // ABI validation done at module init via loadRequiredAbis() — fails closed
-  console.log("  ABIs loaded and bound to streams");
-
-  running = true;
   await scanAllStreams();
-
-  // Start periodic scanning
-  const timer = setInterval(async () => {
-    if (!running) return;
-    try {
-      await scanAllStreams();
-    } catch (err) {
-      console.error("[Chain Worker] Scan cycle error:", err);
-    }
-  }, SCAN_INTERVAL_SECONDS * 1000);
-
-  console.log(`[Chain Worker] Scanning every ${SCAN_INTERVAL_SECONDS}s`);
-  console.log("[Chain Worker] Ready.");
+  setInterval(() => scanAllStreams().catch(e => console.error("[Chain Worker] scan error", e)), SCAN_INTERVAL_SECONDS * 1000);
 }
 
-export async function stop(): Promise<void> {
-  running = false;
-  if (pool) {
-    await pool.end();
-    pool = null;
+async function validateEnvironment(): Promise<void> {
+  const c = getRpc();
+
+  // Verify chain ID
+  const chainId = await c.getChainId();
+  if (chainId !== CHAIN_ID) {
+    console.error(`[Chain Worker] FATAL: RPC chain ${chainId} != config ${CHAIN_ID}`);
+    process.exit(1);
   }
-  console.log("[Chain Worker] Stopped.");
-}
 
-// ── Scan Logic ─────────────────────────────
+  // Verify contract addresses
+  for (const s of STREAMS) {
+    const code = await c.getBytecode({ address: s.contractAddress });
+    if (!code || code === "0x") {
+      console.error(`[Chain Worker] FATAL: ${s.name} at ${s.contractAddress} has no bytecode`);
+      process.exit(1);
+    }
+  }
+
+  // Verify deployment block
+  const latest = Number(await c.getBlockNumber());
+  if (DEPLOYMENT_BLOCK > latest) {
+    console.error(`[Chain Worker] FATAL: DEPLOYMENT_BLOCK ${DEPLOYMENT_BLOCK} > latest ${latest}`);
+    process.exit(1);
+  }
+}
 
 async function scanAllStreams(): Promise<void> {
   for (const stream of STREAMS) {
-    const acquired = await acquireLease(CHAIN_ID, stream.name, WORKER_ID, LEASE_TTL_SECONDS);
-    if (!acquired) {
-      console.log(`[Chain Worker] Lease not acquired for ${stream.name} — another worker is active`);
-      continue;
-    }
-
-    try {
-      await scanStream(stream);
-    } catch (err) {
-      console.error(`[Chain Worker] Error scanning ${stream.name}:`, err);
-    } finally {
-      await releaseLease(CHAIN_ID, stream.name);
-    }
+    const leased = await acquireLease(CHAIN_ID, stream.name, WORKER_ID, LEASE_TTL_SECONDS);
+    if (!leased) continue;
+    try { await scanStream(stream); }
+    finally { await releaseLease(CHAIN_ID, stream.name); }
   }
 }
 
-async function scanStream(stream: {
-  name: string;
-  contractAddress: string;
-  abiName: string;
-  startBlock: number;
-}): Promise<void> {
-  const c = getClient();
-  const p = getPp();
-  const dbClient = await p.connect();
+async function scanStream(stream: ScanStream): Promise<void> {
+  const c = getRpc();
+  const cursor = await getCursor(CHAIN_ID, stream.name);
+  const fromBlock = cursor.last_scanned_block + 1;
+  const latest = Number(await c.getBlockNumber());
+  const safeLatest = latest - CONFIRMATION_BLOCKS;
+  const toBlock = Math.min(fromBlock + SCAN_BATCH_SIZE - 1, safeLatest);
 
-  try {
-    // 1. Read cursor (fallback to stream-specific startBlock if no cursor exists)
-    const fromBlock = Math.max(
-      await getCursor(CHAIN_ID, stream.name),
-      stream.startBlock,
-    );
+  if (fromBlock > safeLatest) return;
 
-    // 2. Get current chain height (stop before confirmation depth)
-    const currentBlock = Number(await c.getBlockNumber());
-    const safeToBlock = currentBlock - CONFIRMATION_BLOCKS;
-
-    if (safeToBlock <= fromBlock) {
-      return; // nothing new to scan
-    }
-
-    const toBlock = Math.min(fromBlock + SCAN_BATCH_SIZE, safeToBlock);
-
-    console.log(`[Chain Worker] Scanning ${stream.name}: blocks ${fromBlock} → ${toBlock}`);
-
-    // 3. Fetch logs
-    const logs = await c.getLogs({
-      address: stream.contractAddress as `0x${string}`,
-      fromBlock: BigInt(fromBlock),
-      toBlock: BigInt(toBlock),
-    });
-
-    console.log(`[Chain Worker] Found ${logs.length} logs in ${stream.name}`);
-
-    // 4. Convert to raw events and insert
-    const rawEvents: RawEventRow[] = [];
-
-    for (const log of logs) {
-      const block = await c.getBlock({ blockNumber: log.blockNumber! });
-
-      // Decode event using ABI — produces human-readable event_name and named params
-      let eventName = log.topics[0] ?? null;
-      let decoded: Record<string, unknown> = { topics: log.topics, data: log.data };
-      try {
-        if (stream.abi) {
-          const decodedLog = decodeEventLog({
-            abi: stream.abi,
-            data: log.data as `0x${string}`,
-            topics: log.topics as `0x${string}`[],
-          });
-          eventName = decodedLog.eventName ?? eventName;
-          // Convert BigInt values to decimal strings for JSON serialization
-          const args = decodedLog.args as Record<string, unknown>;
-          decoded = {};
-          for (const [k, v] of Object.entries(args)) {
-            decoded[k] = typeof v === "bigint" ? v.toString() : v;
-          }
-        }
-      } catch {
-        // Keep raw data if decoding fails (unknown event or ABI mismatch)
-      }
-
-      rawEvents.push({
-        chain_id: CHAIN_ID,
-        contract_address: (log.address as string).toLowerCase(),
-        event_name: eventName,
-        transaction_hash: (log.transactionHash as string).toLowerCase(),
-        log_index: log.logIndex ?? 0,
-        block_number: Number(log.blockNumber),
-        block_hash: (log.blockHash as string).toLowerCase(),
-        transaction_index: log.transactionIndex ?? null,
-        block_timestamp: new Date(Number(block.timestamp) * 1000).toISOString(),
-        decoded_data: decoded,
-        topics: log.topics as string[],
-        raw_data: log.data,
-        status: "PENDING_CONFIRMATION",
-      });
-    }
-
-    // 5. Insert in transaction
-    await dbClient.query("BEGIN");
-    try {
-      await insertRawEvents(dbClient, rawEvents);
-
-      // Mark all scanned blocks as CONFIRMED (toBlock is already safe)
-      for (let bn = fromBlock; bn <= toBlock; bn++) {
-        await dbClient.query(
-          `UPDATE chain_raw_events SET status = 'CONFIRMED', confirmed_at = NOW()
-           WHERE chain_id = $1 AND block_number = $2 AND status = 'PENDING_CONFIRMATION'`,
-          [CHAIN_ID, bn],
-        );
-      }
-
-      // 6. Update cursor with block hash
-      const hashBlock = Math.min(toBlock, safeToBlock);
-      const block = await c.getBlock({ blockNumber: BigInt(hashBlock) });
-      await dbClient.query(
-        `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, last_scanned_block_hash, status, updated_at)
-         VALUES ($1, $2, $3, $4, 'HEALTHY', NOW())
-         ON CONFLICT (chain_id, stream)
-         DO UPDATE SET last_scanned_block = $3, last_scanned_block_hash = $4, last_run_completed_at = NOW(), status = 'HEALTHY', updated_at = NOW()`,
-        [CHAIN_ID, stream.name, toBlock, (block.hash as string).toLowerCase()],
-      );
-
-      await dbClient.query("COMMIT");
-    } catch (err) {
-      await dbClient.query("ROLLBACK");
-      throw err;
-    }
-
-    console.log(`[Chain Worker] ${stream.name}: scanned ${logs.length} events, cursor advanced to ${toBlock}`);
-  } finally {
-    dbClient.release();
-  }
-}
-
-// ── Entry Point ────────────────────────────
-
-if (require.main === module) {
-  start().catch((err) => {
-    console.error("[Chain Worker] Fatal error:", err);
-    process.exit(1);
+  const logs = await c.getLogs({
+    address: stream.contractAddress,
+    fromBlock: BigInt(fromBlock),
+    toBlock: BigInt(toBlock),
   });
+
+  if (logs.length === 0) {
+    await upsertCursor(CHAIN_ID, stream.name, toBlock, "", "SYNCED");
+    return;
+  }
+
+  const rawEvents: RawEventRow[] = [];
+  for (const log of logs) {
+    const block = await c.getBlock({ blockNumber: log.blockNumber! });
+
+    let eventName: string | null = log.topics[0] ?? null;
+    let decoded: Record<string, unknown> = {};
+
+    try {
+      const decodedLog = decodeEventLog({
+        abi: stream.abi,
+        data: log.data as `0x${string}`,
+        topics: log.topics as `0x${string}`[],
+      });
+      eventName = decodedLog.eventName ?? eventName;
+      decoded = toJsonSafe(decodedLog.args) as Record<string, unknown>;
+      if (!decoded || Object.keys(decoded).length === 0) {
+        decoded = { topics: log.topics, data: log.data };
+      }
+    } catch {
+      // Unknown event or ABI mismatch — keep as raw
+      decoded = { topics: log.topics as unknown[] as Record<string, unknown>, data: log.data };
+      eventName = null;
+    }
+
+    rawEvents.push({
+      chain_id: CHAIN_ID,
+      contract_address: (log.address as string).toLowerCase(),
+      event_name: eventName,
+      transaction_hash: (log.transactionHash as string).toLowerCase(),
+      log_index: log.logIndex ?? 0,
+      block_number: Number(log.blockNumber),
+      block_hash: (log.blockHash as string).toLowerCase(),
+      transaction_index: log.transactionIndex ?? null,
+      block_timestamp: new Date(Number(block.timestamp) * 1000).toISOString(),
+      decoded_data: decoded,
+      topics: log.topics as string[],
+      raw_data: log.data,
+      status: "PENDING_CONFIRMATION",
+    });
+  }
+
+  const db = getPool();
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    await insertRawEvents(client, rawEvents);
+    const lastBlockHash = rawEvents[rawEvents.length - 1].block_hash;
+    await upsertCursor(CHAIN_ID, stream.name, toBlock, lastBlockHash, "SYNCED");
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
 }

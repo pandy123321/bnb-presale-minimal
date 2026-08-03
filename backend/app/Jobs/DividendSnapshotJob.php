@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Jobs;
 
 use Illuminate\Bus\Queueable;
@@ -7,26 +9,22 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class DividendSnapshotJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, RetryTokenJob;
 
-    public string $taskName = 'dividend-snapshot';
+    public function __construct(public readonly int $retryTokenId) {}
 
     public function handle(): void
     {
-        Log::info('DividendSnapshotJob: starting snapshot');
-        $this->markComplete();
-    }
+        $this->transition($this->retryTokenId, 'running');
 
-    private function markComplete(): void
-    {
-        DB::table('job_retry_tokens')
-            ->where('task_name', $this->taskName)
-            ->where('status', 'queued')
-            ->update(['status' => 'completed', 'error_message' => null, 'updated_at' => now()]);
+        try {
+            throw new \RuntimeException('DividendSnapshotService not yet implemented — Task marked as not_implemented');
+        } catch (\Throwable $e) {
+            $this->markFailed($this->retryTokenId, $e->getMessage());
+            throw $e;
+        }
     }
 }

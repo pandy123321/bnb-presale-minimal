@@ -17,6 +17,13 @@ Route::middleware('auth:web')->group(function () {
 });
 
 Route::prefix('admin-api/v1/projects/pangu2')->group(function () {
+    // CSRF token — accessible to guest (needed before login)
+    Route::get('/csrf-token', function (\Illuminate\Http\Request $request) {
+        return \App\Http\ApiEnvelope::success([
+            'csrf_token' => $request->session()->token(),
+        ], 'LIVE');
+    });
+
     // Auth — JSON endpoints (no RBAC, guest for login, web guard for me/logout)
     Route::post('/auth/login', [AuthController::class, 'apiLogin']);
     Route::middleware('auth:web')->group(function () {
