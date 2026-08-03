@@ -21,14 +21,16 @@ export interface AbiArtifact {
 import { keccak256, toHex } from "viem";
 
 /**
- * ABI directory pointing at Foundry build output.
+ * ABI directory pointing at Foundry build output (V2 contracts).
  *
- * ⚠️  contracts-v2/out/  is .gitignored — a new checkout does NOT include it.
- * Always run `forge build` before starting the chain-worker so ABI files exist:
- *   cd contracts-v2 && forge build --lib-paths ../contracts/lib
- * CI handles this via the chain-worker job step that runs forge build first.
+ * Default resolves to <repo>/contracts-v2/out from __dirname.
+ * Override via PANGU2_ABI_DIR for CI/Docker/staging.
+ *
+ * ⚠️  contracts-v2/out/ is .gitignored — new checkouts must build it first:
+ *     cd contracts-v2 && forge build --lib-paths ../contracts/lib
  */
-const ABI_DIR = resolve(__dirname, "../../../contracts-v2/out");
+const DEFAULT_ABI_DIR = resolve(__dirname, "../../../../contracts-v2/out");
+const ABI_DIR = process.env.PANGU2_ABI_DIR ?? DEFAULT_ABI_DIR;
 
 /**
  * Load a Foundry-compiled ABI JSON file.
