@@ -14,4 +14,6 @@ interface IPangu2TwapOracle {
         external
         view
         returns (Quote memory quote);
+
+    function update() external;
 }

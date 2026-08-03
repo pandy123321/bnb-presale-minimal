@@ -15,7 +15,10 @@ import { Pangu2TradeRouter } from "../src/Pangu2TradeRouter.sol";
 import { IPancakeFactory, IPancakePair } from "../src/interfaces/IPancakeV2.sol";
 import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
 import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+import { TransferContext } from "../src/libraries/TransferContext.sol";
 
+/// @notice Deploy PANGU2 V2 core contracts.
+///         Does NOT enable pair trading or add liquidity — see BootstrapPangu2.
 contract DeployPangu2 is Script {
     uint256 internal constant TESTNET_LOCK_DURATION = 365 days;
     uint32 internal constant TWAP_WINDOW = 30 minutes;
@@ -26,54 +29,69 @@ contract DeployPangu2 is Script {
     address internal constant ROUTER = 0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3;
 
     function run() external {
+        uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        address deployer = vm.addr(deployerKey);
+        require(deployer != address(0), "invalid deployer key");
+
         address governance = vm.envAddress("GOVERNANCE_ADDRESS");
         address emergencyAccount = vm.envAddress("EMERGENCY_ADDRESS");
         address keeper = vm.envAddress("KEEPER_ADDRESS");
         address releaseRecipient = vm.envAddress("RELEASE_RECIPIENT_ADDRESS");
+        address initialHolder = vm.envAddress("INITIAL_HOLDER_ADDRESS");
+        address rootPublisher = vm.envAddress("ROOT_PUBLISHER_ADDRESS");
+
+        uint256 rawTokenReserve = vm.envUint("MIN_TOKEN_RESERVE");
+        uint256 rawWbnbReserve = vm.envUint("MIN_WBNB_RESERVE");
+        require(rawTokenReserve <= type(uint112).max, "MIN_TOKEN_RESERVE > uint112");
+        require(rawWbnbReserve <= type(uint112).max, "MIN_WBNB_RESERVE > uint112");
+        uint112 minTokenReserve = uint112(rawTokenReserve);
+        uint112 minWbnbReserve = uint112(rawWbnbReserve);
+        require(minTokenReserve > 0 && minWbnbReserve > 0, "zero min reserve");
 
         // Safety checks
         if (block.chainid != 97) revert("Unsupported chain - BSC Testnet (97) only");
         require(WBNB.code.length > 0, "WBNB not deployed");
         require(FACTORY.code.length > 0, "Factory not deployed");
         require(ROUTER.code.length > 0, "Router not deployed");
+        require(deployer != governance, "deployer must differ from governance");
+        require(deployer != initialHolder, "deployer must differ from initialHolder");
+        require(governance != initialHolder, "governance must differ from initialHolder");
+        require(governance != rootPublisher, "governance must differ from rootPublisher");
 
-        address[] memory roles = new address[](4);
-        roles[0] = governance;
-        roles[1] = emergencyAccount;
-        roles[2] = keeper;
-        roles[3] = releaseRecipient;
-        for (uint256 i = 0; i < roles.length; i++) {
-            require(roles[i] != address(0), "zero role address");
+        address[] memory addrs = new address[](6);
+        addrs[0] = governance;
+        addrs[1] = emergencyAccount;
+        addrs[2] = keeper;
+        addrs[3] = releaseRecipient;
+        addrs[4] = initialHolder;
+        addrs[5] = rootPublisher;
+        for (uint256 i = 0; i < addrs.length; i++) {
+            require(addrs[i] != address(0), "zero address");
         }
-
-        // Read deployer key and derive address for governance handover below
-        uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        address deployer = vm.addr(deployerKey);
-        require(deployer != address(0), "invalid deployer key");
-        require(deployer != governance, "deployer must not equal governance");
 
         vm.startBroadcast(deployerKey);
 
-        // 1. Token
-        Pangu2Token token = new Pangu2Token(governance, governance, emergencyAccount);
+        // 1. Token (deployer = temporary governance)
+        Pangu2Token token = new Pangu2Token(initialHolder, deployer, emergencyAccount);
 
         // 2. CostBasis
-        CostBasisManager costBasis = new CostBasisManager(address(token), governance);
+        CostBasisManager costBasis = new CostBasisManager(address(token), deployer);
 
-        // 3. Create V2 pair
+        // 3. Create V2 pair (NOT yet enabled as isPair — Bootstrap enables it)
         address pair = IPancakeFactory(FACTORY).createPair(address(token), WBNB);
         require(pair != address(0), "createPair returned zero");
         require(pair.code.length > 0, "Pair has no code");
         require(IPancakeFactory(FACTORY).getPair(address(token), WBNB) == pair, "getPair mismatch");
 
         // 4. Adapter + Oracle
-        PancakeV2Adapter adapter = new PancakeV2Adapter(address(token), WBNB, FACTORY, pair, ROUTER, governance);
-        PancakeV2TwapOracle oracle =
-            new PancakeV2TwapOracle(address(token), WBNB, FACTORY, pair, TWAP_WINDOW, MAX_DEVIATION_BPS);
+        PancakeV2Adapter adapter = new PancakeV2Adapter(address(token), WBNB, FACTORY, pair, ROUTER, deployer);
+        PancakeV2TwapOracle oracle = new PancakeV2TwapOracle(
+            address(token), WBNB, FACTORY, pair, TWAP_WINDOW, MAX_DEVIATION_BPS, minTokenReserve, minWbnbReserve
+        );
 
         // 5. SupportPool, FeeVault, Locker
         SupportPool supportPool = new SupportPool(
-            address(token), WBNB, address(adapter), address(oracle), 300, 5 minutes, governance, emergencyAccount
+            address(token), WBNB, address(adapter), address(oracle), 300, 5 minutes, deployer, emergencyAccount
         );
         FeeVault feeVault = new FeeVault(
             address(token),
@@ -83,7 +101,7 @@ contract DeployPangu2 is Script {
             payable(address(supportPool)),
             1_000_000 ether,
             300,
-            governance,
+            deployer,
             keeper,
             emergencyAccount
         );
@@ -97,14 +115,14 @@ contract DeployPangu2 is Script {
 
         // 6. Distributor + TradeRouter
         DividendDistributor distributor =
-            new DividendDistributor(address(token), address(costBasis), governance, governance, emergencyAccount);
+            new DividendDistributor(address(token), address(costBasis), deployer, rootPublisher, emergencyAccount);
         Pangu2TradeRouter tradeRouter = new Pangu2TradeRouter(
-            address(token), WBNB, address(costBasis), address(adapter), address(oracle), governance, emergencyAccount
+            address(token), WBNB, address(costBasis), address(adapter), address(oracle), deployer, emergencyAccount
         );
 
-        // 7. Configure system
+        // 7. Configure system contracts
         token.configureCore(address(costBasis), address(feeVault));
-        token.setPair(pair, true);
+        // NOTE: pair NOT enabled yet — BootstrapPangu2 handles this
         token.setSystemAddress(address(tradeRouter), true);
         token.setSystemAddress(address(adapter), true);
         token.setSystemAddress(address(supportPool), true);
@@ -123,33 +141,117 @@ contract DeployPangu2 is Script {
         supportPool.configureLocker(address(locker));
         feeVault.configureDividendDistributor(address(distributor));
 
-        // ── Governance handover ──
-        _renounceDeployerRoles(token, costBasis, tradeRouter, distributor, supportPool, feeVault, adapter, deployer);
+        // 8. Transfer Contexts
+        token.setSystemTransferContext(address(distributor), TransferContext.Kind.DIVIDEND_CLAIM, true);
+        token.setSystemTransferContext(address(locker), TransferContext.Kind.SYSTEM_CREDIT_UNKNOWN, true);
 
-        // Assert deployer fully removed (BuybackLocker has no AccessControl, skipped)
+        // 9. Governance handover: grant target governance
         bytes32 DA = 0x00;
-        address[] memory allTargets = new address[](7);
-        allTargets[0] = address(token);
-        allTargets[1] = address(costBasis);
-        allTargets[2] = address(tradeRouter);
-        allTargets[3] = address(distributor);
-        allTargets[4] = address(supportPool);
-        allTargets[5] = address(feeVault);
-        allTargets[6] = address(adapter);
-        for (uint256 i = 0; i < allTargets.length; i++) {
-            IAccessControl c = IAccessControl(allTargets[i]);
-            require(!c.hasRole(DA, deployer), "deployer retains DEFAULT_ADMIN");
+        bytes32 GOV = keccak256("GOVERNANCE_ROLE");
+        bytes32 UNP = keccak256("UNPAUSER_ROLE");
+
+        // Contracts WITH UNPAUSER_ROLE
+        address[] memory acFull = new address[](5);
+        acFull[0] = address(token);
+        acFull[1] = address(tradeRouter);
+        acFull[2] = address(distributor);
+        acFull[3] = address(supportPool);
+        acFull[4] = address(feeVault);
+
+        for (uint256 i = 0; i < acFull.length; i++) {
+            AccessControl c = AccessControl(acFull[i]);
+            c.grantRole(DA, governance);
+            require(c.hasRole(DA, governance), "grant DA failed");
+            c.grantRole(GOV, governance);
+            require(c.hasRole(GOV, governance), "grant GOV failed");
+            c.grantRole(UNP, governance);
+            require(c.hasRole(UNP, governance), "grant UNP failed");
         }
 
-        // Assert governance holds DEFAULT_ADMIN on all contracts
-        for (uint256 i = 0; i < allTargets.length; i++) {
-            IAccessControl c = IAccessControl(allTargets[i]);
-            require(c.hasRole(DA, governance), "governance missing DEFAULT_ADMIN");
+        // Contracts WITHOUT UNPAUSER_ROLE: CostBasis, Adapter
+        {
+            AccessControl cb = AccessControl(address(costBasis));
+            cb.grantRole(DA, governance);
+            require(cb.hasRole(DA, governance), "costBasis grant DA failed");
+            cb.grantRole(GOV, governance);
+            require(cb.hasRole(GOV, governance), "costBasis grant GOV failed");
+        }
+        {
+            AccessControl ad = AccessControl(address(adapter));
+            ad.grantRole(DA, governance);
+            require(ad.hasRole(DA, governance), "adapter grant DA failed");
+            ad.grantRole(GOV, governance);
+            require(ad.hasRole(GOV, governance), "adapter grant GOV failed");
         }
 
-        console.log("Governance:", governance);
-        console.log("Deployer:", deployer);
-        console.log("Governance handover verified.");
+        // 10. Renounce deployer: ALL admin roles
+        _renounceAll(AccessControl(address(token)), deployer);
+        _renounceAll(AccessControl(address(costBasis)), deployer);
+        _renounceAll(AccessControl(address(tradeRouter)), deployer);
+        _renounceAll(AccessControl(address(distributor)), deployer);
+        _renounceAll(AccessControl(address(supportPool)), deployer);
+        _renounceAll(AccessControl(address(feeVault)), deployer);
+        _renounceAll(AccessControl(address(adapter)), deployer);
+
+        // Also renounce SETTLEMENT_ROLE if deployer was granted it
+        bytes32 SETTLE = token.SETTLEMENT_ROLE();
+        if (token.hasRole(SETTLE, deployer)) token.renounceRole(SETTLE, deployer);
+        // Renounce CALLER_ROLE if held
+        bytes32 CALLER = adapter.CALLER_ROLE();
+        if (adapter.hasRole(CALLER, deployer)) adapter.renounceRole(CALLER, deployer);
+
+        // 11. Post-handover assertions — full contracts
+        for (uint256 i = 0; i < acFull.length; i++) {
+            IAccessControl c = IAccessControl(acFull[i]);
+            require(!c.hasRole(DA, deployer), "deployer retains DA");
+            require(!c.hasRole(GOV, deployer), "deployer retains GOV");
+            require(!c.hasRole(UNP, deployer), "deployer retains UNP");
+            require(c.hasRole(DA, governance), "gov missing DA");
+            require(c.hasRole(GOV, governance), "gov missing GOV");
+            require(c.hasRole(UNP, governance), "gov missing UNP");
+        }
+        // CostBasis (no UNPAUSER)
+        {
+            IAccessControl cb = IAccessControl(address(costBasis));
+            require(!cb.hasRole(DA, deployer), "costBasis deployer retains DA");
+            require(!cb.hasRole(GOV, deployer), "costBasis deployer retains GOV");
+            require(cb.hasRole(DA, governance), "costBasis gov missing DA");
+            require(cb.hasRole(GOV, governance), "costBasis gov missing GOV");
+        }
+        // Adapter (no UNPAUSER)
+        {
+            IAccessControl a = IAccessControl(address(adapter));
+            require(!a.hasRole(DA, deployer), "adapter deployer retains DA");
+            require(!a.hasRole(GOV, deployer), "adapter deployer retains GOV");
+            require(a.hasRole(DA, governance), "adapter gov missing DA");
+            require(a.hasRole(GOV, governance), "adapter gov missing GOV");
+        }
+
+        require(token.hasRole(SETTLE, address(tradeRouter)), "router missing SETTLEMENT");
+        require(!token.hasRole(SETTLE, deployer), "deployer retains SETTLEMENT");
+        require(!adapter.hasRole(CALLER, deployer), "deployer retains CALLER");
+
+        // Adapter whitelist
+        require(adapter.hasRole(CALLER, address(tradeRouter)), "router not adapter CALLER");
+        require(adapter.hasRole(CALLER, address(feeVault)), "feeVault not adapter CALLER");
+        require(adapter.hasRole(CALLER, address(supportPool)), "supportPool not adapter CALLER");
+
+        // CostBasis operators
+        require(costBasis.tradeRouter() == address(tradeRouter), "costBasis router mismatch");
+        require(costBasis.dividendDistributor() == address(distributor), "costBasis distributor mismatch");
+
+        // Transfer contexts
+        require(
+            token.systemTransferContextAllowed(address(distributor), TransferContext.Kind.DIVIDEND_CLAIM),
+            "distributor missing DIVIDEND_CLAIM"
+        );
+        require(
+            token.systemTransferContextAllowed(address(locker), TransferContext.Kind.SYSTEM_CREDIT_UNKNOWN),
+            "locker missing SYSTEM_CREDIT_UNKNOWN"
+        );
+
+        // Pair NOT yet trading-enabled
+        require(!token.isPair(pair), "pair must NOT be enabled yet");
 
         vm.stopBroadcast();
 
@@ -163,36 +265,18 @@ contract DeployPangu2 is Script {
         console.log("V2Pair:", pair);
         console.log("V2Adapter:", address(adapter));
         console.log("V2Oracle:", address(oracle));
+        console.log("Governance:", governance);
+        console.log("Deployer:", deployer);
+        console.log("");
+        console.log("Next: BootstrapPangu2 to add initial liquidity.");
     }
 
-    function _renounceDeployerRoles(
-        Pangu2Token token,
-        CostBasisManager costBasis,
-        Pangu2TradeRouter tradeRouter,
-        DividendDistributor distributor,
-        SupportPool supportPool,
-        FeeVault feeVault,
-        PancakeV2Adapter adapter,
-        address deployer
-    ) internal {
+    function _renounceAll(AccessControl target, address d) internal {
         bytes32 DA = 0x00;
-        _tryRenounce(token, DA, deployer);
-        _tryRenounce(token, token.GOVERNANCE_ROLE(), deployer);
-        _tryRenounce(costBasis, DA, deployer);
-        _tryRenounce(costBasis, costBasis.GOVERNANCE_ROLE(), deployer);
-        _tryRenounce(tradeRouter, DA, deployer);
-        _tryRenounce(tradeRouter, tradeRouter.GOVERNANCE_ROLE(), deployer);
-        _tryRenounce(distributor, DA, deployer);
-        _tryRenounce(distributor, distributor.GOVERNANCE_ROLE(), deployer);
-        _tryRenounce(supportPool, DA, deployer);
-        _tryRenounce(supportPool, supportPool.GOVERNANCE_ROLE(), deployer);
-        _tryRenounce(feeVault, DA, deployer);
-        _tryRenounce(feeVault, feeVault.GOVERNANCE_ROLE(), deployer);
-        _tryRenounce(adapter, DA, deployer);
-        _tryRenounce(adapter, adapter.GOVERNANCE_ROLE(), deployer);
-    }
-
-    function _tryRenounce(AccessControl target, bytes32 role, address deployer) internal {
-        if (target.hasRole(role, deployer)) target.renounceRole(role, deployer);
+        bytes32 GOV = keccak256("GOVERNANCE_ROLE");
+        bytes32 UNP = keccak256("UNPAUSER_ROLE");
+        if (target.hasRole(DA, d)) target.renounceRole(DA, d);
+        if (target.hasRole(GOV, d)) target.renounceRole(GOV, d);
+        if (target.hasRole(UNP, d)) target.renounceRole(UNP, d);
     }
 }

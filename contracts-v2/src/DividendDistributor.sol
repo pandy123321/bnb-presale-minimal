@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-import {ICostBasisManager} from "./interfaces/ICostBasisManager.sol";
-import {IDividendDistributor} from "./interfaces/IDividendDistributor.sol";
-import {IPangu2Token} from "./interfaces/IPangu2Token.sol";
-import {MerkleLeafV1} from "./libraries/MerkleLeafV1.sol";
-import {TransferContext} from "./libraries/TransferContext.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { MerkleProof } from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import { ICostBasisManager } from "./interfaces/ICostBasisManager.sol";
+import { IDividendDistributor } from "./interfaces/IDividendDistributor.sol";
+import { IPangu2Token } from "./interfaces/IPangu2Token.sol";
+import { MerkleLeafV1 } from "./libraries/MerkleLeafV1.sol";
+import { TransferContext } from "./libraries/TransferContext.sol";
 
 contract DividendDistributor is AccessControl, Pausable, ReentrancyGuard, IDividendDistributor {
     bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
@@ -53,6 +53,9 @@ contract DividendDistributor is AccessControl, Pausable, ReentrancyGuard, IDivid
     error ClaimWindowStillOpen(uint256 epochId, uint256 claimEnd);
     error EpochHasClaims(uint256 epochId);
 
+    // New: allow governance to revoke stale unconsumed commitments
+    error CommitmentAlreadyConsumedCantRevoke(uint256 epochId);
+
     event EpochCommitmentApproved(
         uint256 indexed epoch,
         bytes32 indexed commitmentHash,
@@ -78,6 +81,7 @@ contract DividendDistributor is AccessControl, Pausable, ReentrancyGuard, IDivid
     event DividendClaimed(uint256 indexed epoch, address indexed account, uint256 amount);
     event EpochClosed(uint256 indexed epoch, uint256 unclaimedAmount, uint256 nextEpochCarry);
     event EpochCancelled(uint256 indexed epoch, uint256 releasedAmount, uint256 nextEpochCarry);
+    event CommitmentRevoked(uint256 indexed epochId, bytes32 revokedHash);
 
     constructor(
         address rewardToken_,
@@ -196,15 +200,14 @@ contract DividendDistributor is AccessControl, Pausable, ReentrancyGuard, IDivid
         nonReentrant
     {
         Epoch storage e = _epochs[epochId];
-        if (
-            e.status != EpochStatus.PUBLISHED || block.timestamp < e.claimStart || block.timestamp > e.claimEnd
-        ) revert EpochNotClaimable(epochId);
+        if (e.status != EpochStatus.PUBLISHED || block.timestamp < e.claimStart || block.timestamp > e.claimEnd) {
+            revert EpochNotClaimable(epochId);
+        }
         if (amount == 0) revert InvalidAmount();
         if (claimed[epochId][msg.sender]) revert AlreadyClaimed(epochId, msg.sender);
 
-        bytes32 leaf = MerkleLeafV1.hash(
-            block.chainid, address(this), epochId, address(rewardToken), msg.sender, amount
-        );
+        bytes32 leaf =
+            MerkleLeafV1.hash(block.chainid, address(this), epochId, address(rewardToken), msg.sender, amount);
         if (!MerkleProof.verifyCalldata(proof, e.merkleRoot, leaf)) revert InvalidProof();
         if (e.totalClaimed + amount > e.totalAmount) revert ClaimExceedsEpoch(epochId, amount);
 
@@ -228,6 +231,16 @@ contract DividendDistributor is AccessControl, Pausable, ReentrancyGuard, IDivid
         emit EpochClosed(epochId, carryAmount, nextEpochCarry);
     }
 
+    /// @notice Governance can revoke a commitment that has not been consumed (published) yet.
+    ///         Once consumed, commitments are immutable.
+    function revokeCommitment(uint256 epochId) external onlyRole(GOVERNANCE_ROLE) {
+        if (commitmentConsumed[epochId]) revert CommitmentAlreadyConsumedCantRevoke(epochId);
+        bytes32 hash = approvedCommitmentHash[epochId];
+        if (hash == bytes32(0)) revert CommitmentNotApproved(epochId);
+        delete approvedCommitmentHash[epochId];
+        emit CommitmentRevoked(epochId, hash);
+    }
+
     function cancelUnclaimedEpoch(uint256 epochId) external onlyRole(GOVERNANCE_ROLE) returns (uint256 carryAmount) {
         Epoch storage e = _epochs[epochId];
         if (e.status != EpochStatus.PUBLISHED) revert InvalidEpoch();
@@ -243,11 +256,7 @@ contract DividendDistributor is AccessControl, Pausable, ReentrancyGuard, IDivid
         emit EpochCancelled(epochId, carryAmount, nextEpochCarry);
     }
 
-    function commitmentHash(uint256 epochId, EpochCommitment calldata commitment)
-        public
-        view
-        returns (bytes32)
-    {
+    function commitmentHash(uint256 epochId, EpochCommitment calldata commitment) public view returns (bytes32) {
         return keccak256(
             abi.encode(
                 block.chainid,

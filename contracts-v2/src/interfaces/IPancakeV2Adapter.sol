@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 interface IPancakeV2Adapter {
     function quoteExactInput(address tokenIn, address tokenOut, uint256 amountIn)
         external
+        view
         returns (uint256 amountOut, uint256 quoteBlock);
 
     function poolAddress() external view returns (address);
