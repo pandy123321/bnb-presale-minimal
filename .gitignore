@@ -2,6 +2,9 @@
 contracts/cache/
 contracts/out/
 contracts/broadcast/
+contracts-v2/cache/
+contracts-v2/out/
+contracts-v2/broadcast/
 contracts/reports/remediation-build/
 contracts/coverage/
 contracts/lcov.info
