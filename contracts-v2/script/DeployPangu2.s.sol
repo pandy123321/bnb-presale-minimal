@@ -20,13 +20,26 @@ import { TransferContext } from "../src/libraries/TransferContext.sol";
 /// @notice Deploy PANGU2 V2 core contracts.
 ///         Does NOT enable pair trading or add liquidity — see BootstrapPangu2.
 contract DeployPangu2 is Script {
-    uint256 internal constant TESTNET_LOCK_DURATION = 365 days;
+    uint256 internal constant LOCK_DURATION = 365 days;
     uint32 internal constant TWAP_WINDOW = 30 minutes;
     uint16 internal constant MAX_DEVIATION_BPS = 300;
 
-    address internal constant WBNB = 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd;
-    address internal constant FACTORY = 0x6725F303b657a9451d8BA641348b6761A6CC7a17;
-    address internal constant ROUTER = 0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3;
+    // Chain-aware PancakeSwap V2 addresses
+    function _wbnb() internal view returns (address) {
+        if (block.chainid == 56) return 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c; // BSC Mainnet
+        if (block.chainid == 97) return 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd; // BSC Testnet
+        revert("Unsupported chain");
+    }
+    function _factory() internal view returns (address) {
+        if (block.chainid == 56) return 0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73; // BSC Mainnet
+        if (block.chainid == 97) return 0x6725F303b657a9451d8BA641348b6761A6CC7a17; // BSC Testnet
+        revert("Unsupported chain");
+    }
+    function _router() internal view returns (address) {
+        if (block.chainid == 56) return 0x10ED43C718714eb63d5aA57B78B54704E256024E; // BSC Mainnet
+        if (block.chainid == 97) return 0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3; // BSC Testnet
+        revert("Unsupported chain");
+    }
 
     function run() external {
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
@@ -48,8 +61,13 @@ contract DeployPangu2 is Script {
         uint112 minWbnbReserve = uint112(rawWbnbReserve);
         require(minTokenReserve > 0 && minWbnbReserve > 0, "zero min reserve");
 
+        // Resolve chain-specific PancakeSwap addresses
+        address WBNB = _wbnb();
+        address FACTORY = _factory();
+        address ROUTER = _router();
+
         // Safety checks
-        if (block.chainid != 97) revert("Unsupported chain - BSC Testnet (97) only");
+        if (block.chainid != 56 && block.chainid != 97) revert("Unsupported chain - BSC Mainnet (56) or Testnet (97) only");
         require(WBNB.code.length > 0, "WBNB not deployed");
         require(FACTORY.code.length > 0, "Factory not deployed");
         require(ROUTER.code.length > 0, "Router not deployed");
@@ -109,7 +127,7 @@ contract DeployPangu2 is Script {
             address(token),
             address(supportPool),
             BuybackLocker.LockMode.FIXED_DURATION,
-            uint64(TESTNET_LOCK_DURATION),
+            uint64(LOCK_DURATION),
             releaseRecipient
         );
 

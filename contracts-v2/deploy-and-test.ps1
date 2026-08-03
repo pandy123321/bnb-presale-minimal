@@ -33,7 +33,8 @@ function Write-Info($msg)  { Write-Host "  ℹ $msg" -ForegroundColor Gray }
 # ── Banner ─────────────────────────────────────────────────────────
 Write-Host @"
 
-  PANGU2 V2 · BSC Testnet — Multi-stage Deployment
+  PANGU2 V2 · Multi-chain Deployment
+  Supported: BSC Testnet (97) / BSC Mainnet (56)
 
 "@ -ForegroundColor Yellow
 
@@ -60,7 +61,7 @@ if (-not (Test-Path $FORGE)) {
 }
 Write-Pass "Foundry found"
 
-$rpc = if ($RpcUrl) { $RpcUrl } elseif ($env:BSC_TESTNET_RPC) { $env:BSC_TESTNET_RPC } else { "https://data-seed-prebsc-1-s1.binance.org:8545" }
+$rpc = if ($RpcUrl) { $RpcUrl } elseif ($env:RPC_URL) { $env:RPC_URL } else { "https://data-seed-prebsc-1-s1.binance.org:8545" }
 $depKey = $env:DEPLOYER_PRIVATE_KEY
 $lpKey  = $env:LIQUIDITY_PROVIDER_PRIVATE_KEY
 $gov    = $env:GOVERNANCE_ADDRESS
@@ -69,13 +70,17 @@ if (-not $depKey) { Write-Fail "DEPLOYER_PRIVATE_KEY not set"; exit 1 }
 
 Write-Pass "RPC: $rpc"
 
-# Verify RPC connectivity
+# Verify RPC connectivity + chain support
 $chain = & $CAST chain-id --rpc-url $rpc 2>$null
-if ($chain -ne "97") {
-    Write-Fail "Chain ID is $chain, expected 97 (BSC Testnet)"
+if ($chain -eq "97") {
+    Write-Pass "Chain ID: $chain (BSC Testnet)"
+} elseif ($chain -eq "56") {
+    Write-Pass "Chain ID: $chain (BSC Mainnet)"
+    Write-Warn "YOU ARE ON BSC MAINNET — real funds will be used"
+} else {
+    Write-Fail "Chain ID $chain not supported (expected 56 or 97)"
     exit 1
 }
-Write-Pass "Chain ID: $chain (BSC Testnet)"
 
 # ── Stage 1: Deploy ─────────────────────────────────────────────────
 if (-not $SkipDeploy -and -not $Bootstrap -and -not $Finalize -and -not $VerifyOnly) {
