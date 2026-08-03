@@ -54,7 +54,7 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
         if (IPancakeFactory(factory_).getPair(token_, wbnb_) != pair_) revert InvalidPair();
     }
 
-    function update() external override {
+    function update() external {
         (uint112 r0, uint112 r1, uint32 ts) = pair.getReserves();
         if (r0 == 0 || r1 == 0) { windowStatus = 0; return; }
         uint256 p0 = pair.price0CumulativeLast();
