@@ -93,13 +93,9 @@ export async function start(): Promise<void> {
   console.log(`  Confirmation blocks: ${CONFIRMATION_BLOCKS}`);
   console.log(`  Worker ID: ${WORKER_ID}`);
 
-  // Load event signatures for decoding (gives string name → human-readable)
-  try {
-    getAllEventSignatures();
-    console.log("  Event signatures loaded");
-  } catch {
-    console.log("  ABI files not found — scanning without event name decoding");
-  }
+  // Load event signatures for decoding — fails closed: worker exits if required ABIs are missing
+  getAllEventSignatures();
+  console.log("  Event signatures loaded");
 
   running = true;
   await scanAllStreams();

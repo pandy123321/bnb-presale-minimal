@@ -5,10 +5,10 @@
  * Called by CI after forge build to prove the chain-worker
  * can actually load and use the generated artifacts.
  *
- * Usage: npx tsx scripts/verify-abi-artifacts.ts
+ * Usage: pnpm run verify-abi
  */
 
-import { loadAbi, extractEventSignatures, REQUIRED_ABI_NAMES } from "../src/abi/loader";
+import { loadRequiredAbis, extractEventSignatures, REQUIRED_ABI_NAMES } from "../src/abi/loader";
 
 function fail(msg: string): never {
   console.error(`\nABI SMOKE FAIL: ${msg}`);
@@ -16,16 +16,12 @@ function fail(msg: string): never {
 }
 
 function main() {
+  // loadRequiredAbis() throws if any required ABI is missing — Fail Closed
+  const artifacts = loadRequiredAbis();
+
   let ok = 0;
-  let missing: string[] = [];
 
-  for (const name of REQUIRED_ABI_NAMES) {
-    const artifact = loadAbi(name);
-
-    if (!artifact) {
-      missing.push(name);
-      continue;
-    }
+  for (const [name, artifact] of artifacts) {
 
     // --- Validate ABI structure ---
     if (!Array.isArray(artifact.abi)) {
@@ -48,10 +44,6 @@ function main() {
 
   // --- Report ---
   console.log(`\n${ok}/${REQUIRED_ABI_NAMES.length} contract ABIs loaded successfully`);
-
-  if (missing.length > 0) {
-    fail(`Missing ABIs: ${missing.join(", ")}`);
-  }
 
   console.log("✓ ABI smoke test passed\n");
 }

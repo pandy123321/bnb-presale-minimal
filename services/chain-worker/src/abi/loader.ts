@@ -31,17 +31,16 @@ import { keccak256, toHex } from "viem";
  */
 const DEFAULT_ABI_DIR = resolve(__dirname, "../../../../contracts-v2/out");
 
-const configuredDir = process.env.PANGU2_ABI_DIR?.trim();
-let ABI_DIR: string;
-if (configuredDir) {
+/** Resolve the ABI directory — lazy so env check doesn't block pure-type imports. */
+export function getAbiDir(): string {
+  const configuredDir = process.env.PANGU2_ABI_DIR?.trim();
+  if (!configuredDir) return DEFAULT_ABI_DIR;
   if (!isAbsolute(configuredDir)) {
     throw new Error(
       `PANGU2_ABI_DIR must be an absolute path, got: ${configuredDir}`,
     );
   }
-  ABI_DIR = configuredDir;
-} else {
-  ABI_DIR = DEFAULT_ABI_DIR;
+  return resolve(configuredDir);
 }
 
 /** List of contracts whose ABIs the chain-worker depends on. Single source of truth. */
@@ -60,7 +59,7 @@ export const REQUIRED_ABI_NAMES = [
  * Returns parsed artifact or null if file doesn't exist.
  */
 export function loadAbi(contractName: string): AbiArtifact | null {
-  const path = resolve(ABI_DIR, `${contractName}.sol`, `${contractName}.json`);
+  const path = resolve(getAbiDir(), `${contractName}.sol`, `${contractName}.json`);
   if (!existsSync(path)) {
     console.warn(`[ABI] Contract ABI not found: ${path}`);
     return null;
@@ -71,6 +70,32 @@ export function loadAbi(contractName: string): AbiArtifact | null {
     console.error(`[ABI] Failed to parse ABI: ${path}`, err);
     return null;
   }
+}
+
+/**
+ * Load all required ABIs.  Throws if any are missing or unparseable.
+ * Use this at worker startup and in CI to enforce Fail Closed.
+ */
+export function loadRequiredAbis(): Map<string, AbiArtifact> {
+  const loaded = new Map<string, AbiArtifact>();
+  const failures: string[] = [];
+
+  for (const name of REQUIRED_ABI_NAMES) {
+    const artifact = loadAbi(name);
+    if (!artifact) {
+      failures.push(name);
+      continue;
+    }
+    loaded.set(name, artifact);
+  }
+
+  if (failures.length > 0) {
+    throw new Error(
+      `REQUIRED_ABIS_UNAVAILABLE: ${failures.join(", ")}`,
+    );
+  }
+
+  return loaded;
 }
 
 /**
@@ -94,7 +119,8 @@ export function extractEventSignatures(abi: AbiArtifact): Map<string, string> {
 }
 
 /**
- * Get event topic names for all known contracts.
+ * Get event topic names for all required contracts.
+ * Calls loadRequiredAbis() to enforce Fail Closed — worker must exit on missing ABIs.
  */
 export function getAllEventSignatures(): {
   topicToName: Map<string, string>;
@@ -103,11 +129,10 @@ export function getAllEventSignatures(): {
   const topicToName = new Map<string, string>();
   const nameToContract = new Map<string, string>();
 
-  for (const name of REQUIRED_ABI_NAMES) {
-    const abi = loadAbi(name);
-    if (!abi) continue;
+  const artifacts = loadRequiredAbis();
 
-    const sigs = extractEventSignatures(abi);
+  for (const [name, artifact] of artifacts) {
+    const sigs = extractEventSignatures(artifact);
     for (const [topic, eventName] of sigs) {
       topicToName.set(topic, eventName);
       nameToContract.set(eventName, name);
