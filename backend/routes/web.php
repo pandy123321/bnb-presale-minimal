@@ -52,4 +52,13 @@ Route::prefix('admin-api/v1/projects/pangu2')->group(function () {
         Route::get('/audit-logs', [AdminAuditController::class, 'index']);
         Route::get('/audit-logs/{id}', [AdminAuditController::class, 'show'])->whereNumber('id');
     });
+
+    // ── Staking (admin) ──
+    Route::middleware(['auth:web', 'rbac:staking.manage'])->group(function () {
+        Route::post('/staking/fund-rewards', [\App\Modules\Pangu2\Staking\Controllers\StakingController::class, 'fundRewards']);
+        Route::post('/staking/set-reward-rate', [\App\Modules\Pangu2\Staking\Controllers\StakingController::class, 'setRewardRate']);
+    });
+    Route::middleware('rbac:staking.read')->group(function () {
+        Route::get('/staking/coverage', [\App\Modules\Pangu2\Staking\Controllers\StakingController::class, 'coverage']);
+    });
 });

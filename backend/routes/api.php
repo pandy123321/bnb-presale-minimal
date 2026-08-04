@@ -8,6 +8,7 @@ use App\Http\Controllers\SystemController;
 use App\Http\Controllers\TradeController;
 use App\Modules\Pangu2\Dividend\Controllers\DividendController;
 use App\Modules\Pangu2\Buyback\Controllers\BuybackController;
+use App\Modules\Pangu2\Staking\Controllers\StakingController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1/projects/pangu2')->group(function () {
@@ -38,4 +39,9 @@ Route::prefix('v1/projects/pangu2')->group(function () {
     // ── Support (public) ──
     Route::get('/buybacks',                      [BuybackController::class, 'index']);
     Route::get('/locker/batches',                [BuybackController::class, 'lockerBatches']);
+
+    // ── Staking (public) ──
+    Route::get('/staking/earned',               [StakingController::class, 'earned']);
+    Route::get('/staking/positions',            [StakingController::class, 'positions']);
+    Route::get('/staking/status',               [StakingController::class, 'status']);
 });

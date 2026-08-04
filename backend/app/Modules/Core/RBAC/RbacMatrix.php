@@ -68,6 +68,18 @@ final class RbacMatrix
         'chain.write' => [
             self::ROLE_SUPER_ADMIN,
         ],
+        // Staking — read (all roles)
+        'staking.read' => [
+            self::ROLE_SUPER_ADMIN,
+            self::ROLE_OPERATOR,
+            self::ROLE_AUDITOR,
+            self::ROLE_VIEWER,
+        ],
+        // Staking — manage rewards (SUPER_ADMIN + OPERATOR)
+        'staking.manage' => [
+            self::ROLE_SUPER_ADMIN,
+            self::ROLE_OPERATOR,
+        ],
     ];
 
     /**

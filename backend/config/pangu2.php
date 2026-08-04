@@ -18,6 +18,7 @@ return [
     'buyback_locker_address' => env('PANGU2_BUYBACK_LOCKER_ADDRESS', ''),
     'fee_vault_address' => env('PANGU2_FEE_VAULT_ADDRESS', ''),
     'cost_basis_manager_address' => env('PANGU2_COST_BASIS_MANAGER_ADDRESS', ''),
+    'staking_address' => env('PANGU2_STAKING_ADDRESS', ''),
     'wbnb_address' => env('PANGU2_WBNB_ADDRESS', '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'),
 
     'auth_domain' => env('PANGU2_AUTH_DOMAIN', 'localhost'),
