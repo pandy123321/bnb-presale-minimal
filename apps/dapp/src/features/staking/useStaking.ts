@@ -29,9 +29,9 @@ import {
 
 // ── Contract constants ──────────────────────
 
-export const MIN_STAKE_RAW = "1000000000000000000"; // 1 token
+export const MIN_STAKE_RAW = "1000000000000000000";
 export const MAX_LOCK_SECONDS = 730 * 86400;
-export const EARLY_PENALTY_BPS = 1000; // 10%
+export const EARLY_PENALTY_BPS = 1000;
 export const SECONDS_PER_DAY = 86400;
 
 export const LOCK_PRESETS = [
@@ -54,12 +54,16 @@ export type StakingTxPhase =
   | "rejected"
   | "failed";
 
-// ── API response shapes (amounts as WeiAmount strings) ──
+export type TxErrorCode =
+  | "USER_REJECTED"
+  | "NETWORK_ERROR"
+  | "CONTRACT_REVERT"
+  | "INSUFFICIENT_GAS"
+  | "UNKNOWN";
 
-interface EarnedResponse {
-  address: string;
-  earned: WeiAmount;
-}
+// ── API response shapes ──────────
+
+interface EarnedResponse { address: string; earned: WeiAmount; }
 
 interface PositionApiItem {
   positionId: number | null;
@@ -67,23 +71,19 @@ interface PositionApiItem {
   lockedAt: string;
   unlockAt: string;
   claimed: boolean;
+  /** per-position earned (API-provided, authoritative) */
   earned?: WeiAmount;
 }
 
-interface PositionsResponse {
-  address: string;
-  positions: PositionApiItem[];
-  count: number;
-}
+interface PositionsResponse { address: string; positions: PositionApiItem[]; count: number; }
 
 interface StatusResponse {
-  totalStaked: WeiAmount;
-  rewardRate: WeiAmount;
-  periodFinish: string;
-  availableRewardReserve: WeiAmount;
+  totalStaked: WeiAmount; rewardRate: WeiAmount;
+  periodFinish: string; availableRewardReserve: WeiAmount;
+  serverTime?: number;
 }
 
-// ── ABI ─────────────────────────────────────
+// ── ABI ────────────────────────────
 
 const TOKEN_ABI = parseAbi([
   "function allowance(address owner, address spender) view returns (uint256)",
@@ -97,124 +97,85 @@ const STAKING_ABI = parseAbi([
   "function claimRewards() returns (uint256 reward)",
 ]);
 
-// ── Address helpers ─────────────────────────
+// ── Address helpers ────────────────
 
 function requireAddress(v: string | undefined, name: string): `0x${string}` {
   if (!v || !isAddress(v)) throw new Error(`${name} missing or invalid.`);
-  if (v.toLowerCase() === zeroAddress.toLowerCase()) {
-    throw new Error(`${name} is zero address.`);
-  }
+  if (v.toLowerCase() === zeroAddress.toLowerCase()) throw new Error(`${name} is zero address.`);
   return v as `0x${string}`;
 }
 
 function stakingAddress(): `0x${string}` {
-  return requireAddress(
-    import.meta.env.VITE_STAKING_ADDRESS as string | undefined,
-    "VITE_STAKING_ADDRESS",
-  );
+  return requireAddress(import.meta.env.VITE_STAKING_ADDRESS as string | undefined, "VITE_STAKING_ADDRESS");
 }
 
 function tokenAddress(): `0x${string}` {
-  return requireAddress(
-    import.meta.env.VITE_TOKEN_ADDRESS as string | undefined,
-    "VITE_TOKEN_ADDRESS",
-  );
+  return requireAddress(import.meta.env.VITE_TOKEN_ADDRESS as string | undefined, "VITE_TOKEN_ADDRESS");
 }
 
 async function contractsDeployed(): Promise<boolean> {
   try {
     const client = getPublicClient(wagmiConfig);
     if (!client) return false;
-    const [stakingCode, tokenCode] = await Promise.all([
+    const [sCode, tCode] = await Promise.all([
       client.getBytecode({ address: stakingAddress() }),
       client.getBytecode({ address: tokenAddress() }),
     ]);
-    return !!stakingCode && stakingCode !== "0x" && !!tokenCode && tokenCode !== "0x";
-  } catch {
-    return false;
-  }
+    return !!sCode && sCode !== "0x" && !!tCode && tCode !== "0x";
+  } catch { return false; }
 }
 
-// ── String / bigint amount helpers (no float) ──
+// ── Amount helpers (all int strings) ──
 
-/** Human token input → wei decimal string */
 export function tokenToRaw(amount: string): string {
-  const trimmed = amount.trim();
-  if (!trimmed || !/^\d+(\.\d+)?$/.test(trimmed)) return "0";
-  const [intPart, fracPart = ""] = trimmed.split(".");
-  const padded = (intPart.replace(/^0+(?=\d)/, "") || "0")
-    + fracPart.padEnd(18, "0").slice(0, 18);
-  return padded.replace(/^0+(?=\d)/, "") || "0";
+  const t = amount.trim();
+  if (!t || !/^\d+(\.\d+)?$/.test(t)) return "0";
+  const [i, f = ""] = t.split(".");
+  const p = (i.replace(/^0+(?=\d)/, "") || "0") + f.padEnd(18, "0").slice(0, 18);
+  return p.replace(/^0+(?=\d)/, "") || "0";
 }
 
-/** Wei string → display (no float) */
 export function weiToDisplay(wei: string, decimals = 18): string {
   if (!wei || wei === "0") return "0";
   const neg = wei.startsWith("-");
   const abs = neg ? wei.slice(1) : wei;
-  const str = abs.padStart(decimals + 1, "0");
-  const intPart = str.slice(0, -decimals) || "0";
-  const fracPart = str.slice(-decimals).replace(/0+$/, "");
+  const s = abs.padStart(decimals + 1, "0");
+  const intPart = s.slice(0, -decimals) || "0";
+  const fracPart = s.slice(-decimals).replace(/0+$/, "");
   const body = fracPart ? `${intPart}.${fracPart}` : intPart;
   return neg ? `-${body}` : body;
 }
 
-/** Compact token label from wei */
 export function formatTokenRaw(raw: string): string {
   const v = BigInt(raw || "0");
   const ONE = 10n ** 18n;
   if (v === 0n) return "0 P2";
   const whole = v / ONE;
-  const MILLION = 1_000_000n;
-  const THOUSAND = 1_000n;
-  if (whole >= MILLION) {
-    const m = whole / MILLION;
-    const frac = (whole % MILLION) / 100_000n; // 1 decimal
-    return `${m}.${frac}M P2`;
-  }
-  if (whole >= THOUSAND) {
-    return `${whole.toLocaleString()} P2`;
-  }
+  if (whole >= 1_000_000n) { const m = whole / 1_000_000n; const fr = (whole % 1_000_000n) / 100_000n; return `${m}.${fr}M P2`; }
+  if (whole >= 1_000n) return `${whole.toLocaleString()} P2`;
   return `${weiToDisplay(raw)} P2`;
 }
 
 export function compareWei(a: string, b: string): number {
-  const A = BigInt(a || "0");
-  const B = BigInt(b || "0");
-  if (A < B) return -1;
-  if (A > B) return 1;
-  return 0;
+  const A = BigInt(a || "0"); const B = BigInt(b || "0");
+  if (A < B) return -1; if (A > B) return 1; return 0;
 }
 
-/** APY percent string with 2 decimals, e.g. "12.34" */
 export function computeApyPercent(rewardRate: string, totalStaked: string): string {
-  const rate = BigInt(rewardRate || "0");
-  const total = BigInt(totalStaked || "0");
+  const rate = BigInt(rewardRate || "0"); const total = BigInt(totalStaked || "0");
   if (rate === 0n || total === 0n) return "0.00";
   const YEAR = 365n * BigInt(SECONDS_PER_DAY);
-  // hundredths of a percent
-  const hundredths = (rate * YEAR * 10000n) / total;
-  const whole = hundredths / 100n;
-  const frac = hundredths % 100n;
-  return `${whole}.${frac.toString().padStart(2, "0")}`;
+  const h = (rate * YEAR * 10000n) / total; const w = h / 100n; const f = h % 100n;
+  return `${w}.${f.toString().padStart(2, "0")}`;
 }
 
-/** Estimate rewards for staking `amount` over `lockSeconds` */
-export function estimateLockReward(
-  amountRaw: string,
-  lockSeconds: number,
-  rewardRate: string,
-  totalStaked: string,
-): string {
-  const amount = BigInt(amountRaw || "0");
-  const rate = BigInt(rewardRate || "0");
-  const total = BigInt(totalStaked || "0");
-  const denom = total + amount;
-  if (amount === 0n || rate === 0n || denom === 0n || lockSeconds <= 0) return "0";
-  return ((rate * BigInt(lockSeconds) * amount) / denom).toString();
+export function estimateLockReward(amountRaw: string, lockSeconds: number, rewardRate: string, totalStaked: string): string {
+  const a = BigInt(amountRaw || "0"); const r = BigInt(rewardRate || "0"); const t = BigInt(totalStaked || "0");
+  const d = t + a;
+  if (a === 0n || r === 0n || d === 0n || lockSeconds <= 0) return "0";
+  return ((r * BigInt(lockSeconds) * a) / d).toString();
 }
 
-/** 10% penalty on principal (integer) */
 export function computePenalty(amountRaw: string): string {
   return ((BigInt(amountRaw || "0") * BigInt(EARLY_PENALTY_BPS)) / 10000n).toString();
 }
@@ -232,25 +193,37 @@ export function validateLockSeconds(seconds: number): string | null {
   return null;
 }
 
-function nowUnix(): number {
-  return Math.floor(Date.now() / 1000);
+function classifyTxError(e: unknown): TxErrorCode {
+  const err = e as { code?: string | number; message?: string; name?: string };
+  if (err.code === 4001 || err.code === "4001") return "USER_REJECTED";
+  const msg = (err.message ?? "").toLowerCase();
+  if (msg.includes("rejected") || msg.includes("denied")) return "USER_REJECTED";
+  if (msg.includes("network") || msg.includes("fetch") || msg.includes("timeout")) return "NETWORK_ERROR";
+  if ((msg.includes("insufficient") || msg.includes("intrinsic")) && msg.includes("gas")) return "INSUFFICIENT_GAS";
+  if (msg.includes("revert") || msg.includes("execution reverted")) return "CONTRACT_REVERT";
+  return "UNKNOWN";
 }
 
-function deriveStatus(claimed: boolean, unlockAt: string): PositionStatus {
+// ── P2-002 fix: use server-time, not client clock ──
+
+function deriveStatus(claimed: boolean, unlockAt: string, store: ReturnType<typeof useStakingStore>): PositionStatus {
   if (claimed) return "claimed";
   const unlock = Number(unlockAt);
-  if (Number.isFinite(unlock) && nowUnix() >= unlock) return "matured";
+  if (!Number.isFinite(unlock)) return "locked";
+  if (store.serverNow() >= unlock) return "matured";
   return "locked";
 }
 
-function remainingDays(unlockAt: string, claimed: boolean): number {
+function remainingDays(unlockAt: string, claimed: boolean, store: ReturnType<typeof useStakingStore>): number {
   if (claimed) return 0;
   const unlock = Number(unlockAt);
   if (!Number.isFinite(unlock)) return 0;
-  const rem = unlock - nowUnix();
+  const rem = unlock - store.serverNow();
   if (rem <= 0) return 0;
   return Math.floor((rem + SECONDS_PER_DAY - 1) / SECONDS_PER_DAY);
 }
+
+// ── P2-001 fix: per-position earned from API, not proportional estimate ──
 
 function toWeiAmount(v: string | undefined | null): WeiAmount {
   return (v && /^\d+$/.test(v) ? v : "0") as WeiAmount;
@@ -259,23 +232,32 @@ function toWeiAmount(v: string | undefined | null): WeiAmount {
 function mapPositions(
   items: PositionApiItem[],
   accountEarned: string,
+  store: ReturnType<typeof useStakingStore>,
 ): StakePositionSnapshot[] {
-  let activeTotal = 0n;
-  for (const item of items) {
-    if (!item.claimed) activeTotal += BigInt(item.amount || "0");
-  }
+  // P2-001: prefer per-position earned from API. Only fallback to proportional
+  // if the API does NOT supply per-position earned.
+  const hasPerPositionEarned = items.some((i) => i.earned !== undefined && i.earned !== "0");
   const earned = BigInt(accountEarned || "0");
+  let totalUnclaimed = 0n;
+  if (!hasPerPositionEarned) {
+    for (const item of items) {
+      if (!item.claimed) totalUnclaimed += BigInt(item.amount || "0");
+    }
+  }
 
   return items.map((item, index) => {
     const amount = toWeiAmount(item.amount);
     const claimed = !!item.claimed;
     let earnedEstimate: WeiAmount = "0" as WeiAmount;
-    if (!claimed && activeTotal > 0n) {
-      earnedEstimate = ((earned * BigInt(amount)) / activeTotal).toString() as WeiAmount;
-    } else if (item.earned) {
+
+    // P2-001: API per-position earned takes priority
+    if (item.earned !== undefined) {
       earnedEstimate = toWeiAmount(item.earned);
+    } else if (!claimed && totalUnclaimed > 0n) {
+      earnedEstimate = ((earned * BigInt(amount)) / totalUnclaimed).toString() as WeiAmount;
     }
-    const status = deriveStatus(claimed, item.unlockAt);
+
+    const status = deriveStatus(claimed, item.unlockAt, store);
     return {
       positionId: item.positionId ?? index,
       amount,
@@ -284,22 +266,16 @@ function mapPositions(
       claimed,
       earnedEstimate,
       status,
-      remainingDays: remainingDays(item.unlockAt, claimed),
+      remainingDays: remainingDays(item.unlockAt, claimed, store),
     };
   });
 }
 
 function isUserRejected(e: unknown): boolean {
-  const err = e as { code?: string | number; message?: string; name?: string };
-  return (
-    err.code === 4001 ||
-    err.code === "4001" ||
-    !!err.message?.toLowerCase().includes("rejected") ||
-    !!err.message?.toLowerCase().includes("denied")
-  );
+  return classifyTxError(e) === "USER_REJECTED";
 }
 
-// ── Composable ──────────────────────────────
+// ── Composable ─────────────────────
 
 export function useStaking(address: Ref<string | null>) {
   const wallet = useWalletStore();
@@ -307,15 +283,12 @@ export function useStaking(address: Ref<string | null>) {
 
   const txPhase = ref<StakingTxPhase>("idle");
   const txError = ref<string | null>(null);
+  const txErrorCode = ref<TxErrorCode | null>(null);
   const lastTxHash = ref<`0x${string}` | null>(null);
 
-  const isBusy = computed(
-    () =>
-      txPhase.value !== "idle" &&
-      txPhase.value !== "success" &&
-      txPhase.value !== "rejected" &&
-      txPhase.value !== "failed",
-  );
+  const isBusy = computed(() =>
+    txPhase.value !== "idle" && txPhase.value !== "success"
+    && txPhase.value !== "rejected" && txPhase.value !== "failed");
 
   const apyPercent = computed(() => {
     const s = store.globalStatus;
@@ -327,18 +300,23 @@ export function useStaking(address: Ref<string | null>) {
   const totalStakedDisplay = computed(() => formatTokenRaw(store.totalStakedRaw));
   const totalEarnedDisplay = computed(() => formatTokenRaw(store.earnedRaw));
 
-  // ── Fetch ─────────────────────────────────
+  // ── Fetch ─────────────────────────
 
   async function refresh(): Promise<void> {
     store.setLoading(true);
     store.setError(null);
-
     try {
-      // Global status (no wallet required)
       const statusRes = await fetchGet<StatusResponse>(
-        "/v1/projects/pangu2/staking/status",
-        new AbortController().signal,
+        "/v1/projects/pangu2/staking/status", new AbortController().signal,
       );
+
+      // P2-002: capture server time
+      if (statusRes.data.serverTime) {
+        store.setServerTime(statusRes.data.serverTime);
+      } else if (statusRes.meta?.generated_at) {
+        store.setServerTime(Math.floor(new Date(statusRes.meta.generated_at).getTime() / 1000));
+      }
+
       const gs: StakingGlobalStatus = {
         totalStaked: toWeiAmount(statusRes.data.totalStaked),
         rewardRate: toWeiAmount(statusRes.data.rewardRate),
@@ -359,71 +337,38 @@ export function useStaking(address: Ref<string | null>) {
       store.setAddress(addr as EvmAddress);
 
       const [earnedRes, positionsRes] = await Promise.all([
-        fetchGet<EarnedResponse>(
-          `/v1/projects/pangu2/staking/earned?address=${addr}`,
-          new AbortController().signal,
-        ),
-        fetchGet<PositionsResponse>(
-          `/v1/projects/pangu2/staking/positions?address=${addr}`,
-          new AbortController().signal,
-        ),
+        fetchGet<EarnedResponse>(`/v1/projects/pangu2/staking/earned?address=${addr}`, new AbortController().signal),
+        fetchGet<PositionsResponse>(`/v1/projects/pangu2/staking/positions?address=${addr}`, new AbortController().signal),
       ]);
 
-      const earned = toWeiAmount(earnedRes.data.earned);
-      store.setEarned(earned);
-      store.setPositions(mapPositions(positionsRes.data.positions ?? [], earned));
+      const earnedV = toWeiAmount(earnedRes.data.earned);
+      store.setEarned(earnedV);
+      store.setPositions(mapPositions(positionsRes.data.positions ?? [], earnedV, store));
       applyMeta(positionsRes.meta);
     } catch (e: unknown) {
       store.setError(e instanceof Error ? e.message : "加载锁仓数据失败");
-    } finally {
-      store.setLoading(false);
-    }
+    } finally { store.setLoading(false); }
   }
 
   function applyMeta(meta: EnvelopeMeta | null | undefined): void {
     if (!meta) return;
-    store.setMeta(
-      meta.data_status ?? DataStatus.MOCK_DATA,
-      meta.block_number,
-    );
+    store.setMeta(meta.data_status ?? DataStatus.MOCK_DATA, meta.block_number);
   }
 
-  watch(
-    address,
-    (addr) => {
-      if (!addr) {
-        store.reset();
-        refresh();
-        return;
-      }
-      refresh();
-    },
-    { immediate: true },
-  );
+  watch(address, (addr) => { if (!addr) store.reset(); refresh(); }, { immediate: true });
 
-  // ── On-chain actions ──────────────────────
+  // ── On-chain actions ──────────────
 
   async function ensureReady(): Promise<boolean> {
-    txError.value = null;
+    txError.value = null; txErrorCode.value = null;
     if (!wallet.canTransact) {
-      txPhase.value = "failed";
-      txError.value = "请先连接钱包并切换到支持的网络";
-      return false;
+      txPhase.value = "failed"; txError.value = "请先连接钱包并切换到支持的网络";
+      txErrorCode.value = "NETWORK_ERROR"; return false;
     }
-    try {
-      stakingAddress();
-      tokenAddress();
-    } catch (e: unknown) {
-      txPhase.value = "failed";
-      txError.value = e instanceof Error ? e.message : "合约地址未配置";
-      return false;
-    }
+    try { stakingAddress(); tokenAddress(); }
+    catch (e: unknown) { txPhase.value = "failed"; txError.value = e instanceof Error ? e.message : "合约地址未配置"; txErrorCode.value = "UNKNOWN"; return false; }
     const ok = await contractsDeployed();
-    if (!ok) {
-      txPhase.value = "failed";
-      txError.value = "合约未部署到当前网络";
-      return false;
-    }
+    if (!ok) { txPhase.value = "failed"; txError.value = "合约未部署到当前网络"; txErrorCode.value = "NETWORK_ERROR"; return false; }
     return true;
   }
 
@@ -432,192 +377,89 @@ export function useStaking(address: Ref<string | null>) {
     const spender = stakingAddress();
     const token = tokenAddress();
     const needed = BigInt(amountRaw);
-
-    const allowance = (await readContract(wagmiConfig, {
-      address: token,
-      abi: TOKEN_ABI,
-      functionName: "allowance",
-      args: [owner, spender],
-    })) as bigint;
-
+    const allowance = (await readContract(wagmiConfig, { address: token, abi: TOKEN_ABI, functionName: "allowance", args: [owner, spender] })) as bigint;
     if (allowance >= needed) return true;
-
     txPhase.value = "approving";
-    const hash = await writeContract(wagmiConfig, {
-      address: token,
-      abi: TOKEN_ABI,
-      functionName: "approve",
-      args: [spender, needed],
-    });
-    lastTxHash.value = hash;
-    txPhase.value = "confirming";
+    const hash = await writeContract(wagmiConfig, { address: token, abi: TOKEN_ABI, functionName: "approve", args: [spender, needed] });
+    lastTxHash.value = hash; txPhase.value = "confirming";
     await waitForTransactionReceipt(wagmiConfig, { hash });
     return true;
   }
 
-  async function stake(amountHuman: string, lockSeconds: number): Promise<boolean> {
-    const amountErr = validateStakeAmount(amountHuman);
-    if (amountErr) {
-      txPhase.value = "failed";
-      txError.value = amountErr;
-      return false;
-    }
-    const lockErr = validateLockSeconds(lockSeconds);
-    if (lockErr) {
-      txPhase.value = "failed";
-      txError.value = lockErr;
-      return false;
-    }
+  function handleTxError(e: unknown): void {
+    const code = classifyTxError(e);
+    txErrorCode.value = code;
+    if (code === "USER_REJECTED") { txPhase.value = "rejected"; txError.value = "已在钱包中拒绝交易"; }
+    else { txPhase.value = "failed"; txError.value = e instanceof Error ? e.message : "交易失败"; }
+  }
 
-    if (!(await ensureReady())) return false;
-
-    const amountRaw = tokenToRaw(amountHuman);
-
+  async function handleTx<R>(phase: StakingTxPhase, fn: () => Promise<R>): Promise<R> {
+    txPhase.value = phase;
     try {
-      await approveIfNeeded(amountRaw);
-
-      txPhase.value = "staking";
-      const hash = await writeContract(wagmiConfig, {
-        address: stakingAddress(),
-        abi: STAKING_ABI,
-        functionName: "stake",
-        args: [BigInt(amountRaw), BigInt(lockSeconds)],
-      });
-      lastTxHash.value = hash;
+      const r = await fn();
+      lastTxHash.value = r as unknown as `0x${string}`;
       txPhase.value = "confirming";
-      const receipt = await waitForTransactionReceipt(wagmiConfig, { hash });
-      if (receipt.status !== "success") {
-        txPhase.value = "failed";
-        txError.value = "锁仓交易失败";
-        return false;
-      }
+      const receipt = await waitForTransactionReceipt(wagmiConfig, { hash: lastTxHash.value! });
+      if (receipt.status !== "success") throw new Error("tx reverted");
       txPhase.value = "success";
       await refresh();
+      return r;
+    } catch (e: unknown) { handleTxError(e); throw e; }
+  }
+
+  async function stake(amountHuman: string, lockSeconds: number): Promise<boolean> {
+    const ae = validateStakeAmount(amountHuman);
+    if (ae) { txPhase.value = "failed"; txError.value = ae; txErrorCode.value = "UNKNOWN"; return false; }
+    const le = validateLockSeconds(lockSeconds);
+    if (le) { txPhase.value = "failed"; txError.value = le; txErrorCode.value = "UNKNOWN"; return false; }
+    if (!(await ensureReady())) return false;
+    try {
+      const raw = tokenToRaw(amountHuman);
+      await approveIfNeeded(raw);
+      await handleTx("staking", async () => {
+        return writeContract(wagmiConfig, { address: stakingAddress(), abi: STAKING_ABI, functionName: "stake", args: [BigInt(raw), BigInt(lockSeconds)] });
+      });
       return true;
-    } catch (e: unknown) {
-      if (isUserRejected(e)) {
-        txPhase.value = "rejected";
-        txError.value = "已在钱包中拒绝交易";
-      } else {
-        txPhase.value = "failed";
-        txError.value = e instanceof Error ? e.message : "锁仓失败";
-      }
-      return false;
-    }
+    } catch { return false; }
   }
 
   async function unstake(positionId: number): Promise<boolean> {
     if (!(await ensureReady())) return false;
     try {
-      txPhase.value = "unstaking";
-      const hash = await writeContract(wagmiConfig, {
-        address: stakingAddress(),
-        abi: STAKING_ABI,
-        functionName: "unstake",
-        args: [BigInt(positionId)],
+      await handleTx("unstaking", async () => {
+        return writeContract(wagmiConfig, { address: stakingAddress(), abi: STAKING_ABI, functionName: "unstake", args: [BigInt(positionId)] });
       });
-      lastTxHash.value = hash;
-      txPhase.value = "confirming";
-      const receipt = await waitForTransactionReceipt(wagmiConfig, { hash });
-      if (receipt.status !== "success") {
-        txPhase.value = "failed";
-        txError.value = "解锁交易失败";
-        return false;
-      }
-      txPhase.value = "success";
-      await refresh();
       return true;
-    } catch (e: unknown) {
-      if (isUserRejected(e)) {
-        txPhase.value = "rejected";
-        txError.value = "已在钱包中拒绝交易";
-      } else {
-        txPhase.value = "failed";
-        txError.value = e instanceof Error ? e.message : "解锁失败";
-      }
-      return false;
-    }
+    } catch { return false; }
   }
 
   async function earlyUnstake(positionId: number): Promise<boolean> {
     if (!(await ensureReady())) return false;
     try {
-      txPhase.value = "early_unstaking";
-      const hash = await writeContract(wagmiConfig, {
-        address: stakingAddress(),
-        abi: STAKING_ABI,
-        functionName: "earlyUnstake",
-        args: [BigInt(positionId)],
+      await handleTx("early_unstaking", async () => {
+        return writeContract(wagmiConfig, { address: stakingAddress(), abi: STAKING_ABI, functionName: "earlyUnstake", args: [BigInt(positionId)] });
       });
-      lastTxHash.value = hash;
-      txPhase.value = "confirming";
-      const receipt = await waitForTransactionReceipt(wagmiConfig, { hash });
-      if (receipt.status !== "success") {
-        txPhase.value = "failed";
-        txError.value = "提前解锁交易失败";
-        return false;
-      }
-      txPhase.value = "success";
-      await refresh();
       return true;
-    } catch (e: unknown) {
-      if (isUserRejected(e)) {
-        txPhase.value = "rejected";
-        txError.value = "已在钱包中拒绝交易";
-      } else {
-        txPhase.value = "failed";
-        txError.value = e instanceof Error ? e.message : "提前解锁失败";
-      }
-      return false;
-    }
+    } catch { return false; }
   }
 
   async function claimRewards(): Promise<boolean> {
     if (!(await ensureReady())) return false;
     if (compareWei(store.earnedRaw, "0") <= 0) {
-      txPhase.value = "failed";
-      txError.value = "暂无可领取收益";
-      return false;
+      txPhase.value = "failed"; txError.value = "暂无可领取收益"; txErrorCode.value = "UNKNOWN"; return false;
     }
     try {
-      txPhase.value = "claiming";
-      const hash = await writeContract(wagmiConfig, {
-        address: stakingAddress(),
-        abi: STAKING_ABI,
-        functionName: "claimRewards",
-        args: [],
+      await handleTx("claiming", async () => {
+        return writeContract(wagmiConfig, { address: stakingAddress(), abi: STAKING_ABI, functionName: "claimRewards", args: [] });
       });
-      lastTxHash.value = hash;
-      txPhase.value = "confirming";
-      const receipt = await waitForTransactionReceipt(wagmiConfig, { hash });
-      if (receipt.status !== "success") {
-        txPhase.value = "failed";
-        txError.value = "领取收益失败";
-        return false;
-      }
-      txPhase.value = "success";
-      await refresh();
       return true;
-    } catch (e: unknown) {
-      if (isUserRejected(e)) {
-        txPhase.value = "rejected";
-        txError.value = "已在钱包中拒绝交易";
-      } else {
-        txPhase.value = "failed";
-        txError.value = e instanceof Error ? e.message : "领取失败";
-      }
-      return false;
-    }
+    } catch { return false; }
   }
 
-  function resetTx(): void {
-    txPhase.value = "idle";
-    txError.value = null;
-    lastTxHash.value = null;
-  }
+  function resetTx(): void { txPhase.value = "idle"; txError.value = null; txErrorCode.value = null; lastTxHash.value = null; }
 
   function estimateUnlockAt(lockSeconds: number): Date {
-    return new Date((nowUnix() + Math.max(0, lockSeconds)) * 1000);
+    return new Date((store.serverNow() + Math.max(0, lockSeconds)) * 1000);
   }
 
   function estimateNewStakeReward(amountHuman: string, lockSeconds: number): string {
@@ -628,26 +470,10 @@ export function useStaking(address: Ref<string | null>) {
   }
 
   return {
-    store,
-    txPhase,
-    txError,
-    lastTxHash,
-    isBusy,
-    apyPercent,
-    claimableDisplay,
-    totalStakedDisplay,
-    totalEarnedDisplay,
-    refresh,
-    stake,
-    unstake,
-    earlyUnstake,
-    claimRewards,
-    resetTx,
-    estimateUnlockAt,
-    estimateNewStakeReward,
-    formatTokenRaw,
-    weiToDisplay,
-    computePenalty,
-    tokenToRaw,
+    store, txPhase, txError, txErrorCode, lastTxHash, isBusy,
+    apyPercent, claimableDisplay, totalStakedDisplay, totalEarnedDisplay,
+    refresh, stake, unstake, earlyUnstake, claimRewards, resetTx,
+    estimateUnlockAt, estimateNewStakeReward,
+    formatTokenRaw, weiToDisplay, computePenalty, tokenToRaw,
   };
 }
