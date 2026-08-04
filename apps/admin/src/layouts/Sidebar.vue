@@ -7,6 +7,7 @@ const navItems = [
   { id: "assets", label: "链上资产", sub: "合约、资金池与同步", route: "/assets" },
   { id: "trades", label: "交易与税费", sub: "交易、分桶与成本", route: "/trades" },
   { id: "buyback", label: "托底与回购", sub: "兑换、回购与Locker", route: "/buyback" },
+  { id: "staking", label: "锁仓管理", sub: "奖励池、速率与仓位", route: "/staking" },
   { id: "dividend", label: "分红管理", sub: "Epoch、排名与领取", route: "/dividend" },
   { id: "governance", label: "系统治理", sub: "任务、权限与审计", route: "/governance" },
 ];

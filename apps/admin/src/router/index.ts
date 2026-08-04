@@ -14,6 +14,7 @@ const router = createRouter({
     { path: "/assets", name: "assets", component: () => import("@/views/AssetsView.vue"), meta: { requiresAuth: true } },
     { path: "/trades", name: "trades", component: () => import("@/views/TradesView.vue"), meta: { requiresAuth: true } },
     { path: "/buyback", name: "buyback", component: () => import("@/views/BuybackView.vue"), meta: { requiresAuth: true } },
+    { path: "/staking", name: "staking", component: () => import("@/views/StakingView.vue"), meta: { requiresAuth: true } },
     { path: "/dividend", name: "dividend", component: () => import("@/views/DividendView.vue"), meta: { requiresAuth: true } },
     { path: "/governance", name: "governance", component: () => import("@/views/GovernanceView.vue"), meta: { requiresAuth: true } },
   ],
