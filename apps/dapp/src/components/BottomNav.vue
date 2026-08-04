@@ -19,7 +19,7 @@ function isActive(tab: typeof tabs[0]) {
 <template>
   <nav class="bottom-nav">
     <button v-for="tab in tabs" :key="tab.id" :class="{ active: isActive(tab) }" @click="$router.push(tab.route)">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none">
         <!-- Home -->
         <path v-if="tab.id==='home'" d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
         <polyline v-if="tab.id==='home'" points="9 22 9 12 15 12 15 22"/>

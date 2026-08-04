@@ -58,7 +58,7 @@ class AdminJobsController extends Controller
             ])
             ->toArray();
 
-        return ApiEnvelope::success($tasks, 'MOCK_DATA');
+        return ApiEnvelope::success($tasks, 'LIVE');
     }
 
     /**

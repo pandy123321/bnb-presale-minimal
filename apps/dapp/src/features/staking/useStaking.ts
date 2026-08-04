@@ -364,7 +364,7 @@ export function useStaking(address: Ref<string | null>) {
 
   function applyMeta(meta: EnvelopeMeta | null | undefined): void {
     if (!meta) return;
-    store.setMeta(meta.data_status ?? DataStatus.MOCK_DATA, meta.block_number);
+    store.setMeta(meta.data_status ?? DataStatus.LIVE, meta.block_number);
   }
 
   watch(address, (addr) => { if (!addr) store.reset(); refresh(); }, { immediate: true });

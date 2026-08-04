@@ -21,7 +21,7 @@ export const DATA_STATUS_COLORS: Record<string, string> = {
 };
 
 export const useAppStore = defineStore("app", () => {
-  const dataStatus = ref<string>("MOCK_DATA");
+  const dataStatus = ref<string>("LIVE");
   const environment = ref("LOCAL");
   const chainId = ref<number>(31337);
   const blockNumber = ref<string | null>(null);

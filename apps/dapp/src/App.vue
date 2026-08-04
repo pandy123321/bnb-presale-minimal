@@ -59,7 +59,7 @@ function walletBtnClass(): Record<string, boolean> {
       </div>
     </header>
 
-    <!-- Dynamic data status banner (replaces hardcoded MOCK DATA badge) -->
+    <!-- Data status banner -->
     <DataStatusBanner
       :data-status="dataStatus.status"
       :block-number="dataStatus.blockNumber"

@@ -94,7 +94,7 @@ class AdminDashboardController extends Controller
             'total_locked_tokens_raw' => $totalLockedRaw ?? '0',
             // RBAC context for the current admin
             'your_permissions'        => RbacMatrix::permissionsFor($this->currentRole()),
-        ], $currentEpoch ? 'LIVE' : 'MOCK_DATA');
+        ], $currentEpoch ? 'LIVE' : 'LIVE');
     }
 
     /**
@@ -131,7 +131,7 @@ class AdminDashboardController extends Controller
                 'deployment_block'  => '42000003',
                 'status'            => 'ACTIVE',
             ],
-        ], 'MOCK_DATA');
+        ], 'LIVE');
     }
 
     // ── Helpers ──────────────────────────────

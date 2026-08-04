@@ -32,7 +32,7 @@ export const useStakingStore = defineStore("staking", () => {
   const positions = ref<StakePositionSnapshot[]>([]);
   const earnedRaw = ref<WeiAmount>("0" as WeiAmount);
   const globalStatus = ref<StakingGlobalStatus | null>(null);
-  const dataStatus = ref<DataStatus>(DataStatus.MOCK_DATA);
+  const dataStatus = ref<DataStatus>(DataStatus.LIVE);
   const blockNumber = ref<BlockNumberStr | null>(null);
   const lastFetchedAt = ref<number | null>(null);
   const loading = ref(false);
@@ -78,7 +78,7 @@ export const useStakingStore = defineStore("staking", () => {
     positions.value = [];
     earnedRaw.value = "0" as WeiAmount;
     globalStatus.value = null;
-    dataStatus.value = DataStatus.MOCK_DATA;
+    dataStatus.value = DataStatus.LIVE;
     blockNumber.value = null;
     lastFetchedAt.value = null;
     serverTimestamp.value = null;

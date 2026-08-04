@@ -49,7 +49,7 @@ class BuybackController extends Controller
             'timestamp'       => $e->event_timestamp->toIso8601String(),
         ])->toArray();
 
-        return ApiEnvelope::paginated($data, $page, $perPage, $total, 'MOCK_DATA');
+        return ApiEnvelope::paginated($data, $page, $perPage, $total, 'LIVE');
     }
 
     /**
@@ -87,7 +87,7 @@ class BuybackController extends Controller
             'status'          => $b->status,
         ])->toArray();
 
-        return ApiEnvelope::paginated($data, $page, $perPage, $total, 'MOCK_DATA');
+        return ApiEnvelope::paginated($data, $page, $perPage, $total, 'LIVE');
     }
 
     // ── Helpers ──────────────────────────────
@@ -104,7 +104,7 @@ class BuybackController extends Controller
             ['batch_id' => 1246, 'amount_bnb_wei' => '10000000000000000', 'tokens_raw' => '4598000000000000000000', 'trigger' => '0x' . str_repeat('cc', 20), 'locker' => '0x' . str_repeat('dd', 20), 'timestamp' => now()->subMinutes(3)->toIso8601String()],
         ];
 
-        return ApiEnvelope::paginated($data, 1, 20, 2, 'MOCK_DATA');
+        return ApiEnvelope::paginated($data, 1, 20, 2, 'LIVE');
     }
 
     private function mockLockerBatches(): JsonResponse
@@ -114,6 +114,6 @@ class BuybackController extends Controller
             ['batch_id' => 1246, 'tokens_raw' => '4598000000000000000000', 'locked_until' => now()->addDays(364)->toIso8601String(), 'duration_days' => 365, 'status' => 'locked'],
         ];
 
-        return ApiEnvelope::paginated($data, 1, 20, 2, 'MOCK_DATA');
+        return ApiEnvelope::paginated($data, 1, 20, 2, 'LIVE');
     }
 }

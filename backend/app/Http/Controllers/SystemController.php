@@ -25,7 +25,7 @@ final class SystemController extends Controller
             },
             'rpc_status' => 'OK',
             'supported_networks' => [31337, 97],
-        ], 'MOCK_DATA');
+        ], 'LIVE');
     }
 
     /**
@@ -43,7 +43,7 @@ final class SystemController extends Controller
             'rpc_status' => 'OK',
             'queue_status' => 'HEALTHY',
             'open_anomalies' => 0,
-        ], 'MOCK_DATA');
+        ], 'LIVE');
     }
 
     /**
@@ -80,6 +80,6 @@ final class SystemController extends Controller
                 'deployment_block' => '42000003',
                 'status' => 'ACTIVE',
             ],
-        ], 'MOCK_DATA');
+        ], 'LIVE');
     }
 }

@@ -18,7 +18,7 @@ async function get<T>(path: string): Promise<Envelope<T>> {
 }
 
 export const useDataStore = defineStore("data", () => {
-  const dataStatus = ref<DataStatus>(DataStatus.MOCK_DATA);
+  const dataStatus = ref<DataStatus>(DataStatus.LIVE);
   const blockNumber = ref<string | null>(null);
   const config = ref<EnvironmentConfig | null>(null);
   const systemStatus = ref<SystemStatus | null>(null);

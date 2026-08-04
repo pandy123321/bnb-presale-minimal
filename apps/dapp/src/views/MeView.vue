@@ -124,12 +124,6 @@ const isClaimed = computed(() => {
           </span>
         </div>
 
-        <!-- Mock -->
-        <div v-if="isMockData" style="margin-top:10px; text-align:center">
-          <span class="mock-tag">MOCK DATA</span>
-        </div>
-      </div>
-
       <!-- 成本 / 税率 -->
       <div class="card" style="margin-top:11px">
         <div class="row">

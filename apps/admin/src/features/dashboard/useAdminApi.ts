@@ -189,7 +189,7 @@ export function useAdminTransactions() {
     error.value = null;
 
     // Fetch real transactions from API. Falls back to empty on failure.
-    fetch(`${ADMIN_API}/wallets/0x0000000000000000000000000000000000000000/transactions`)
+    fetch(`/api/v1/projects/pangu2/wallets/0x0000000000000000000000000000000000000000/transactions`)
       .then(r => r.json())
       .then(body => {
         if (body?.data?.length) {

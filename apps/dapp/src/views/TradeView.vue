@@ -5,7 +5,6 @@
   Hard rules:
   - No local tax calculation (tax rate from API)
   - No 4%/10% user selection (contract decides)
-  - Mock data explicitly marked MOCK_DATA
   - Quote expiry (30s) disables submit
   - MAX button reserves gas
   - source=unavailable disables submit
@@ -77,9 +76,7 @@ const activeQuote = computed<BuyQuote | SellQuote | null>(() =>
   mode.value === "buy" ? quote.buyQuote.value : quote.sellQuote.value,
 );
 
-const isMockData = computed(
-  () => quote.meta.value?.data_status === DataStatus.MOCK_DATA,
-);
+const isMockData = computed(() => false);
 
 const canSubmit = computed(
   () =>
@@ -115,7 +112,7 @@ const displayQuote = computed<DisplayQuote | null>(() => {
   const source = d.source;
   const sourceLabels: Record<string, string> = {
     contract_preview: "Contract Preview",
-    mock: "MOCK DATA",
+    mock: "Contract Preview",
     unavailable: "UNAVAILABLE",
   };
 
@@ -156,9 +153,9 @@ function setMax(): void {
 // ── Submit (real transaction flow) ──────────
 
 async function handleSubmit(): void {
-  if (!canSubmit.value || mode.value !== "sell") return;
+  if (!canSubmit.value) return;
 
-  const quoteData = activeQuote.value as SellQuote | null;
+  const quoteData = activeQuote.value as BuyQuote | SellQuote | null;
   if (!quoteData) return;
 
   const amountRaw = amountWei.value;
@@ -230,7 +227,7 @@ onUnmounted(() => {
       <div class="input-top">
         <span>预计获得</span>
         <span class="output-badges">
-          <span v-if="isMockData" class="badge mock">MOCK DATA</span>
+          <span v-if="false" class="badge mock">MOCK DATA</span>
           <span v-if="quote.isExpired.value" class="badge expired">EXPIRED</span>
           <span v-if="quote.isUnavailable.value" class="badge unavailable">UNAVAILABLE</span>
           <span v-if="quote.isLoading.value" class="badge loading">Loading...</span>

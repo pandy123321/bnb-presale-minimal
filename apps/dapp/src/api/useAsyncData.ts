@@ -42,7 +42,7 @@ export function useAsyncData<T>(
   const state = ref<AsyncDataState<T>>({
     data: null,
     meta: null,
-    dataStatus: DataStatus.MOCK_DATA,
+    dataStatus: DataStatus.LIVE,
     isLoading: false,
     error: null,
     errorCode: null,

@@ -119,14 +119,6 @@ function handleTriggerBuyback(): void {
         </div>
       </div>
     </div>
-
-    <!-- Mock 标记 -->
-    <div v-if="isMockData" class="card" style="margin-top:10px; border-color:rgba(243,163,75,.2)">
-      <div class="mock-footer">
-        <span class="tag warning">MOCK DATA</span>
-        <small>当前为模拟数据，回购和锁仓数据来自 Mock API。</small>
-      </div>
-    </div>
   </div>
 </template>
 

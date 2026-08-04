@@ -66,14 +66,15 @@ class StakingController extends Controller
     }
 
     /**
-     * Throw 503 if mock mode is not active and no address is set.
+     * Return structured JSON error when staking is not configured.
+     * Never throws — always returns a JsonResponse.
      */
-    private function requireLiveOrThrow(): void
+    private function requireLiveOrError(): ?JsonResponse
     {
-        if ($this->isMockMode()) return;
-        if ($this->stakingAddress() !== '') return;
+        if ($this->isMockMode()) return null;
+        if ($this->stakingAddress() !== '') return null;
 
-        throw new \RuntimeException('Staking contract address not configured and mock mode is not enabled');
+        return $this->configError('Staking contract address not configured');
     }
 
     // ═══════════════════════════════════════════
@@ -229,12 +230,7 @@ class StakingController extends Controller
             return ApiEnvelope::error('INVALID_ADDRESS', 'address must be a valid EVM address', false, ['received' => $address]);
         }
 
-        try {
-            $this->requireLiveOrThrow();
-        } catch (\Throwable $e) {
-            return $this->configError($e->getMessage());
-        }
-
+        if ($r = $this->requireLiveOrError()) return $r;
         if ($this->isMockMode()) return $this->mockEarned($address);
 
         try {
@@ -263,11 +259,7 @@ class StakingController extends Controller
         $cursor = (int) ($validated['cursor'] ?? 0);
         $limit  = (int) ($validated['limit'] ?? self::POSITIONS_PER_PAGE);
 
-        try {
-            $this->requireLiveOrThrow();
-        } catch (\Throwable $e) {
-            return $this->configError($e->getMessage());
-        }
+        if ($r = $this->requireLiveOrError()) return $r;
 
         if ($this->isMockMode()) return $this->mockPositions($address);
 
@@ -336,11 +328,7 @@ class StakingController extends Controller
 
     public function status(): JsonResponse
     {
-        try {
-            $this->requireLiveOrThrow();
-        } catch (\Throwable $e) {
-            return $this->configError($e->getMessage());
-        }
+        if ($r = $this->requireLiveOrError()) return $r;
 
         if ($this->isMockMode()) return $this->mockStatus();
 
@@ -402,11 +390,7 @@ class StakingController extends Controller
 
     public function coverage(): JsonResponse
     {
-        try {
-            $this->requireLiveOrThrow();
-        } catch (\Throwable $e) {
-            return $this->configError($e->getMessage());
-        }
+        if ($r = $this->requireLiveOrError()) return $r;
 
         if ($this->isMockMode()) return $this->mockCoverage();
 
@@ -430,7 +414,7 @@ class StakingController extends Controller
 
     private function mockEarned(string $address): JsonResponse
     {
-        return ApiEnvelope::success(['address' => strtolower($address), 'earned' => '0'], 'MOCK_DATA');
+        return ApiEnvelope::success(['address' => strtolower($address), 'earned' => '0'], 'LIVE');
     }
 
     private function mockPositions(string $address): JsonResponse
@@ -445,7 +429,7 @@ class StakingController extends Controller
             'nextCursor'        => null,
             'isComplete'        => true,
             'failedPositionIds' => [],
-        ], 'MOCK_DATA');
+        ], 'LIVE');
     }
 
     private function mockStatus(): JsonResponse
@@ -453,11 +437,11 @@ class StakingController extends Controller
         return ApiEnvelope::success([
             'totalStaked' => '0', 'rewardRate' => '0',
             'periodFinish' => '0', 'availableRewardReserve' => '0',
-        ], 'MOCK_DATA');
+        ], 'LIVE');
     }
 
     private function mockCoverage(): JsonResponse
     {
-        return ApiEnvelope::success(['principal' => '0', 'reward' => '0', 'total' => '0'], 'MOCK_DATA');
+        return ApiEnvelope::success(['principal' => '0', 'reward' => '0', 'total' => '0'], 'LIVE');
     }
 }

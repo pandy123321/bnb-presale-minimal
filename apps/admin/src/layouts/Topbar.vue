@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
+import { useAppStore } from "@/stores/useApp";
 
 const route = useRoute();
+const app = useAppStore();
 const pageTitles: Record<string, { title: string; sub: string }> = {
   overview: { title: "运营总览", sub: "资产、运行状态与风险" },
   assets: { title: "链上资产与合约", sub: "合约、资金池与同步" },
@@ -19,7 +21,7 @@ const page = pageTitles[currentRoute] || pageTitles.overview;
     <div class="page-title"><h2>{{ page.title }}</h2><p>{{ page.sub }}</p></div>
     <div class="top-tools">
       <div class="env-pill">BSC TESTNET · 97</div>
-      <div class="data-pill"><span class="dot"></span>MOCK_DATA</div>
+      <div class="data-pill"><span :class="app.isLive ? 'dot' : 'dot warn'"></span>{{ app.statusLabel }}</div>
       <button class="operation-btn">操作中心</button>
     </div>
   </header>
@@ -46,6 +48,7 @@ const page = pageTitles[currentRoute] || pageTitles.overview;
 .env-pill { color: var(--gold2); }
 .data-pill { color: var(--green); }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 12px rgba(78,213,154,.55); display: inline-block; }
+.dot.warn { background: var(--orange); box-shadow: 0 0 12px rgba(240,170,93,.55); }
 .operation-btn { height: 36px; border: 1px solid rgba(214,173,95,.42); background: linear-gradient(145deg, rgba(214,173,95,.18), rgba(214,173,95,.05)); color: var(--gold2); padding: 0 12px; font-weight: 700; font-size: 12px; }
 
 @media (max-width: 820px) {

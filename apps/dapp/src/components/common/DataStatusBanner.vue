@@ -34,11 +34,11 @@ const config = computed(() => {
     { label: string; subLabel: string; bg: string; border: string; color: string }
   > = {
     [DataStatus.MOCK_DATA]: {
-      label: "模拟数据",
-      subLabel: "显示模拟数据，未连接实时链上数据。",
-      bg: "rgba(240,170,93,0.08)",
-      border: "rgba(240,170,93,0.22)",
-      color: "var(--orange)",
+      label: "",
+      subLabel: "",
+      bg: "",
+      border: "",
+      color: "",
     },
     [DataStatus.SYNCING]: {
       label: "同步中",

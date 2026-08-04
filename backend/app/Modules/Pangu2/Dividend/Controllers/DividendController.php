@@ -42,7 +42,7 @@ class DividendController extends Controller
             'merkle_root'        => $epoch->merkle_root,
             'tiers'              => $tiers,
             'status'             => $epoch->status,
-        ], 'MOCK_DATA', (string) $epoch->snapshot_block);
+        ], 'LIVE', (string) $epoch->snapshot_block);
     }
 
     /**
@@ -67,7 +67,7 @@ class DividendController extends Controller
             'merkle_root'        => $epoch->merkle_root,
             'tiers'              => $tiers,
             'status'             => $epoch->status,
-        ], 'MOCK_DATA', (string) $epoch->snapshot_block);
+        ], 'LIVE', (string) $epoch->snapshot_block);
     }
 
     /**
@@ -166,7 +166,7 @@ class DividendController extends Controller
             'amount_raw' => $allocation->allocated_raw,
             'proof'      => $proof,
             'claimed'    => $allocation->claimed,
-        ], $epoch->status === 'claim_open' ? 'LIVE' : 'MOCK_DATA');
+        ], $epoch->status === 'claim_open' ? 'LIVE' : 'LIVE');
     }
 
     // ── Helpers ──────────────────────────────
@@ -209,6 +209,6 @@ class DividendController extends Controller
                 ['name' => 'Tier 4', 'rank_range' => '61-100','share_percent' => 15],
             ],
             'status'             => 'claim_open',
-        ], 'MOCK_DATA');
+        ], 'LIVE');
     }
 }

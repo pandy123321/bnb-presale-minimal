@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
+import { useAppStore } from "@/stores/useApp";
 
 const route = useRoute();
+const app = useAppStore();
 const navItems = [
   { id: "overview", label: "总览", sub: "资产、状态与风险", route: "/" },
   { id: "assets", label: "链上资产", sub: "合约、资金池与同步", route: "/assets" },
@@ -32,8 +34,8 @@ function isActive(item: typeof navItems[0]) {
     <div class="side-block">
       <div class="side-status">
         <span>目标网络</span><b>BSC Testnet</b>
-        <span>数据状态</span><b class="gold">MOCK_DATA</b>
-        <span>同步高度</span><b>42,815,128</b>
+        <span>数据状态</span><b :style="{color:app.statusColor}">{{ app.statusLabel }}</b>
+        <span v-if="app.blockNumber">同步高度</span><b v-if="app.blockNumber">{{ app.blockNumber }}</b>
       </div>
       <p class="side-note">后台不托管用户私钥，不修改用户资产、成本或分红结果。</p>
     </div>

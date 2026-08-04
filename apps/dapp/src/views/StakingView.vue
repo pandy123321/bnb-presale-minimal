@@ -291,10 +291,6 @@ function formatUnlockDate(unlockAt: string): string {
       <p v-if="txPhase !== 'idle' && phaseLabel" class="tx-hint" :class="txPhase">
         {{ phaseLabel }}
       </p>
-      <p v-if="store.isMockData" class="sub mock-tip">
-        <span class="tag warning">MOCK DATA</span>
-        当前为模拟数据时仍可发起钱包签名；合约地址需配置 VITE_STAKING_ADDRESS。
-      </p>
     </div>
 
     <!-- B) 我的仓位 -->

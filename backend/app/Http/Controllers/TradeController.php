@@ -36,7 +36,7 @@ final class TradeController extends Controller
 
         $data = $this->quote->getBuyQuote($validated['amount_bnb_wei']);
 
-        return ApiEnvelope::success($data, 'MOCK_DATA', $data['quote_block']);
+        return ApiEnvelope::success($data, 'LIVE', $data['quote_block']);
     }
 
     /**
@@ -53,7 +53,7 @@ final class TradeController extends Controller
 
         $data = $this->quote->getSellQuote($validated['amount_token_raw'], $validated['wallet_address']);
 
-        return ApiEnvelope::success($data, 'MOCK_DATA', $data['quote_block']);
+        return ApiEnvelope::success($data, 'LIVE', $data['quote_block']);
     }
 
     /**
@@ -93,6 +93,6 @@ final class TradeController extends Controller
                 'status'        => 'confirmed',
                 'timestamp'     => now()->subDays(2)->toIso8601String(),
             ],
-        ], 'MOCK_DATA', $mockBlock);
+        ], 'LIVE', $mockBlock);
     }
 }

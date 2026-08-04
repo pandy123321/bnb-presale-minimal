@@ -44,7 +44,7 @@ export const STATUS_COLORS: Record<DataStatusType, string> = {
 
 export const useDataStatusStore = defineStore("dataStatus", () => {
   // ── State ──
-  const status = ref<DataStatusType>(DataStatus.MOCK_DATA);
+  const status = ref<DataStatusType>(DataStatus.LIVE);
   const blockNumber = ref<string | null>(null);
   const schemaVersion = ref<string>("1.0.0");
   const lastUpdatedAt = ref<number>(0); // Date.now() of last successful API response

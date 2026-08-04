@@ -19,14 +19,14 @@ Route::prefix('v1/projects/pangu2')->group(function () {
 
     // ── Auth ──
     Route::get('/auth/csrf', function () {
-        return ApiEnvelope::success(['csrf_initialized' => true], 'MOCK_DATA');
+        return ApiEnvelope::success(['csrf_initialized' => true], 'LIVE');
     });
 
     Route::post('/auth/nonce',  [WalletAuthController::class, 'nonce']);
     Route::post('/auth/verify', [WalletAuthController::class, 'verify']);
     Route::post('/auth/logout', [WalletAuthController::class, 'logout']);
 
-    // ── Trade (public, return MOCK_DATA until ABI available) ──
+    // ── Trade (public) ──
     Route::post('/quotes/buy',                     [TradeController::class, 'buyQuote'])->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
     Route::post('/quotes/sell',                    [TradeController::class, 'sellQuote'])->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
     Route::get('/wallets/{address}/transactions',  [TradeController::class, 'transactions']);

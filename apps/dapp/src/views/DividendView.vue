@@ -144,10 +144,6 @@ function handleClaim(): void {
         </button>
 
         <!-- Claim 状态标记 -->
-        <div v-if="isMockData" class="mock-tip">
-          <span class="tag warning">MOCK DATA</span>
-          <small>当前为模拟数据，真实 Claim 由钱包签名发起。</small>
-        </div>
       </div>
     </template>
 

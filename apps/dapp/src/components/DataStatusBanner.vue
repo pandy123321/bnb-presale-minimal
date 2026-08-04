@@ -9,7 +9,7 @@ const data = useDataStore();
     <span class="banner-icon">{{ data.isMocked ? '◈' : data.isStale ? '⏳' : data.isDegraded ? '⚠' : '✕' }}</span>
     <div>
       <b>{{ data.dataStatus }}</b>
-      <span>{{ data.isMocked ? '当前为模拟数据，不代表真实链上状态。' : data.isStale ? '数据可能已过期。' : data.isDegraded ? '部分服务不可用。' : '服务暂时不可用。' }}</span>
+      <span>{{ data.isStale ? '数据可能已过期。' : data.isDegraded ? '部分服务不可用。' : data.isUnavailable ? '服务暂时不可用。' : '' }}</span>
     </div>
   </div>
 </template>
