@@ -40,6 +40,7 @@ export const useStakingStore = defineStore("staking", () => {
 
   // P2-002: server-time from API (avoid client clock dependency)
   const serverTimestamp = ref<number | null>(null);
+  const serverTimeAvailable = ref(false);
 
   const positionCount = computed(() => positions.value.length);
 
@@ -63,9 +64,9 @@ export const useStakingStore = defineStore("staking", () => {
     dataStatus.value = status;
     blockNumber.value = block;
     lastFetchedAt.value = Date.now();
-    if (serverTime != null) serverTimestamp.value = serverTime;
+    if (serverTime != null) { serverTimestamp.value = serverTime; serverTimeAvailable.value = true; }
   }
-  function setServerTime(ts: number | null): void { serverTimestamp.value = ts; }
+  function setServerTime(ts: number | null): void { serverTimestamp.value = ts; serverTimeAvailable.value = ts != null; }
   function serverNow(): number {
     return serverTimestamp.value ?? Math.floor(Date.now() / 1000);
   }
@@ -81,13 +82,14 @@ export const useStakingStore = defineStore("staking", () => {
     blockNumber.value = null;
     lastFetchedAt.value = null;
     serverTimestamp.value = null;
+    serverTimeAvailable.value = false;
     loading.value = false;
     error.value = null;
   }
 
   return {
     address, positions, earnedRaw, globalStatus,
-    dataStatus, blockNumber, lastFetchedAt, serverTimestamp,
+    dataStatus, blockNumber, lastFetchedAt, serverTimestamp, serverTimeAvailable,
     loading, error,
     positionCount, totalStakedRaw, activePositions,
     isMockData, isLive,

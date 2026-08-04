@@ -194,13 +194,25 @@ export function validateLockSeconds(seconds: number): string | null {
 }
 
 function classifyTxError(e: unknown): TxErrorCode {
-  const err = e as { code?: string | number; message?: string; name?: string };
-  if (err.code === 4001 || err.code === "4001") return "USER_REJECTED";
+  const err = e as { code?: string | number; message?: string; name?: string; cause?: unknown };
+  // viem/wagmi: UserRejectedRequestError has statusCode or code 4001
+  const code = err.code;
+  if (code === 4001 || code === "4001" || code === "USER_REJECTED") return "USER_REJECTED";
+  // viem: ContractFunctionExecutionError wraps ContractFunctionRevertedError
+  const name = err.name ?? "";
+  const causeName = (err.cause as { name?: string })?.name ?? "";
+  if (name.includes("ContractFunction") || causeName.includes("ContractFunction")) return "CONTRACT_REVERT";
+  if (name.includes("Reverted") || causeName.includes("Reverted")) return "CONTRACT_REVERT";
+  // viem: TransactionExecutionError / TimeoutError
+  if (name.includes("Timeout") || name.includes("TransactionExecution")) return "NETWORK_ERROR";
+  // wagmi: writeContract rejection
+  if (name.includes("UserRejected") || name.includes("RejectedRequest")) return "USER_REJECTED";
+  // fallback string matching (last resort)
   const msg = (err.message ?? "").toLowerCase();
-  if (msg.includes("rejected") || msg.includes("denied")) return "USER_REJECTED";
-  if (msg.includes("network") || msg.includes("fetch") || msg.includes("timeout")) return "NETWORK_ERROR";
+  if (msg.includes("user rejected") || msg.includes("denied")) return "USER_REJECTED";
   if ((msg.includes("insufficient") || msg.includes("intrinsic")) && msg.includes("gas")) return "INSUFFICIENT_GAS";
   if (msg.includes("revert") || msg.includes("execution reverted")) return "CONTRACT_REVERT";
+  if (msg.includes("network") || msg.includes("timeout")) return "NETWORK_ERROR";
   return "UNKNOWN";
 }
 
@@ -393,7 +405,7 @@ export function useStaking(address: Ref<string | null>) {
     else { txPhase.value = "failed"; txError.value = e instanceof Error ? e.message : "交易失败"; }
   }
 
-  async function handleTx<R>(phase: StakingTxPhase, fn: () => Promise<R>): Promise<R> {
+  async function handleTx<R extends `0x${string}`>(phase: StakingTxPhase, fn: () => Promise<R>): Promise<R> {
     txPhase.value = phase;
     try {
       const r = await fn();
