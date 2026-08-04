@@ -39,9 +39,9 @@ function walletBtnClass(): Record<string, boolean> {
   <div class="app">
     <header class="topbar">
       <div class="brand">
-        <div class="logo">盘</div>
+        <img class="logo" src="/logo/bgp-logo-32.png" alt="BGP" width="32" height="32" />
         <div>
-          <b>PANGU2</b>
+          <b>BingGoPlus</b>
           <small>{{ wallet.isConnected ? `${wallet.chainName} · ${wallet.chainId}` : '未连接' }}</small>
         </div>
       </div>
@@ -52,6 +52,7 @@ function walletBtnClass(): Record<string, boolean> {
           @click="handleWalletBtnClick"
           :disabled="wallet.isConnecting"
         >
+          <span v-if="wallet.isConnected" class="conn-dot" />
           <span v-if="wallet.isConnecting" class="btn-spinner" />
           {{ walletBtnLabel() }}
         </button>
@@ -89,7 +90,10 @@ function walletBtnClass(): Record<string, boolean> {
   margin: 0 auto;
   position: relative;
   overflow-x: hidden;
-  background: radial-gradient(circle at 95% 0, rgba(216,170,81,.11), transparent 29%), var(--bg);
+  background:
+    radial-gradient(circle at 88% -5%, rgba(37,194,255,.09), transparent 30%),
+    radial-gradient(circle at 18% 18%, rgba(128,85,238,.05), transparent 26%),
+    var(--bg);
 }
 
 .topbar {
@@ -100,9 +104,9 @@ function walletBtnClass(): Record<string, boolean> {
   align-items: center;
   justify-content: space-between;
   padding: calc(11px + env(safe-area-inset-top)) 14px 10px;
-  background: rgba(8,10,14,.93);
-  backdrop-filter: blur(18px);
-  border-bottom: 1px solid rgba(255,255,255,.04);
+  background: rgba(3,5,26,.94);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(87,116,176,.18);
 }
 
 .brand {
@@ -112,41 +116,45 @@ function walletBtnClass(): Record<string, boolean> {
 }
 
 .logo {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  font-weight: 950;
-  color: var(--gold2);
-  border: 1px solid rgba(216,170,81,.48);
-  background: rgba(216,170,81,.08);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  object-fit: contain;
 }
 
-.brand b { font-size: 15px; }
+.brand b { font-size: 15px; font-weight: 800; }
 .brand small { display: block; font-size: 9px; color: var(--muted); margin-top: 2px; }
 
 .top-actions { display: flex; gap: 7px; align-items: center; }
 
 .wallet-btn {
   height: 36px;
-  border: 0;
-  background: var(--gold);
-  color: #181108;
+  border: 1px solid rgba(37,194,255,.32);
+  background: rgba(37,194,255,.06);
+  color: var(--text);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 700;
   padding: 0 11px;
   border-radius: 11px;
   display: flex;
   align-items: center;
   gap: 5px;
-  transition: background 0.2s, color 0.2s;
+  transition: background 0.2s, border-color 0.2s;
 }
 
 .wallet-btn.connected {
   background: var(--panel);
   color: var(--gold2);
-  border: 1px solid rgba(216,170,81,.4);
+  border: 1px solid rgba(220,174,109,.35);
+}
+
+.conn-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(53,201,154,.12);
+  flex-shrink: 0;
 }
 
 .wallet-btn.connecting {
@@ -156,9 +164,9 @@ function walletBtnClass(): Record<string, boolean> {
 }
 
 .wallet-btn.error {
-  background: rgba(255,116,125,.12);
+  background: rgba(255,107,125,.12);
   color: var(--red);
-  border: 1px solid rgba(255,116,125,.3);
+  border: 1px solid rgba(255,107,125,.3);
 }
 
 .wallet-btn:disabled {
@@ -169,8 +177,8 @@ function walletBtnClass(): Record<string, boolean> {
   display: inline-block;
   width: 12px;
   height: 12px;
-  border: 2px solid rgba(255,255,255,.25);
-  border-top-color: var(--muted);
+  border: 2px solid rgba(255,255,255,.2);
+  border-top-color: var(--cyan);
   border-radius: 50%;
   animation: btn-spin 0.7s linear infinite;
 }

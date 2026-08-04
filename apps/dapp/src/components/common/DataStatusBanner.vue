@@ -31,23 +31,21 @@ const show = computed(() => props.dataStatus !== DataStatus.LIVE);
 const config = computed(() => {
   const map: Record<
     DataStatusType,
-    { label: string; subLabel: string; bg: string; border: string; color: string; icon: string }
+    { label: string; subLabel: string; bg: string; border: string; color: string }
   > = {
     [DataStatus.MOCK_DATA]: {
-      label: "Mock Data",
-      subLabel: "Showing simulated data. Not connected to live chain.",
-      bg: "rgba(243,163,75,0.08)",
-      border: "rgba(243,163,75,0.22)",
+      label: "模拟数据",
+      subLabel: "显示模拟数据，未连接实时链上数据。",
+      bg: "rgba(240,170,93,0.08)",
+      border: "rgba(240,170,93,0.22)",
       color: "var(--orange)",
-      icon: "🛠",
     },
     [DataStatus.SYNCING]: {
-      label: "Syncing",
-      subLabel: "Indexing chain data. Recent transactions may not appear yet.",
-      bg: "rgba(106,169,255,0.08)",
-      border: "rgba(106,169,255,0.22)",
-      color: "var(--blue)",
-      icon: "⟳",
+      label: "同步中",
+      subLabel: "正在索引链上数据，近期交易可能尚未显示。",
+      bg: "rgba(37,194,255,0.08)",
+      border: "rgba(37,194,255,0.22)",
+      color: "var(--cyan)",
     },
     [DataStatus.LIVE]: {
       label: "Live",
@@ -55,31 +53,27 @@ const config = computed(() => {
       bg: "",
       border: "",
       color: "",
-      icon: "",
     },
     [DataStatus.STALE]: {
-      label: "Stale",
-      subLabel: "Data is out of date. Prices may be inaccurate.",
-      bg: "rgba(243,163,75,0.08)",
-      border: "rgba(243,163,75,0.22)",
-      color: "#f3a34b",
-      icon: "⏳",
+      label: "数据滞后",
+      subLabel: "数据未及时更新，价格可能不准确。",
+      bg: "rgba(240,170,93,0.08)",
+      border: "rgba(240,170,93,0.22)",
+      color: "var(--orange)",
     },
     [DataStatus.DEGRADED]: {
-      label: "Degraded",
-      subLabel: "RPC or backend connection is degraded.",
-      bg: "rgba(255,116,125,0.08)",
-      border: "rgba(255,116,125,0.22)",
+      label: "服务降级",
+      subLabel: "RPC 或后端连接质量下降。",
+      bg: "rgba(255,107,125,0.08)",
+      border: "rgba(255,107,125,0.22)",
       color: "var(--red)",
-      icon: "⚠",
     },
     [DataStatus.UNAVAILABLE]: {
-      label: "Unavailable",
-      subLabel: "Cannot reach the backend. Data may be inaccessible.",
-      bg: "rgba(255,116,125,0.12)",
-      border: "rgba(255,116,125,0.3)",
+      label: "数据不可用",
+      subLabel: "无法连接后端服务，数据可能无法访问。",
+      bg: "rgba(255,107,125,0.12)",
+      border: "rgba(255,107,125,0.3)",
       color: "var(--red)",
-      icon: "⊘",
     },
   };
   return map[props.dataStatus] ?? map[DataStatus.UNAVAILABLE];
@@ -89,12 +83,16 @@ const config = computed(() => {
 <template>
   <Transition name="banner-fade">
     <div v-if="show" class="status-banner" :style="{ background: config.bg, borderColor: config.border }">
-      <span class="icon">{{ config.icon }}</span>
+      <svg class="icon" viewBox="0 0 24 24" width="20" height="20" :stroke="config.color" fill="none" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
       <div class="body">
         <span class="label" :style="{ color: config.color }">{{ config.label }}</span>
         <span class="sublabel">{{ config.subLabel }}</span>
-        <span v-if="blockNumber" class="block">Block: {{ blockNumber }}</span>
-        <span v-if="ageFormatted" class="age">{{ ageFormatted }} ago</span>
+        <span v-if="blockNumber" class="block">区块 {{ blockNumber }}</span>
+        <span v-if="ageFormatted" class="age">{{ ageFormatted }}</span>
       </div>
       <slot />
     </div>

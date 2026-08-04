@@ -1,5 +1,5 @@
 <!-- ═══════════════════════════════════════════
-  PANGU2 DApp — NetworkBanner
+  BGP DApp — NetworkBanner
   Persistent banner when connected to an unsupported chain.
   States: UNSUPPORTED (warning + switch btn) → SWITCHING (spinner) → ERROR (retry)
   Hidden when SUPPORTED / UNKNOWN / DISCONNECTED.
@@ -29,7 +29,7 @@ function supportedChainNames(): string {
           <span class="nb-spinner" />
         </template>
         <template v-else>
-          ⚠
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         </template>
       </div>
 
@@ -71,8 +71,9 @@ function supportedChainNames(): string {
 
 <style scoped>
 .network-banner {
-  background: linear-gradient(135deg, rgba(243, 163, 75, 0.13), rgba(243, 163, 75, 0.06));
-  border-bottom: 1px solid rgba(243, 163, 75, 0.18);
+  background: linear-gradient(135deg, rgba(240,170,93,.12), rgba(240,170,93,.05));
+  border-bottom: 1px solid rgba(240,170,93,.18);
+  border-left: 3px solid var(--orange);
   padding: 10px 14px;
 }
 
@@ -83,17 +84,13 @@ function supportedChainNames(): string {
 }
 
 .nb-icon {
-  font-size: 18px;
   flex-shrink: 0;
   width: 24px;
   display: grid;
   place-items: center;
 }
 
-.nb-text {
-  flex: 1;
-  min-width: 0;
-}
+.nb-text { flex: 1; min-width: 0; }
 
 .nb-text b {
   display: block;
@@ -109,15 +106,13 @@ function supportedChainNames(): string {
   line-height: 1.4;
 }
 
-.nb-action {
-  flex-shrink: 0;
-}
+.nb-action { flex-shrink: 0; }
 
 .nb-btn {
   height: 30px;
   padding: 0 12px;
-  border: 1px solid rgba(243, 163, 75, 0.35);
-  background: rgba(243, 163, 75, 0.12);
+  border: 1px solid rgba(240,170,93,.35);
+  background: rgba(240,170,93,.12);
   color: var(--orange);
   font-size: 11px;
   font-weight: 700;
@@ -128,31 +123,20 @@ function supportedChainNames(): string {
   gap: 5px;
 }
 
-.nb-btn:hover {
-  background: rgba(243, 163, 75, 0.2);
-}
-
-.nb-btn:disabled {
-  opacity: 0.5;
-}
+.nb-btn:hover { background: rgba(240,170,93,.2); }
+.nb-btn:disabled { opacity: 0.5; }
 
 .nb-spinner {
   display: inline-block;
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(243, 163, 75, 0.3);
+  border: 2px solid rgba(240,170,93,.3);
   border-top-color: var(--orange);
   border-radius: 50%;
   animation: nb-spin 0.7s linear infinite;
 }
 
-.nb-spinner.sm {
-  width: 11px;
-  height: 11px;
-  border-width: 1.5px;
-}
+.nb-spinner.sm { width: 11px; height: 11px; border-width: 1.5px; }
 
-@keyframes nb-spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes nb-spin { to { transform: rotate(360deg); } }
 </style>

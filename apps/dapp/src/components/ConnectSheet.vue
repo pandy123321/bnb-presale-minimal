@@ -60,22 +60,19 @@ defineExpose({ open, close });
         <div class="sheet-panel">
           <div class="sheet-handle" />
           <div class="sheet-header">
+            <img class="sheet-logo" src="/logo/bgp-logo-28.png" alt="BGP" width="28" height="28" />
             <h3>连接钱包</h3>
-            <button class="sheet-close" @click="close" aria-label="Close">✕</button>
+            <button class="sheet-close" @click="close" aria-label="Close">
+              <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
           </div>
 
           <!-- DISCONNECTED / CONNECTING / ERROR states -->
           <template v-if="!wallet.isConnected">
             <p class="sheet-desc">
-              <template v-if="wallet.isConnecting">
-                请在钱包中确认连接请求...
-              </template>
-              <template v-else-if="wallet.hasError">
-                {{ wallet.error }}
-              </template>
-              <template v-else>
-                连接 MetaMask 或兼容钱包以查看您的链上资产。
-              </template>
+              <template v-if="wallet.isConnecting">请在钱包中确认连接请求...</template>
+              <template v-else-if="wallet.hasError">{{ wallet.error }}</template>
+              <template v-else>连接后查看资产，并由钱包确认链上操作。</template>
             </p>
 
             <!-- CONNECTING: spinner -->
@@ -97,7 +94,9 @@ defineExpose({ open, close });
             <!-- DISCONNECTED: connect button -->
             <div v-else class="sheet-wallets">
               <button class="wallet-option" @click="handleConnect">
-                <span class="wallet-option-icon">🦊</span>
+                <span class="wallet-option-icon">
+                  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>
+                </span>
                 <div class="wallet-option-info">
                   <b>MetaMask</b>
                   <small>浏览器扩展钱包</small>
@@ -106,7 +105,9 @@ defineExpose({ open, close });
               </button>
 
               <button class="wallet-option" @click="handleConnect">
-                <span class="wallet-option-icon">🌐</span>
+                <span class="wallet-option-icon">
+                  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10"/><path d="M12 2a15.3 15.3 0 0 0-4 10 15.3 15.3 0 0 0 4 10"/></svg>
+                </span>
                 <div class="wallet-option-info">
                   <b>Injected Wallet</b>
                   <small>Rabby / Trust / OKX / Coinbase</small>
@@ -155,14 +156,17 @@ defineExpose({ open, close });
 
 .sheet-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
 }
+
+.sheet-logo { border-radius: 6px; flex-shrink: 0; }
 
 .sheet-header h3 {
   font-size: 17px;
   font-weight: 800;
+  flex: 1;
 }
 
 .sheet-close {
@@ -171,10 +175,10 @@ defineExpose({ open, close });
   border-radius: 50%;
   border: 1px solid var(--line);
   background: transparent;
-  font-size: 13px;
   color: var(--muted);
   display: grid;
   place-items: center;
+  padding: 0;
 }
 
 .sheet-desc {
@@ -222,7 +226,8 @@ defineExpose({ open, close });
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 13px;
+  padding: 0 13px;
+  height: 58px;
   background: var(--panel2);
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -231,13 +236,15 @@ defineExpose({ open, close });
 }
 
 .wallet-option:hover {
-  border-color: rgba(216, 170, 81, 0.3);
+  border-color: rgba(37,194,255,.25);
 }
 
 .wallet-option-icon {
-  font-size: 24px;
   width: 36px;
-  text-align: center;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
   flex-shrink: 0;
 }
 
