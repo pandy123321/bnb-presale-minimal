@@ -63,12 +63,22 @@ services:
     build:
       context: ../..
       dockerfile: docker/php/Dockerfile
+      args:
+        http_proxy: ${HTTP_PROXY:-http://127.0.0.1:7890}
+        https_proxy: ${HTTPS_PROXY:-http://127.0.0.1:7890}
+        no_proxy: ${NO_PROXY:-localhost,127.0.0.1,.local}
     container_name: bnb-php
     restart: unless-stopped
     working_dir: /var/www
+    entrypoint: ["/usr/local/bin/entrypoint.sh"]
+    environment:
+      http_proxy: ${HTTP_PROXY:-http://127.0.0.1:7890}
+      https_proxy: ${HTTPS_PROXY:-http://127.0.0.1:7890}
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,.local}
     volumes:
       - ../../backend:/var/www
       - ../../docker/php/php.ini:/usr/local/etc/php/conf.d/custom.ini
+      - ../../docker/php/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -96,6 +106,10 @@ services:
     build:
       context: ../..
       dockerfile: docker/php/Dockerfile
+      args:
+        http_proxy: ${HTTP_PROXY:-http://127.0.0.1:7890}
+        https_proxy: ${HTTPS_PROXY:-http://127.0.0.1:7890}
+        no_proxy: ${NO_PROXY:-localhost,127.0.0.1,.local}
     container_name: bnb-queue
     restart: unless-stopped
     working_dir: /var/www
@@ -112,6 +126,10 @@ services:
     build:
       context: ../..
       dockerfile: docker/php/Dockerfile
+      args:
+        http_proxy: ${HTTP_PROXY:-http://127.0.0.1:7890}
+        https_proxy: ${HTTPS_PROXY:-http://127.0.0.1:7890}
+        no_proxy: ${NO_PROXY:-localhost,127.0.0.1,.local}
     container_name: bnb-scheduler
     restart: unless-stopped
     working_dir: /var/www
