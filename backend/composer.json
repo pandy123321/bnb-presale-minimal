@@ -4,6 +4,7 @@
   "description": "BNB Presale Admin Backend",
     "require": {
         "php": "^8.4",
+        "ext-gmp": "*",
         "laravel/framework": "^13.0",
         "laravel/tinker": "^2.10",
         "guzzlehttp/guzzle": "^7.9",
