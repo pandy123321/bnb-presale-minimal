@@ -6,6 +6,7 @@ const tabs = [
   { id: "home", label: "首页", icon: "⌂", route: "/" },
   { id: "trade", label: "交易", icon: "⇄", route: "/trade" },
   { id: "dividend", label: "分红", icon: "◇", route: "/dividend" },
+  { id: "staking", label: "锁仓", icon: "⬡", route: "/staking" },
   { id: "me", label: "我的", icon: "○", route: "/me" },
 ];
 
@@ -34,7 +35,7 @@ function isActive(tab: typeof tabs[0]) {
   width: min(100%, 430px);
   height: calc(70px + env(safe-area-inset-bottom));
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   padding: 8px 8px env(safe-area-inset-bottom);
   border-top: 1px solid rgba(255,255,255,.06);
   background: rgba(10,12,16,.95);
