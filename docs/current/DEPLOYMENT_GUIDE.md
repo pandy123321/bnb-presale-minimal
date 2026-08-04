@@ -1,6 +1,6 @@
 # PANGU2 V2 部署文档
 
-版本: V2 (PancakeSwap V2 AMM) | 支持链: BSC Testnet (97) + BSC Mainnet (56) | 更新: 2026-08-03
+版本: V2 (PancakeSwap V2 AMM) | 支持链: BSC Testnet (97) + BSC Mainnet (56) | 更新: 2026-08-04
 
 ## 前置条件
 
@@ -94,12 +94,19 @@ DividendDistributor: 0x...
 SupportPool: 0x...
 FeeVault: 0x...
 BuybackLocker: 0x...
+Pangu2Staking: 0x...
 V2Pair: 0x...
 V2Adapter: 0x...
 V2Oracle: 0x...
 ```
 
-**记下这些地址。**
+**记下所有地址。** 部署后存为环境变量:
+
+```powershell
+$env:PANGU2_TOKEN = "0xToken地址"
+$env:PANGU2_ROUTER = "0xTradeRouter地址"
+$env:PANGU2_STAKING = "0xStaking地址"
+```
 
 ---
 
@@ -139,21 +146,97 @@ Oracle 需要完整 `twapWindow`。**中途不要修改储备。**
 
 ## 10. 手工测试
 
+### 买卖
+
 ```powershell
 $rpc = "https://data-seed-prebsc-1-s1.binance.org:8545"
 $key = "你的私钥"
-$router = "0xTradeRouter地址"
-$token = "0xToken地址"
 
 # 买入 0.01 BNB
-cast send $router "buy(uint256,uint256)" 1 9999999999 --value 0.01ether --rpc-url $rpc --private-key $key
+cast send $env:PANGU2_ROUTER "buy(uint256,uint256)" 1 9999999999 --value 0.01ether --rpc-url $rpc --private-key $key
 
 # 查看余额
-cast call $token "balanceOf(address)(uint256)" 0x你的地址 --rpc-url $rpc
+cast call $env:PANGU2_TOKEN "balanceOf(address)(uint256)" 0x你的地址 --rpc-url $rpc
 
 # 授权 + 卖出
-cast send $token "approve(address,uint256)" $router 1000000000000000000000 --rpc-url $rpc --private-key $key
-cast send $router "sell(uint256,uint256,uint256)" 100000000000000000000 1 9999999999 --rpc-url $rpc --private-key $key
+cast send $env:PANGU2_TOKEN "approve(address,uint256)" $env:PANGU2_ROUTER 1000000000000000000000 --rpc-url $rpc --private-key $key
+cast send $env:PANGU2_ROUTER "sell(uint256,uint256,uint256)" 100000000000000000000 1 9999999999 --rpc-url $rpc --private-key $key
+```
+
+### 锁仓
+
+```powershell
+$staking = $env:PANGU2_STAKING
+$token = $env:PANGU2_TOKEN
+
+# 1. 授权 Staking 合约
+cast send $token "approve(address,uint256)" $staking 1000000000000000000000 --rpc-url $rpc --private-key $key
+
+# 2. 锁仓 1000 Token，锁 90 天
+cast send $staking "stake(uint256,uint64)" 1000000000000000000000 7776000 --rpc-url $rpc --private-key $key
+
+# 3. 查看仓位
+cast call $staking "positions(address,uint256)((uint256,uint64,uint64,bool))" 0x你的地址 0 --rpc-url $rpc
+
+# 4. 查看可领取收益
+cast call $staking "earned(address)(uint256)" 0x你的地址 --rpc-url $rpc
+```
+
+### 管理端 (Governance)
+
+```powershell
+# 充值奖励池
+cast send $staking "fundRewards(uint256)" 100000000000000000000000 --rpc-url $rpc --private-key $key
+
+# 设置奖励速率 (例如: 每天 1 Token ≈ 11574074074074)
+cast send $staking "setRewardRate(uint256)" 11574074074074 --rpc-url $rpc --private-key $key
+
+# 查看奖励储备
+cast call $staking "availableRewardReserve()(uint256)" --rpc-url $rpc
+
+# 查看质押总量
+cast call $staking "totalStaked()(uint256)" --rpc-url $rpc
+
+# 查看偿付能力
+cast call $staking "coverageRatio()(uint256,uint256,uint256)" --rpc-url $rpc
+```
+
+### 用户端
+
+```powershell
+# 到期解锁
+cast send $staking "unstake(uint256)" 0 --rpc-url $rpc --private-key $key
+
+# 提前解锁 (扣 10% 罚金 + 没收收益)
+cast send $staking "earlyUnstake(uint256)" 0 --rpc-url $rpc --private-key $key
+
+# 单独领取收益 (不解锁本金)
+cast send $staking "claimRewards()" --rpc-url $rpc --private-key $key
+```
+
+---
+
+## Staking 经济参数
+
+| 参数 | 值 | 说明 |
+|---|---|---|
+| 最小质押 | 1 Token | `MIN_STAKE = 1 ether` |
+| 最大锁期 | 730 天 | `MAX_LOCK_SECONDS` |
+| 提前解锁罚金 | 10% | `EARLY_UNSTAKE_PENALTY_BPS = 1000` |
+| 最大奖励速率 | ~1 Token/天 | `MAX_REWARD_RATE` |
+| 奖励周期 | 30 天 | 每次 `setRewardRate` 默认周期 |
+| 罚金去向 | 奖励储备池 | 提升后续锁仓者收益 |
+
+### 奖励管理流程
+
+```text
+Governance 钱包 → 转 Token 到 Staking 合约
+                 → 调用 fundRewards(amount)
+                 → availableRewardReserve 增加
+                 → 调用 setRewardRate(rate)
+                 → 30 天周期开始
+                 → 每 24h 自动从 available 扣减到 accrued
+                 → 用户随时调用 claimRewards() 取走
 ```
 
 ---
@@ -172,3 +255,5 @@ cast send $router "sell(uint256,uint256,uint256)" 100000000000000000000 1 999999
 | nonce too low | 等上一笔确认 (3秒) |
 | in-flight limit | 公共节点限流，等 30s 重试 |
 | createPair reverted | Pair 已存在，用 -SkipDeploy |
+| unstake StillLocked | 锁仓期未到，查看 `unlockAt` 时间戳 |
+| claimRewards 返回 0 | 奖励周期未启动或 `rewardRate=0` |
