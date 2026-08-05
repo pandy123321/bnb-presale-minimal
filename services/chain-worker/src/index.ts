@@ -1,7 +1,9 @@
 // PANGU2 Chain Worker — Entry Point
-// Starts the event scanner, reorg detector, and projector.
+// Starts Scanner, Confirmation Worker, Projection Worker, and Reorg Detector.
 
 import { start } from "./workers/event-scanner";
+import { startConfirmationWorker } from "./workers/confirmation-worker";
+import { startProjectionWorker } from "./workers/projection-worker";
 import { startReorgDetection } from "./workers/reorg-detector";
 
 async function main() {
@@ -9,8 +11,10 @@ async function main() {
   console.log("  PANGU2 Chain Worker");
   console.log("═════════════════════════════════");
 
-  await start();
-  await startReorgDetection();
+  await start();                    // Scanner
+  await startConfirmationWorker();  // Confirmation
+  await startProjectionWorker();    // Projection
+  await startReorgDetection();      // Reorg Detection
 }
 
 main().catch((err) => {

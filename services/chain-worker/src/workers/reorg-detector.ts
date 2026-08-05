@@ -1,7 +1,10 @@
 // PANGU2 Chain Worker — Reorg Detector
 
 import { createPublicClient, http, type PublicClient } from "viem";
-import { getPool, findReorgedBlocks, markBlockReorged, acquireLease, releaseLease } from "../db/client";
+import {
+  getPool, findReorgedBlocks, markBlockReorged, deleteProjections,
+  acquireLease, releaseLease, getCursor, upsertCursor,
+} from "../db/client";
 import { CHAIN_ID, RPC_URL, REORG_DEPTH, WORKER_ID, LEASE_TTL_SECONDS, rpcLogLabel } from "../config";
 
 let rpc: PublicClient | null = null;
@@ -11,7 +14,7 @@ function getRpc(): PublicClient {
 }
 
 export async function startReorgDetection(): Promise<void> {
-  console.log(`[Reorg] Starting — depth=${REORG_DEPTH}, RPC=${rpcLogLabel()}`);
+  console.log(`[Reorg] depth=${REORG_DEPTH}`);
   await checkReorgs();
   setInterval(() => checkReorgs().catch(e => console.error("[Reorg]", e)), 60_000);
 }
@@ -20,20 +23,14 @@ async function checkReorgs(): Promise<void> {
   const c = getRpc();
   const currentBlock = Number(await c.getBlockNumber());
   const fromBlock = Math.max(0, currentBlock - REORG_DEPTH);
-
-  // Streams to check — must match scanner stream names
   const streams = ["TRADE_EVENTS", "DIVIDEND_EVENTS"];
 
   for (const stream of streams) {
-    // Acquire the SAME lease the scanner uses — prevents concurrent cursor modification
-    const leased = await acquireLease(CHAIN_ID, stream, `reorg-${WORKER_ID}`, LEASE_TTL_SECONDS);
-    if (!leased) {
-      console.log(`[Reorg] Skipping ${stream} — lease held by scanner`);
-      continue;
-    }
+    const { leased } = await acquireLease(CHAIN_ID, stream, `reorg-${WORKER_ID}`, LEASE_TTL_SECONDS);
+    if (!leased) continue;
 
-    const p = getPool();
-    const db = await p.connect();
+    const pool = getPool();
+    const db = await pool.connect();
     try {
       const suspect = await findReorgedBlocks(db, CHAIN_ID, fromBlock, currentBlock);
       for (const s of suspect) {
@@ -41,28 +38,26 @@ async function checkReorgs(): Promise<void> {
           const block = await c.getBlock({ blockNumber: BigInt(s.blockNumber) });
           const actualHash = (block.hash as string).toLowerCase();
           if (actualHash !== s.storedHash) {
-            console.log(`[Reorg] Block #${s.blockNumber} reorged in ${stream}`);
-
+            console.log(`[Reorg] ${stream}: block #${s.blockNumber} reorged`);
             await db.query("BEGIN");
             await markBlockReorged(db, CHAIN_ID, s.blockNumber);
-            // Rewind cursor for this specific stream
-            await db.query(
-              `UPDATE chain_cursors
-               SET last_scanned_block = LEAST($1, last_scanned_block)
-               WHERE chain_id = $2 AND stream = $3`,
-              [s.blockNumber - 1, CHAIN_ID, stream],
-            );
+            await deleteProjections(db, CHAIN_ID, s.blockNumber);
+            const cursor = await getCursor(db, CHAIN_ID, stream);
+            const rewindTo = s.blockNumber - 1;
+            if (cursor && cursor.last_scanned_block > rewindTo) {
+              await upsertCursor(db, CHAIN_ID, stream, rewindTo, null, "REORG_RECOVERY");
+            }
             await db.query("COMMIT");
-            console.log(`[Reorg] Cursor for ${stream} rewound to ${s.blockNumber - 1}`);
+            console.log(`[Reorg] ${stream}: cursor rewound to ${rewindTo}`);
           }
         } catch (e) {
-          console.error(`[Reorg] Block #${s.blockNumber} in ${stream} failed`, e);
-          try { await db.query("ROLLBACK"); } catch {}
+          console.error(`[Reorg] ${stream} block #${s.blockNumber}`, e);
+          await db.query("ROLLBACK").catch(() => {});
         }
       }
     } finally {
       db.release();
-      await releaseLease(CHAIN_ID, stream);
+      await releaseLease(CHAIN_ID, stream, `reorg-${WORKER_ID}`);
     }
   }
 }

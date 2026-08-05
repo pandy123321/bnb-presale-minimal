@@ -1,5 +1,5 @@
 // PANGU2 Chain Worker — Database Layer
-// PostgreSQL client for raw events, cursors, and outbox writes.
+// PostgreSQL client for raw events, cursors, projections, and outbox writes.
 
 import { Pool, type PoolClient } from "pg";
 
@@ -25,6 +25,9 @@ export interface CursorRow {
   last_scanned_block: number;
   last_scanned_block_hash: string | null;
   status: string;
+  lease_holder: string | null;
+  lease_expires_at: Date | null;
+  lease_generation: number;
 }
 
 let pool: Pool | null = null;
@@ -44,36 +47,49 @@ export function getPool(): Pool {
 }
 
 export async function closePool(): Promise<void> {
-  if (pool) {
-    await pool.end();
-    pool = null;
-  }
+  if (pool) { await pool.end(); pool = null; }
 }
 
-// ── Cursor Operations ──────────────────────
+// ── Cursor Operations ────────────────────────
 
+/** Returns full CursorRow or null. Caller reads .last_scanned_block */
 export async function getCursor(
+  client: PoolClient | Pool,
   chainId: number,
   stream: string,
-): Promise<number> {
-  const { rows } = await getPool().query(
-    `SELECT last_scanned_block FROM chain_cursors WHERE chain_id = $1 AND stream = $2`,
+): Promise<CursorRow | null> {
+  const { rows } = await client.query(
+    `SELECT chain_id, stream, last_scanned_block, last_scanned_block_hash,
+            status, lease_holder, lease_expires_at,
+            COALESCE(lease_generation, 0) AS lease_generation
+     FROM chain_cursors WHERE chain_id = $1 AND stream = $2`,
     [chainId, stream],
   );
   if (rows.length > 0) {
-    return parseInt(rows[0].last_scanned_block);
+    return {
+      chain_id: parseInt(rows[0].chain_id),
+      stream: rows[0].stream,
+      last_scanned_block: parseInt(rows[0].last_scanned_block),
+      last_scanned_block_hash: rows[0].last_scanned_block_hash ?? null,
+      status: rows[0].status,
+      lease_holder: rows[0].lease_holder ?? null,
+      lease_expires_at: rows[0].lease_expires_at ?? null,
+      lease_generation: parseInt(rows[0].lease_generation ?? "0"),
+    };
   }
-  return parseInt(process.env.START_BLOCK ?? "0");
+  return null;
 }
 
+/** upsertCursor accepts PoolClient for transaction safety */
 export async function upsertCursor(
+  client: PoolClient,
   chainId: number,
   stream: string,
   blockNumber: number,
   blockHash: string | null,
   status: string = "HEALTHY",
 ): Promise<void> {
-  await getPool().query(
+  await client.query(
     `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, last_scanned_block_hash, status, last_run_completed_at, updated_at)
      VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
      ON CONFLICT (chain_id, stream)
@@ -82,44 +98,54 @@ export async function upsertCursor(
   );
 }
 
-// ── Lease (Distributed Lock) ───────────────
+// ── Lease (Distributed Lock with fencing token) ──
 
 export async function acquireLease(
   chainId: number,
   stream: string,
   workerId: string,
   ttlSeconds: number,
-): Promise<boolean> {
-  // Upsert: insert the stream row if it doesn't exist, then attempt lease acquisition.
-  // This fixes the cold-start deadlock where a fresh database has no cursor rows.
+): Promise<{ leased: boolean; leaseGeneration: number }> {
+  // Upsert the cursor row if missing (cold-start)
   await getPool().query(
-    `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status)
-     VALUES ($1, $2, 0, 'PENDING')
+    `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, lease_generation)
+     VALUES ($1, $2, 0, 'PENDING', 0)
      ON CONFLICT (chain_id, stream) DO NOTHING`,
     [chainId, stream],
   );
 
-  const { rowCount } = await getPool().query(
+  // Atomically: increment lease_generation + set holder if expired or free
+  const { rowCount, rows } = await getPool().query(
     `UPDATE chain_cursors
-     SET lease_holder = $3, lease_expires_at = NOW() + ($4 || ' seconds')::INTERVAL
+     SET lease_holder = $3, lease_expires_at = NOW() + ($4 || ' seconds')::INTERVAL,
+         lease_generation = lease_generation + 1
      WHERE chain_id = $1 AND stream = $2
-       AND (lease_holder IS NULL OR lease_expires_at < NOW())`,
+       AND (lease_holder IS NULL OR lease_expires_at < NOW())
+     RETURNING lease_generation`,
     [chainId, stream, workerId, ttlSeconds],
   );
-  return (rowCount ?? 0) > 0;
+
+  if ((rowCount ?? 0) > 0) {
+    return { leased: true, leaseGeneration: parseInt(rows[0].lease_generation) };
+  }
+  return { leased: false, leaseGeneration: 0 };
 }
 
+/** releaseLease with workerId guard — only the holder can release */
 export async function releaseLease(
   chainId: number,
   stream: string,
+  workerId: string,
 ): Promise<void> {
   await getPool().query(
-    `UPDATE chain_cursors SET lease_holder = NULL, lease_expires_at = NULL WHERE chain_id = $1 AND stream = $2`,
-    [chainId, stream],
+    `UPDATE chain_cursors
+     SET lease_holder = NULL, lease_expires_at = NULL
+     WHERE chain_id = $1 AND stream = $2 AND lease_holder = $3`,
+    [chainId, stream, workerId],
   );
 }
 
-// ── Raw Event Insertion ────────────────────
+// ── Raw Event Insertion ──────────────────────
 
 export async function insertRawEvents(
   client: PoolClient,
@@ -160,12 +186,34 @@ export async function insertRawEvents(
   return result.rowCount ?? 0;
 }
 
-// ── Reorg Detection ────────────────────────
+// ── Delete raw events + projection for reorg ──
 
-/**
- * Check if a previously confirmed block has been replaced.
- * Compares the stored block_hash against the RPC's block hash at that height.
- */
+export async function deleteRawEvents(
+  client: PoolClient,
+  chainId: number,
+  blockNumber: number,
+): Promise<number> {
+  const { rowCount } = await client.query(
+    `DELETE FROM chain_raw_events WHERE chain_id = $1 AND block_number = $2 AND status = 'PENDING_CONFIRMATION'`,
+    [chainId, blockNumber],
+  );
+  return rowCount ?? 0;
+}
+
+export async function deleteProjections(
+  client: PoolClient,
+  chainId: number,
+  blockNumber: number,
+): Promise<number> {
+  const { rowCount } = await client.query(
+    `DELETE FROM transaction_projections WHERE chain_id = $1 AND block_number = $2`,
+    [chainId, blockNumber],
+  );
+  return rowCount ?? 0;
+}
+
+// ── Reorg Detection ──────────────────────────
+
 export async function findReorgedBlocks(
   client: PoolClient,
   chainId: number,
@@ -179,27 +227,14 @@ export async function findReorgedBlocks(
     [chainId, fromBlock, toBlock],
   );
 
-  const reorged: Array<{ blockNumber: number; storedHash: string; actualHash: string }> = [];
-
-  for (const row of rows) {
-    const bn = parseInt(row.block_number);
-    const storedHash = row.block_hash as string;
-
-    // The actual hash would be checked against the RPC — here we store the structure
-    // The worker will call eth_getBlockByNumber to compare
-    reorged.push({
-      blockNumber: bn,
-      storedHash,
-      actualHash: "", // filled by the caller via RPC
-    });
-  }
-
-  return reorged;
+  return rows.map(row => ({
+    blockNumber: parseInt(row.block_number),
+    storedHash: row.block_hash as string,
+    actualHash: "", // filled by caller via RPC
+  }));
 }
 
-/**
- * Mark all events in a block as REORGED.
- */
+/** Mark all events in a block as REORGED */
 export async function markBlockReorged(
   client: PoolClient,
   chainId: number,
@@ -213,9 +248,9 @@ export async function markBlockReorged(
   return rowCount ?? 0;
 }
 
-/**
- * Mark events as CONFIRMED once block depth is sufficient.
- */
+// ── Confirmation ─────────────────────────────
+
+/** Confirm events once block depth >= CONFIRMATION_BLOCKS */
 export async function confirmEvents(
   client: PoolClient,
   chainId: number,
@@ -227,4 +262,18 @@ export async function confirmEvents(
     [chainId, blockNumber],
   );
   return rowCount ?? 0;
+}
+
+/** Get the oldest unconfirmed block number */
+export async function getOldestUnconfirmedBlock(
+  client: PoolClient,
+  chainId: number,
+): Promise<number | null> {
+  const { rows } = await client.query(
+    `SELECT block_number FROM chain_raw_events
+     WHERE chain_id = $1 AND status = 'PENDING_CONFIRMATION'
+     ORDER BY block_number ASC LIMIT 1`,
+    [chainId],
+  );
+  return rows.length > 0 ? parseInt(rows[0].block_number) : null;
 }
