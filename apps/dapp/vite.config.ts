@@ -6,6 +6,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": "/src",
+      "@ui": "/packages/ui",
     },
   },
   server: {

@@ -1,0 +1,38 @@
+/* ══════════════════════════════════════════════
+   BGP V7.1 — Design Tokens
+   Extracted from prototype, zero modifications
+   ══════════════════════════════════════════════ */
+
+:root {
+  /* ── Colors ── */
+  --bg: #070A13;
+  --surface: #0D1422;
+  --surface-2: #111A2B;
+  --surface-3: #151F32;
+  --line: rgba(182, 198, 227, .11);
+  --line-strong: rgba(76, 201, 240, .28);
+  --text: #F7F9FC;
+  --text-2: #A9B4C8;
+  --text-3: #718099;
+  --cyan: #4CC9F0;
+  --blue: #2E6BE6;
+  --gold: #E4B96B;
+  --green: #39C99B;
+  --red: #FF7181;
+  --amber: #E6A85A;
+
+  /* ── Radii ── */
+  --radius: 20px;
+  --radius-sm: 14px;
+
+  /* ── Layout ── */
+  --nav-h: 72px;
+  --page-pad: 16px;
+  --section-gap: 26px;
+  --module-pad: 16px;
+  --module-radius: 20px;
+  --control-radius: 14px;
+
+  /* ── Shadows ── */
+  --shadow: 0 18px 44px rgba(0, 0, 0, .22);
+}
