@@ -9,6 +9,7 @@ import type { Abi } from "viem";
 import {
   getPool, getCursor, upsertCursor,
   acquireLease, releaseLease, insertRawEvents,
+  checkLeaseValid,
   type RawEventRow,
 } from "../db/client";
 import { toJsonSafe } from "../utils/json-safe";
@@ -61,20 +62,28 @@ async function validateEnvironment(): Promise<void> {
 
 async function scanAllStreams(): Promise<void> {
   for (const stream of STREAMS) {
-    const { leased } = await acquireLease(CHAIN_ID, stream.name, WORKER_ID, LEASE_TTL_SECONDS);
+    const { leased, leaseGeneration } = await acquireLease(CHAIN_ID, stream.name, WORKER_ID, LEASE_TTL_SECONDS);
     if (!leased) continue;
-    try { await scanStream(stream); }
+    try { await scanStream(stream, leaseGeneration); }
     finally { await releaseLease(CHAIN_ID, stream.name, WORKER_ID); }
   }
 }
 
-async function scanStream(stream: ScanStream): Promise<void> {
+async function scanStream(stream: ScanStream, leaseGeneration: number): Promise<void> {
   const c = getRpc();
   const pool = getPool();
   const db = await pool.connect();
 
   try {
     await db.query("BEGIN");
+
+    // Validate lease is still current before any writes
+    const valid = await checkLeaseValid(db, CHAIN_ID, stream.name, leaseGeneration, WORKER_ID);
+    if (!valid) {
+      console.warn(`[Scanner] ${stream.name}: lease expired/invalid (gen=${leaseGeneration}), aborting`);
+      await db.query("ROLLBACK");
+      return;
+    }
 
     const cursor = await getCursor(db, CHAIN_ID, stream.name);
     const fromBlock = cursor ? cursor.last_scanned_block + 1 : Math.max(1, parseInt(process.env.START_BLOCK ?? "0") + 1);
@@ -92,11 +101,11 @@ async function scanStream(stream: ScanStream): Promise<void> {
       let eventName: string | null = log.topics[0] ?? null;
       let decoded: Record<string, unknown> = {};
       try {
-        const d = decodeEventLog({ abi: stream.abi, data: log.data as `0x${string}`, topics: log.topics as `0x${string}`[] });
+        const d = decodeEventLog({ abi: stream.abi, data: log.data as `0x${string}`, topics: log.topics as [`0x${string}`, ...`0x${string}`[]] });
         eventName = d.eventName ?? eventName;
         decoded = toJsonSafe(d.args) as Record<string, unknown>;
         if (!decoded || Object.keys(decoded).length === 0) decoded = { topics: log.topics, data: log.data };
-      } catch { decoded = { topics: log.topics as unknown[] as Record<string, unknown>, data: log.data }; eventName = null; }
+      } catch { decoded = { topics: log.topics, data: log.data } as unknown as Record<string, unknown>; eventName = null; }
       rawEvents.push({
         chain_id: CHAIN_ID, contract_address: (log.address as string).toLowerCase(), event_name: eventName,
         transaction_hash: (log.transactionHash as string).toLowerCase(), log_index: log.logIndex ?? 0,
@@ -112,10 +121,15 @@ async function scanStream(stream: ScanStream): Promise<void> {
     const lastBlockHash = (toBlockObj.hash as string).toLowerCase();
 
     if (rawEvents.length > 0) await insertRawEvents(db, rawEvents);
-    await upsertCursor(db, CHAIN_ID, stream.name, toBlock, lastBlockHash, "SYNCED");
+    const written = await upsertCursor(db, CHAIN_ID, stream.name, toBlock, lastBlockHash, "SYNCED", leaseGeneration);
+    if (!written) {
+      console.warn(`[Scanner] ${stream.name}: cursor update rejected — lease stale (gen=${leaseGeneration})`);
+      await db.query("ROLLBACK");
+      return;
+    }
     await db.query("COMMIT");
 
-    console.log(`[Scanner] ${stream.name}: ${rawEvents.length} events [${fromBlock}-${toBlock}] hash=${lastBlockHash.slice(0,10)}`);
+    console.log(`[Scanner] ${stream.name}: ${rawEvents.length} events [${fromBlock}-${toBlock}] hash=${lastBlockHash.slice(0,10)} gen=${leaseGeneration}`);
   } catch (e) {
     await db.query("ROLLBACK").catch(() => {});
     throw e;

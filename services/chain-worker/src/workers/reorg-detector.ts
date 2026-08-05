@@ -1,4 +1,7 @@
 // PANGU2 Chain Worker — Reorg Detector
+// Checks block hashes in the reorg window against RPC.
+// On mismatch: marks raw events REORGED, deletes projections, rewinds cursor.
+// All operations happen atomically in a single DB transaction.
 
 import { createPublicClient, http, type PublicClient } from "viem";
 import {
@@ -26,7 +29,8 @@ async function checkReorgs(): Promise<void> {
   const streams = ["TRADE_EVENTS", "DIVIDEND_EVENTS"];
 
   for (const stream of streams) {
-    const { leased } = await acquireLease(CHAIN_ID, stream, `reorg-${WORKER_ID}`, LEASE_TTL_SECONDS);
+    const holderId = `reorg-${WORKER_ID}`;
+    const { leased, leaseGeneration } = await acquireLease(CHAIN_ID, stream, holderId, LEASE_TTL_SECONDS);
     if (!leased) continue;
 
     const pool = getPool();
@@ -38,26 +42,47 @@ async function checkReorgs(): Promise<void> {
           const block = await c.getBlock({ blockNumber: BigInt(s.blockNumber) });
           const actualHash = (block.hash as string).toLowerCase();
           if (actualHash !== s.storedHash) {
-            console.log(`[Reorg] ${stream}: block #${s.blockNumber} reorged`);
+            console.log(`[Reorg] ${stream}: block #${s.blockNumber} reorged (stored=${s.storedHash.slice(0,10)}, actual=${actualHash.slice(0,10)})`);
+
+            // All operations in a single atomic transaction
             await db.query("BEGIN");
-            await markBlockReorged(db, CHAIN_ID, s.blockNumber);
-            await deleteProjections(db, CHAIN_ID, s.blockNumber);
+
+            // 1. Mark raw events as REORGED
+            const reorged = await markBlockReorged(db, CHAIN_ID, s.blockNumber);
+
+            // 2. Delete projections for the reorged block
+            const deletedProj = await deleteProjections(db, CHAIN_ID, s.blockNumber);
+
+            // 3. Rewind cursor to safe point
             const cursor = await getCursor(db, CHAIN_ID, stream);
             const rewindTo = s.blockNumber - 1;
             if (cursor && cursor.last_scanned_block > rewindTo) {
-              await upsertCursor(db, CHAIN_ID, stream, rewindTo, null, "REORG_RECOVERY");
+              // Use lease_generation for fencing — only the current lease holder can rewind
+              const written = await upsertCursor(
+                db, CHAIN_ID, stream, rewindTo, null,
+                "REORG_RECOVERY", leaseGeneration,
+              );
+              if (!written) {
+                console.warn(`[Reorg] ${stream}: cursor rewind rejected — lease stale`);
+                await db.query("ROLLBACK");
+                continue;
+              }
             }
+
             await db.query("COMMIT");
-            console.log(`[Reorg] ${stream}: cursor rewound to ${rewindTo}`);
+            console.log(
+              `[Reorg] ${stream}: block #${s.blockNumber} handled — ` +
+              `${reorged} events marked REORGED, ${deletedProj} projections deleted, cursor rewound to ${rewindTo}`,
+            );
           }
         } catch (e) {
-          console.error(`[Reorg] ${stream} block #${s.blockNumber}`, e);
           await db.query("ROLLBACK").catch(() => {});
+          console.error(`[Reorg] ${stream} block #${s.blockNumber}`, e);
         }
       }
     } finally {
       db.release();
-      await releaseLease(CHAIN_ID, stream, `reorg-${WORKER_ID}`);
+      await releaseLease(CHAIN_ID, stream, holderId);
     }
   }
 }

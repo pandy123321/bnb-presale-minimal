@@ -80,7 +80,7 @@ export async function getCursor(
   return null;
 }
 
-/** upsertCursor accepts PoolClient for transaction safety */
+/** upsertCursor with lease fencing: only the current lease generation may write */
 export async function upsertCursor(
   client: PoolClient,
   chainId: number,
@@ -88,14 +88,17 @@ export async function upsertCursor(
   blockNumber: number,
   blockHash: string | null,
   status: string = "HEALTHY",
-): Promise<void> {
-  await client.query(
+  leaseGeneration: number,
+): Promise<boolean> {
+  const { rowCount } = await client.query(
     `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, last_scanned_block_hash, status, last_run_completed_at, updated_at)
      VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
      ON CONFLICT (chain_id, stream)
-     DO UPDATE SET last_scanned_block = $3, last_scanned_block_hash = $4, status = $5, last_run_completed_at = NOW(), updated_at = NOW()`,
-    [chainId, stream, blockNumber, blockHash, status],
+     DO UPDATE SET last_scanned_block = $3, last_scanned_block_hash = $4, status = $5, last_run_completed_at = NOW(), updated_at = NOW()
+     WHERE chain_cursors.lease_generation = $6`,
+    [chainId, stream, blockNumber, blockHash, status, leaseGeneration],
   );
+  return (rowCount ?? 0) > 0;
 }
 
 // ── Lease (Distributed Lock with fencing token) ──
@@ -276,4 +279,25 @@ export async function getOldestUnconfirmedBlock(
     [chainId],
   );
   return rows.length > 0 ? parseInt(rows[0].block_number) : null;
+}
+
+/** Check if a lease is currently valid */
+export async function checkLeaseValid(
+  client: PoolClient,
+  chainId: number,
+  stream: string,
+  leaseGeneration: number,
+  workerId: string,
+): Promise<boolean> {
+  const { rows } = await client.query(
+    `SELECT lease_generation, lease_holder, lease_expires_at
+     FROM chain_cursors WHERE chain_id = $1 AND stream = $2`,
+    [chainId, stream],
+  );
+  if (rows.length === 0) return false;
+  const gen = parseInt(rows[0].lease_generation ?? "0");
+  const holder = rows[0].lease_holder as string | null;
+  const expires = rows[0].lease_expires_at as Date | null;
+  return gen === leaseGeneration && holder === workerId
+    && expires !== null && expires > new Date();
 }

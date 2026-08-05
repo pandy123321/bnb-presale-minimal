@@ -9,6 +9,7 @@
     "start": "tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
     "verify-abi": "tsx scripts/verify-abi-artifacts.ts"
   },
   "dependencies": {
