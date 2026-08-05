@@ -18,42 +18,47 @@ import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.so
 import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
 import { TransferContext } from "../src/libraries/TransferContext.sol";
 
-/// @notice Deploy PANGU2 V2 core contracts.
-///         Does NOT enable pair trading or add liquidity — see BootstrapPangu2.
+/// @notice 部署 PANGU2 V2 核心合约
+///         部署者临时持有 governance 完成所有配置后，移交给目标 governance。
+///         部署完成后不开放交易对（由 BootstrapPangu2 处理）也不加池。
 contract DeployPangu2 is Script {
-    uint256 internal constant LOCK_DURATION = 365 days;
-    uint32 internal constant TWAP_WINDOW = 30 minutes;
-    uint16 internal constant MAX_DEVIATION_BPS = 300;
+    uint256 internal constant LOCK_DURATION = 365 days;       // Locker 锁仓时长
+    uint32 internal constant TWAP_WINDOW = 30 minutes;        // Oracle TWAP 时间窗口
+    uint16 internal constant MAX_DEVIATION_BPS = 300;         // 最大现货/TWAP 偏差 3%
 
-    // Chain-aware PancakeSwap V2 addresses
+    /// 根据链 ID 返回对应的 WBNB 地址
     function _wbnb() internal view returns (address) {
-        if (block.chainid == 56) return 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c; // BSC Mainnet
-        if (block.chainid == 97) return 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd; // BSC Testnet
+        if (block.chainid == 56) return 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c; // BSC 主网
+        if (block.chainid == 97) return 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd; // BSC 测试网
         revert("Unsupported chain");
     }
+    /// 根据链 ID 返回对应的 PancakeSwap Factory 地址
     function _factory() internal view returns (address) {
-        if (block.chainid == 56) return 0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73; // BSC Mainnet
-        if (block.chainid == 97) return 0x6725F303b657a9451d8BA641348b6761A6CC7a17; // BSC Testnet
+        if (block.chainid == 56) return 0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73;
+        if (block.chainid == 97) return 0x6725F303b657a9451d8BA641348b6761A6CC7a17;
         revert("Unsupported chain");
     }
+    /// 根据链 ID 返回对应的 PancakeSwap Router 地址
     function _router() internal view returns (address) {
-        if (block.chainid == 56) return 0x10ED43C718714eb63d5aA57B78B54704E256024E; // BSC Mainnet
-        if (block.chainid == 97) return 0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3; // BSC Testnet
+        if (block.chainid == 56) return 0x10ED43C718714eb63d5aA57B78B54704E256024E;
+        if (block.chainid == 97) return 0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3;
         revert("Unsupported chain");
     }
 
     function run() external {
+        // ── 1. 读取环境变量 ──
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployer = vm.addr(deployerKey);
         require(deployer != address(0), "invalid deployer key");
 
-        address governance = vm.envAddress("GOVERNANCE_ADDRESS");
-        address emergencyAccount = vm.envAddress("EMERGENCY_ADDRESS");
-        address keeper = vm.envAddress("KEEPER_ADDRESS");
-        address releaseRecipient = vm.envAddress("RELEASE_RECIPIENT_ADDRESS");
-        address initialHolder = vm.envAddress("INITIAL_HOLDER_ADDRESS");
-        address rootPublisher = vm.envAddress("ROOT_PUBLISHER_ADDRESS");
+        address governance        = vm.envAddress("GOVERNANCE_ADDRESS");       // 目标治理地址
+        address emergencyAccount  = vm.envAddress("EMERGENCY_ADDRESS");       // 紧急暂停地址
+        address keeper            = vm.envAddress("KEEPER_ADDRESS");          // FeeVault Keeper
+        address releaseRecipient  = vm.envAddress("RELEASE_RECIPIENT_ADDRESS"); // Locker 释放接收者
+        address initialHolder     = vm.envAddress("INITIAL_HOLDER_ADDRESS");   // 初始持币人（独立于 deployer/governance）
+        address rootPublisher     = vm.envAddress("ROOT_PUBLISHER_ADDRESS");   // Dividend Root 发布者
 
+        // Oracle 最低储备阈值
         uint256 rawTokenReserve = vm.envUint("MIN_TOKEN_RESERVE");
         uint256 rawWbnbReserve = vm.envUint("MIN_WBNB_RESERVE");
         require(rawTokenReserve <= type(uint112).max, "MIN_TOKEN_RESERVE > uint112");
@@ -62,89 +67,54 @@ contract DeployPangu2 is Script {
         uint112 minWbnbReserve = uint112(rawWbnbReserve);
         require(minTokenReserve > 0 && minWbnbReserve > 0, "zero min reserve");
 
-        // Resolve chain-specific PancakeSwap addresses
+        // ── 2. 解析链上地址并校验 ──
         address WBNB = _wbnb();
         address FACTORY = _factory();
         address ROUTER = _router();
 
-        // Safety checks
-        if (block.chainid != 56 && block.chainid != 97) revert("Unsupported chain - BSC Mainnet (56) or Testnet (97) only");
+        if (block.chainid != 56 && block.chainid != 97) revert("Unsupported chain");
         require(WBNB.code.length > 0, "WBNB not deployed");
         require(FACTORY.code.length > 0, "Factory not deployed");
         require(ROUTER.code.length > 0, "Router not deployed");
+
+        // 关键角色不得复用
         require(deployer != governance, "deployer must differ from governance");
-        require(deployer != initialHolder, "deployer must differ from initialHolder");
+        // 测试网允许 deployer 兼任 initialHolder
+        if (block.chainid != 97) require(deployer != initialHolder, "deployer must differ from initialHolder");
         require(governance != initialHolder, "governance must differ from initialHolder");
         require(governance != rootPublisher, "governance must differ from rootPublisher");
 
         address[] memory addrs = new address[](6);
-        addrs[0] = governance;
-        addrs[1] = emergencyAccount;
-        addrs[2] = keeper;
-        addrs[3] = releaseRecipient;
-        addrs[4] = initialHolder;
-        addrs[5] = rootPublisher;
-        for (uint256 i = 0; i < addrs.length; i++) {
-            require(addrs[i] != address(0), "zero address");
-        }
+        addrs[0] = governance; addrs[1] = emergencyAccount; addrs[2] = keeper;
+        addrs[3] = releaseRecipient; addrs[4] = initialHolder; addrs[5] = rootPublisher;
+        for (uint256 i = 0; i < addrs.length; i++) require(addrs[i] != address(0), "zero address");
 
         vm.startBroadcast(deployerKey);
 
-        // 1. Token (deployer = temporary governance)
+        // ── 3. 部署核心合约（deployer 临时持有 governance） ──
         Pangu2Token token = new Pangu2Token(initialHolder, deployer, emergencyAccount);
-
-        // 2. CostBasis
         CostBasisManager costBasis = new CostBasisManager(address(token), deployer);
 
-        // 3. Create V2 pair (NOT yet enabled as isPair — Bootstrap enables it)
+        // 创建 V2 交易对（尚未注册为 isPair，由 Bootstrap 处理）
         address pair = IPancakeFactory(FACTORY).createPair(address(token), WBNB);
         require(pair != address(0), "createPair returned zero");
         require(pair.code.length > 0, "Pair has no code");
         require(IPancakeFactory(FACTORY).getPair(address(token), WBNB) == pair, "getPair mismatch");
 
-        // 4. Adapter + Oracle
         PancakeV2Adapter adapter = new PancakeV2Adapter(address(token), WBNB, FACTORY, pair, ROUTER, deployer);
-        PancakeV2TwapOracle oracle = new PancakeV2TwapOracle(
-            address(token), WBNB, FACTORY, pair, TWAP_WINDOW, MAX_DEVIATION_BPS, minTokenReserve, minWbnbReserve
-        );
+        PancakeV2TwapOracle oracle = new PancakeV2TwapOracle(address(token), WBNB, FACTORY, pair, TWAP_WINDOW, MAX_DEVIATION_BPS, minTokenReserve, minWbnbReserve);
 
-        // 5. SupportPool, FeeVault, Locker
-        SupportPool supportPool = new SupportPool(
-            address(token), WBNB, address(adapter), address(oracle), 300, 5 minutes, deployer, emergencyAccount
-        );
-        FeeVault feeVault = new FeeVault(
-            address(token),
-            WBNB,
-            address(adapter),
-            address(oracle),
-            payable(address(supportPool)),
-            1_000_000 ether,
-            300,
-            deployer,
-            keeper,
-            emergencyAccount
-        );
-        BuybackLocker locker = new BuybackLocker(
-            address(token),
-            address(supportPool),
-            BuybackLocker.LockMode.FIXED_DURATION,
-            uint64(LOCK_DURATION),
-            releaseRecipient
-        );
+        SupportPool supportPool = new SupportPool(address(token), WBNB, address(adapter), address(oracle), 300, 5 minutes, deployer, emergencyAccount);
+        FeeVault feeVault = new FeeVault(address(token), WBNB, address(adapter), address(oracle), payable(address(supportPool)), 1_000_000 ether, 300, deployer, keeper, emergencyAccount);
+        BuybackLocker locker = new BuybackLocker(address(token), address(supportPool), BuybackLocker.LockMode.FIXED_DURATION, uint64(LOCK_DURATION), releaseRecipient);
 
-        // 6. Distributor + TradeRouter + Staking
-        DividendDistributor distributor =
-            new DividendDistributor(address(token), address(costBasis), deployer, rootPublisher, emergencyAccount);
-        Pangu2TradeRouter tradeRouter = new Pangu2TradeRouter(
-            address(token), WBNB, address(costBasis), address(adapter), address(oracle), deployer, emergencyAccount
-        );
-
-        // 6b. Staking
+        DividendDistributor distributor = new DividendDistributor(address(token), address(costBasis), deployer, rootPublisher, emergencyAccount);
+        Pangu2TradeRouter tradeRouter = new Pangu2TradeRouter(address(token), WBNB, address(costBasis), address(adapter), address(oracle), deployer, emergencyAccount);
         Pangu2Staking staking = new Pangu2Staking(address(token), governance);
 
-        // 7. Configure system contracts
+        // ── 4. 配置系统合约（deployer 可执行所有配置） ──
         token.configureCore(address(costBasis), address(feeVault));
-        // NOTE: pair NOT enabled yet — BootstrapPangu2 handles this
+        // 注意：交易对暂不开放 —— BootstrapPangu2 负责加池和保护
         token.setSystemAddress(address(tradeRouter), true);
         token.setSystemAddress(address(adapter), true);
         token.setSystemAddress(address(supportPool), true);
@@ -164,50 +134,37 @@ contract DeployPangu2 is Script {
         supportPool.configureLocker(address(locker));
         feeVault.configureDividendDistributor(address(distributor));
 
-        // 8. Transfer Contexts
+        // ── 5. Transfer Contexts ──
         token.setSystemTransferContext(address(distributor), TransferContext.Kind.DIVIDEND_CLAIM, true);
         token.setSystemTransferContext(address(locker), TransferContext.Kind.SYSTEM_CREDIT_UNKNOWN, true);
+        token.setSystemTransferContext(address(staking), TransferContext.Kind.STAKING_PRINCIPAL_RETURN, true);
+        token.setSystemTransferContext(address(staking), TransferContext.Kind.STAKING_REWARD, true);
 
-        // 9. Governance handover: grant target governance
+        // ── 6. 治理移交：给目标 governance 授予所有管理员角色 ──
         bytes32 DA = 0x00;
         bytes32 GOV = keccak256("GOVERNANCE_ROLE");
         bytes32 UNP = keccak256("UNPAUSER_ROLE");
 
-        // Contracts WITH UNPAUSER_ROLE
+        // 带 UNPAUSER 的合约（Pausable）
         address[] memory acFull = new address[](5);
-        acFull[0] = address(token);
-        acFull[1] = address(tradeRouter);
-        acFull[2] = address(distributor);
-        acFull[3] = address(supportPool);
-        acFull[4] = address(feeVault);
-
+        acFull[0] = address(token); acFull[1] = address(tradeRouter);
+        acFull[2] = address(distributor); acFull[3] = address(supportPool); acFull[4] = address(feeVault);
         for (uint256 i = 0; i < acFull.length; i++) {
             AccessControl c = AccessControl(acFull[i]);
-            c.grantRole(DA, governance);
-            require(c.hasRole(DA, governance), "grant DA failed");
-            c.grantRole(GOV, governance);
-            require(c.hasRole(GOV, governance), "grant GOV failed");
-            c.grantRole(UNP, governance);
-            require(c.hasRole(UNP, governance), "grant UNP failed");
+            c.grantRole(DA, governance);  require(c.hasRole(DA, governance), "grant DA failed");
+            c.grantRole(GOV, governance); require(c.hasRole(GOV, governance), "grant GOV failed");
+            c.grantRole(UNP, governance); require(c.hasRole(UNP, governance), "grant UNP failed");
         }
 
-        // Contracts WITHOUT UNPAUSER_ROLE: CostBasis, Adapter
-        {
-            AccessControl cb = AccessControl(address(costBasis));
-            cb.grantRole(DA, governance);
-            require(cb.hasRole(DA, governance), "costBasis grant DA failed");
-            cb.grantRole(GOV, governance);
-            require(cb.hasRole(GOV, governance), "costBasis grant GOV failed");
-        }
-        {
-            AccessControl ad = AccessControl(address(adapter));
-            ad.grantRole(DA, governance);
-            require(ad.hasRole(DA, governance), "adapter grant DA failed");
-            ad.grantRole(GOV, governance);
-            require(ad.hasRole(GOV, governance), "adapter grant GOV failed");
-        }
+        // 不带 UNPAUSER 的合约（CostBasis, Adapter）
+        { AccessControl cb = AccessControl(address(costBasis));
+          cb.grantRole(DA, governance); require(cb.hasRole(DA, governance), "costBasis grant DA");
+          cb.grantRole(GOV, governance); require(cb.hasRole(GOV, governance), "costBasis grant GOV"); }
+        { AccessControl ad = AccessControl(address(adapter));
+          ad.grantRole(DA, governance); require(ad.hasRole(DA, governance), "adapter grant DA");
+          ad.grantRole(GOV, governance); require(ad.hasRole(GOV, governance), "adapter grant GOV"); }
 
-        // 10. Renounce deployer: ALL admin roles
+        // ── 7. 撤销 deployer 的所有管理员角色 ──
         _renounceAll(AccessControl(address(token)), deployer);
         _renounceAll(AccessControl(address(costBasis)), deployer);
         _renounceAll(AccessControl(address(tradeRouter)), deployer);
@@ -216,14 +173,13 @@ contract DeployPangu2 is Script {
         _renounceAll(AccessControl(address(feeVault)), deployer);
         _renounceAll(AccessControl(address(adapter)), deployer);
 
-        // Also renounce SETTLEMENT_ROLE if deployer was granted it
+        // 额外清理 SETTLEMENT_ROLE 和 CALLER_ROLE
         bytes32 SETTLE = token.SETTLEMENT_ROLE();
         if (token.hasRole(SETTLE, deployer)) token.renounceRole(SETTLE, deployer);
-        // Renounce CALLER_ROLE if held
         bytes32 CALLER = adapter.CALLER_ROLE();
         if (adapter.hasRole(CALLER, deployer)) adapter.renounceRole(CALLER, deployer);
 
-        // 11. Post-handover assertions — full contracts
+        // ── 8. 部署后断言 — 确认所有角色正确 ──
         for (uint256 i = 0; i < acFull.length; i++) {
             IAccessControl c = IAccessControl(acFull[i]);
             require(!c.hasRole(DA, deployer), "deployer retains DA");
@@ -233,47 +189,29 @@ contract DeployPangu2 is Script {
             require(c.hasRole(GOV, governance), "gov missing GOV");
             require(c.hasRole(UNP, governance), "gov missing UNP");
         }
-        // CostBasis (no UNPAUSER)
-        {
-            IAccessControl cb = IAccessControl(address(costBasis));
-            require(!cb.hasRole(DA, deployer), "costBasis deployer retains DA");
-            require(!cb.hasRole(GOV, deployer), "costBasis deployer retains GOV");
-            require(cb.hasRole(DA, governance), "costBasis gov missing DA");
-            require(cb.hasRole(GOV, governance), "costBasis gov missing GOV");
-        }
-        // Adapter (no UNPAUSER)
-        {
-            IAccessControl a = IAccessControl(address(adapter));
-            require(!a.hasRole(DA, deployer), "adapter deployer retains DA");
-            require(!a.hasRole(GOV, deployer), "adapter deployer retains GOV");
-            require(a.hasRole(DA, governance), "adapter gov missing DA");
-            require(a.hasRole(GOV, governance), "adapter gov missing GOV");
-        }
+        { IAccessControl cb = IAccessControl(address(costBasis));
+          require(!cb.hasRole(DA, deployer), "cb deployer retains DA");
+          require(!cb.hasRole(GOV, deployer), "cb deployer retains GOV");
+          require(cb.hasRole(DA, governance), "cb gov missing DA");
+          require(cb.hasRole(GOV, governance), "cb gov missing GOV"); }
+        { IAccessControl a = IAccessControl(address(adapter));
+          require(!a.hasRole(DA, deployer), "adapter deployer retains DA");
+          require(!a.hasRole(GOV, deployer), "adapter deployer retains GOV");
+          require(a.hasRole(DA, governance), "adapter gov missing DA");
+          require(a.hasRole(GOV, governance), "adapter gov missing GOV"); }
 
         require(token.hasRole(SETTLE, address(tradeRouter)), "router missing SETTLEMENT");
         require(!token.hasRole(SETTLE, deployer), "deployer retains SETTLEMENT");
         require(!adapter.hasRole(CALLER, deployer), "deployer retains CALLER");
-
-        // Adapter whitelist
         require(adapter.hasRole(CALLER, address(tradeRouter)), "router not adapter CALLER");
         require(adapter.hasRole(CALLER, address(feeVault)), "feeVault not adapter CALLER");
         require(adapter.hasRole(CALLER, address(supportPool)), "supportPool not adapter CALLER");
-
-        // CostBasis operators
         require(costBasis.tradeRouter() == address(tradeRouter), "costBasis router mismatch");
         require(costBasis.dividendDistributor() == address(distributor), "costBasis distributor mismatch");
-
-        // Transfer contexts
-        require(
-            token.systemTransferContextAllowed(address(distributor), TransferContext.Kind.DIVIDEND_CLAIM),
-            "distributor missing DIVIDEND_CLAIM"
-        );
-        require(
-            token.systemTransferContextAllowed(address(locker), TransferContext.Kind.SYSTEM_CREDIT_UNKNOWN),
-            "locker missing SYSTEM_CREDIT_UNKNOWN"
-        );
-
-        // Pair NOT yet trading-enabled
+        require(token.systemTransferContextAllowed(address(distributor), TransferContext.Kind.DIVIDEND_CLAIM), "distributor missing DIVIDEND_CLAIM");
+        require(token.systemTransferContextAllowed(address(locker), TransferContext.Kind.SYSTEM_CREDIT_UNKNOWN), "locker missing SYSTEM_CREDIT_UNKNOWN");
+        require(token.systemTransferContextAllowed(address(staking), TransferContext.Kind.STAKING_PRINCIPAL_RETURN), "staking missing PRINCIPAL_RETURN");
+        require(token.systemTransferContextAllowed(address(staking), TransferContext.Kind.STAKING_REWARD), "staking missing REWARD");
         require(!token.isPair(pair), "pair must NOT be enabled yet");
 
         vm.stopBroadcast();
@@ -288,12 +226,15 @@ contract DeployPangu2 is Script {
         console.log("V2Pair:", pair);
         console.log("V2Adapter:", address(adapter));
         console.log("V2Oracle:", address(oracle));
+        console.log("CostBasisManager:", address(costBasis));
+        console.log("Pangu2Staking:", address(staking));
         console.log("Governance:", governance);
         console.log("Deployer:", deployer);
         console.log("");
         console.log("Next: BootstrapPangu2 to add initial liquidity.");
     }
 
+    /// 撤销 deployer 的 DA、GOV、UNP 三个角色
     function _renounceAll(AccessControl target, address d) internal {
         bytes32 DA = 0x00;
         bytes32 GOV = keccak256("GOVERNANCE_ROLE");

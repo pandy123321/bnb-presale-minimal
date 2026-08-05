@@ -6,11 +6,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IPangu2Staking} from "./interfaces/IPangu2Staking.sol";
+import {IPangu2Token} from "./interfaces/IPangu2Token.sol";
+import {TransferContext} from "./libraries/TransferContext.sol";
 
 contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
     using SafeERC20 for IERC20;
 
-    IERC20 public immutable token;
+    IPangu2Token public immutable token;
 
     bytes32 public constant REWARD_MANAGER_ROLE = keccak256("REWARD_MANAGER_ROLE");
 
@@ -56,7 +58,7 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
 
     constructor(address token_, address governance) {
         if (token_ == address(0) || governance == address(0)) revert ZeroAddress();
-        token = IERC20(token_);
+        token = IPangu2Token(token_);
         _grantRole(DEFAULT_ADMIN_ROLE, governance);
         _grantRole(REWARD_MANAGER_ROLE, governance);
     }
@@ -64,7 +66,6 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
     // ── Modifier ──────────────────────────────
 
     modifier updateReward(address account) {
-        // Update global accumulator + settle already-emitted rewards into liability
         _updateGlobalReward();
         if (account != address(0)) {
             _unclaimedRewards[account] = earned(account);
@@ -79,11 +80,9 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
         rewardPerTokenStored = rewardPerToken();
         lastUpdateTime = lastTimeRewardApplicable();
 
-        // Move emitted rewards from 'available' to 'accrued' liability
         uint256 emitted = elapsed * rewardRate;
         if (emitted > 0 && totalStaked > 0) {
             if (emitted > availableRewardReserve) {
-                // Period was over-committed — clamp to available
                 emitted = availableRewardReserve;
             }
             availableRewardReserve -= emitted;
@@ -105,7 +104,7 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
         return rewardPerTokenStored + (rewardRate * elapsed * 1e18) / totalStaked;
     }
 
-    function earned(address account) public view returns (uint256) {
+    function earned(address account) public view override returns (uint256) {
         return _unclaimedRewards[account]
             + (userTotalStaked[account] * (rewardPerToken() - _userRewardPerTokenPaid[account])) / 1e18;
     }
@@ -118,9 +117,9 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
 
     function fundRewards(uint256 amount) external onlyRole(REWARD_MANAGER_ROLE) {
         if (amount == 0) revert InvalidAmount();
-        uint256 beforeBalance = token.balanceOf(address(this));
-        token.safeTransferFrom(msg.sender, address(this), amount);
-        uint256 received = token.balanceOf(address(this)) - beforeBalance;
+        uint256 beforeBalance = IERC20(address(token)).balanceOf(address(this));
+        IERC20(address(token)).safeTransferFrom(msg.sender, address(this), amount);
+        uint256 received = IERC20(address(token)).balanceOf(address(this)) - beforeBalance;
         if (received == 0) revert InvalidAmount();
         availableRewardReserve += received;
         emit RewardFunded(msg.sender, received);
@@ -128,12 +127,9 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
 
     function setRewardRate(uint256 rate) external onlyRole(REWARD_MANAGER_ROLE) {
         if (rate > MAX_REWARD_RATE) revert InvalidRewardRate(rate, MAX_REWARD_RATE);
-
-        // Settle current state before changing
         _updateGlobalReward();
 
         if (rate == 0) {
-            // Stop current period immediately
             rewardRate = 0;
             periodFinish = block.timestamp;
             lastUpdateTime = block.timestamp;
@@ -141,7 +137,6 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
             return;
         }
 
-        // Calculate total liability for the new period
         uint256 maxLiability;
         if (block.timestamp >= periodFinish) {
             rewardRate = rate;
@@ -149,15 +144,13 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
             lastUpdateTime = block.timestamp;
             maxLiability = rate * 30 days;
         } else {
-            // Extend: leftover reward from old rate distributed at new rate
             uint256 remaining = periodFinish - block.timestamp;
             uint256 leftover = remaining * rewardRate;
             rewardRate = rate;
             periodFinish = block.timestamp + leftover / rate;
-            maxLiability = leftover; // same absolute value, just spread over different time
+            maxLiability = leftover;
         }
 
-        // Require available reserve covers max new-period liability
         if (availableRewardReserve < maxLiability) {
             revert InsufficientRewardReserve(maxLiability, availableRewardReserve);
         }
@@ -168,12 +161,17 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
     // ── Solvency ───────────────────────────────
 
     function coverageRatio() public view returns (uint256 principal, uint256 reward, uint256 total) {
-        uint256 balance = token.balanceOf(address(this));
+        uint256 balance = IERC20(address(token)).balanceOf(address(this));
+        // Prevent underflow: if balance < totalStaked, principal ratio is computed safely
         principal = totalStaked > 0 ? (balance * 1e18) / totalStaked : type(uint256).max;
         uint256 rewardLiabilities = accruedRewardLiability;
-        reward = rewardLiabilities > 0 ? ((balance - totalStaked) * 1e18) / rewardLiabilities : type(uint256).max;
-        total = (totalStaked + rewardLiabilities) > 0
-            ? (balance * 1e18) / (totalStaked + rewardLiabilities) : type(uint256).max;
+        if (balance > totalStaked && rewardLiabilities > 0) {
+            reward = ((balance - totalStaked) * 1e18) / rewardLiabilities;
+        } else {
+            reward = rewardLiabilities > 0 ? 0 : type(uint256).max;
+        }
+        uint256 combined = totalStaked + rewardLiabilities;
+        total = combined > 0 ? (balance * 1e18) / combined : type(uint256).max;
     }
 
     // ── Core Actions ──────────────────────────
@@ -184,9 +182,9 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
         if (amount < MIN_STAKE) revert InvalidAmount();
         if (lockSeconds == 0 || lockSeconds > MAX_LOCK_SECONDS) revert InvalidLockDuration();
 
-        uint256 beforeBalance = token.balanceOf(address(this));
-        token.safeTransferFrom(msg.sender, address(this), amount);
-        uint256 received = token.balanceOf(address(this)) - beforeBalance;
+        uint256 beforeBalance = IERC20(address(token)).balanceOf(address(this));
+        IERC20(address(token)).safeTransferFrom(msg.sender, address(this), amount);
+        uint256 received = IERC20(address(token)).balanceOf(address(this)) - beforeBalance;
         if (received < MIN_STAKE) revert InvalidAmount();
 
         uint64 unlockAt = uint64(block.timestamp) + lockSeconds;
@@ -218,7 +216,7 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
         userTotalStaked[msg.sender] -= amount;
         totalStaked -= amount;
 
-        token.safeTransfer(msg.sender, amount);
+        token.systemTransfer(msg.sender, amount, TransferContext.Kind.STAKING_PRINCIPAL_RETURN);
         emit Unstaked(msg.sender, amount, 0, positionId);
     }
 
@@ -239,12 +237,18 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
         uint256 forfeitedReward = totalBefore > 0 ? (accountReward * amount) / totalBefore : 0;
         _unclaimedRewards[msg.sender] = accountReward - forfeitedReward;
 
+        // Sync liability: forfeited rewards are no longer owed
+        if (forfeitedReward > 0 && accruedRewardLiability >= forfeitedReward) {
+            accruedRewardLiability -= forfeitedReward;
+        }
+
         pos.claimed = true;
         userTotalStaked[msg.sender] -= amount;
         totalStaked -= amount;
+        // Penalty returns to available reward reserve
         availableRewardReserve += penalty;
 
-        token.safeTransfer(msg.sender, netAmount);
+        token.systemTransfer(msg.sender, netAmount, TransferContext.Kind.STAKING_PRINCIPAL_RETURN);
         emit EarlyUnstake(msg.sender, amount, penalty, positionId);
     }
 
@@ -252,17 +256,16 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
         reward = _unclaimedRewards[msg.sender];
         if (reward == 0) return 0;
 
-        // Clamp to available balance (principal is always safe, only rewards capped)
-        uint256 principalOwed = userTotalStaked[msg.sender];
-        uint256 availableForRewards = token.balanceOf(address(this)) > principalOwed
-            ? token.balanceOf(address(this)) - principalOwed : 0;
+        // Protect ALL staked principal, not just the claiming user's
+        uint256 availableForRewards = IERC20(address(token)).balanceOf(address(this)) > totalStaked
+            ? IERC20(address(token)).balanceOf(address(this)) - totalStaked : 0;
         if (reward > availableForRewards) reward = availableForRewards;
 
         _unclaimedRewards[msg.sender] -= reward;
         accruedRewardLiability -= reward;
         totalRewardPaid += reward;
 
-        token.safeTransfer(msg.sender, reward);
+        token.systemTransfer(msg.sender, reward, TransferContext.Kind.STAKING_REWARD);
         emit RewardClaimed(msg.sender, reward);
     }
 

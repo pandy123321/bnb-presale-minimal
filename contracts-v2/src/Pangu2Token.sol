@@ -155,6 +155,9 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
                 && kind != TransferContext.Kind.LIQUIDITY_FEE_COLLECTION
                 && kind != TransferContext.Kind.DIVIDEND_CLAIM
                 && kind != TransferContext.Kind.SYSTEM_CREDIT_UNKNOWN
+                && kind != TransferContext.Kind.STAKING_DEPOSIT
+                && kind != TransferContext.Kind.STAKING_PRINCIPAL_RETURN
+                && kind != TransferContext.Kind.STAKING_REWARD
         ) revert InvalidTransferContext(kind);
         if (
             (kind == TransferContext.Kind.LIQUIDITY_WITHDRAWAL
