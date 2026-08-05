@@ -35,12 +35,6 @@ const demoChange = "+4.72%";
         <div class="pair">BGP / BNB<small><Tag variant="demo">Preview data</Tag></small></div>
         <div class="price"><b>{{ demoPrice }} BNB</b><span class="green">{{ demoChange }}</span></div>
       </div>
-      <div class="market-toolbar">
-        <div class="timeframes">
-          <button>1H</button><button class="active">1D</button><button>1W</button><button>1M</button>
-        </div>
-        <span class="market-status"><i></i><span>Preview data</span></span>
-      </div>
       <!-- Chart placeholder: trading NOT yet activated -->
       <div class="chart-placeholder">
         <b>Trading not yet activated</b>
@@ -61,7 +55,7 @@ const demoChange = "+4.72%";
     </Card>
 
     <!-- ═══ 2. Order Panel ═══ -->
-    <Card style="margin-top:12px">
+    <Card class="order-card">
       <div class="trade-context"><span>BGP / BNB</span><b>BNB Smart Chain</b></div>
       <div class="segmented">
         <button :class="{ active: mode === 'buy' }" @click="toggleMode('buy')">Buy</button>
@@ -87,7 +81,7 @@ const demoChange = "+4.72%";
         <div><span>Gas estimate</span><b>0.00021 BNB</b></div>
         <div><span>Pool depth</span><b>420 BNB</b></div>
       </div>
-      <button class="btn primary" style="width:100%;margin-top:12px" disabled>Trading not yet activated</button>
+      <button class="btn primary trade-submit" disabled>Trading not yet activated</button>
     </Card>
 
     <!-- ═══ 3. Activity ═══ -->
@@ -176,4 +170,7 @@ const demoChange = "+4.72%";
 .activity-info b { display: block; font-size: 11px; }
 .activity-info small { display: block; font-size: 8px; color: var(--text-3); margin-top: 3px; }
 .activity-status { font-size: 9px; color: var(--green); }
+
+.order-card { margin-top: 12px; }
+.trade-submit { width: 100%; margin-top: 12px; }
 </style>
