@@ -26,23 +26,15 @@ contract DeployPangu2 is Script {
     uint32 internal constant TWAP_WINDOW = 30 minutes;        // Oracle TWAP 时间窗口
     uint16 internal constant MAX_DEVIATION_BPS = 300;         // 最大现货/TWAP 偏差 3%
 
-    /// 根据链 ID 返回对应的 WBNB 地址
-    function _wbnb() internal view returns (address) {
-        if (block.chainid == 56) return 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c; // BSC 主网
-        if (block.chainid == 97) return 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd; // BSC 测试网
-        revert("Unsupported chain");
+    /// 部署脚本仅支持 BSC Testnet (chain 97)。主网使用独立 Never-Broadcast Fork 脚本。
+    function _wbnb() internal pure returns (address) {
+        return 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd; // BSC Testnet only
     }
-    /// 根据链 ID 返回对应的 PancakeSwap Factory 地址
-    function _factory() internal view returns (address) {
-        if (block.chainid == 56) return 0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73;
-        if (block.chainid == 97) return 0x6725F303b657a9451d8BA641348b6761A6CC7a17;
-        revert("Unsupported chain");
+    function _factory() internal pure returns (address) {
+        return 0x6725F303b657a9451d8BA641348b6761A6CC7a17; // BSC Testnet only
     }
-    /// 根据链 ID 返回对应的 PancakeSwap Router 地址
-    function _router() internal view returns (address) {
-        if (block.chainid == 56) return 0x10ED43C718714eb63d5aA57B78B54704E256024E;
-        if (block.chainid == 97) return 0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3;
-        revert("Unsupported chain");
+    function _router() internal pure returns (address) {
+        return 0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3; // BSC Testnet only
     }
 
     function run() external {
@@ -72,15 +64,14 @@ contract DeployPangu2 is Script {
         address FACTORY = _factory();
         address ROUTER = _router();
 
-        if (block.chainid != 56 && block.chainid != 97) revert("Unsupported chain");
+        if (block.chainid != 97) revert("BSC Testnet (97) only - Mainnet uses separate Fork script");
         require(WBNB.code.length > 0, "WBNB not deployed");
         require(FACTORY.code.length > 0, "Factory not deployed");
         require(ROUTER.code.length > 0, "Router not deployed");
 
         // 关键角色不得复用
         require(deployer != governance, "deployer must differ from governance");
-        // 测试网允许 deployer 兼任 initialHolder
-        if (block.chainid != 97) require(deployer != initialHolder, "deployer must differ from initialHolder");
+        require(deployer != initialHolder, "deployer must differ from initialHolder");
         require(governance != initialHolder, "governance must differ from initialHolder");
         require(governance != rootPublisher, "governance must differ from rootPublisher");
 
