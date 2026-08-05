@@ -307,7 +307,7 @@ class StakingController extends Controller
             }
 
             $isComplete = empty($failedIds);
-            $dataStatus = $isComplete ? 'LIVE' : 'PARTIAL';
+            $dataStatus = $isComplete ? 'LIVE' : 'DEGRADED';
 
             return ApiEnvelope::success([
                 'address'        => strtolower($address),

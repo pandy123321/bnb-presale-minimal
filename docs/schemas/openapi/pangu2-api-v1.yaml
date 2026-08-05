@@ -29,6 +29,8 @@ tags:
     description: Epoch, ranking, proof, claim
   - name: Support
     description: Buyback, locker, support pool
+  - name: Staking
+    description: Staking positions, rewards, coverage
   - name: Admin
     description: Admin dashboard, RBAC, jobs, audit
 
@@ -305,6 +307,54 @@ paths:
           in: query
           schema:
             type: integer
+      responses:
+        "200":
+          description: OK
+
+  # ── Staking ──
+  /projects/pangu2/staking/earned:
+    get:
+      tags: [Staking]
+      operationId: getStakingEarned
+      summary: Get unclaimed staking rewards for an address
+      parameters:
+        - name: address
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/EvmAddress"
+      responses:
+        "200":
+          description: OK
+
+  /projects/pangu2/staking/positions:
+    get:
+      tags: [Staking]
+      operationId: getStakingPositions
+      summary: Get user staking positions
+      parameters:
+        - name: address
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/EvmAddress"
+        - name: cursor
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+
+  /projects/pangu2/staking/status:
+    get:
+      tags: [Staking]
+      operationId: getStakingStatus
+      summary: Global staking status (totalStaked, rewardRate, etc.)
       responses:
         "200":
           description: OK
