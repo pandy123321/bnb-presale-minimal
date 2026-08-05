@@ -7,14 +7,8 @@ import SectionHead from "@ui/components/SectionHead.vue";
 
 const wallet = useWalletStore();
 
-// ── Preview data (real API pending for hero/ranking) ──
-const isPreview = true;
-const previewPrice = "0.00000284";
-const previewChange = "+4.72";
-const previewHolders = "6.8K";
-const previewLiquidity = "420";
-const previewBalance = "286W";
-const previewBnbValue = "8.12";
+// ── Preview data (API integration pending; real data shows "—") ──
+const noData = "—";
 
 const rankData = [
   { no: "01", addr: "0x7A91…4E2C", label: "Top holder", amount: "842W BGP", lockLabel: "Locked", lockAmount: "620W", tagVariant: "locked" as const },
@@ -40,9 +34,9 @@ const shortAddr = computed(() => wallet.isConnected ? `${wallet.address?.slice(0
         <h1>Precision meets transparency.</h1>
         <p>Trade with clarity. Participate in community rewards. Lock on your terms.</p>
         <div class="hero-market">
-          <div><span>Price</span><b>{{ previewPrice }} BNB <em class="green hero-change">{{ previewChange }}%</em></b></div>
-          <div><span>Holders</span><b>{{ previewHolders }}</b></div>
-          <div><span>Liquidity</span><b>{{ previewLiquidity }} BNB</b></div>
+          <div><span>Price</span><b>{{ noData }} BNB <em class="green hero-change">{{ noData }}%</em></b></div>
+          <div><span>Holders</span><b>{{ noData }}</b></div>
+          <div><span>Liquidity</span><b>{{ noData }} BNB</b></div>
         </div>
         <div class="hero-actions">
           <router-link to="/trade" class="btn primary">Trade BGP</router-link>
