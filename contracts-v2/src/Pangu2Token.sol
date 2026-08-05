@@ -317,7 +317,7 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
 
         bool liquidityDeposit;
         bool sellEntry;
-        bool stakingDeposit;
+        bool isStakingDeposit;
         bool fromUser = _isUser(from);
         bool toUser = _isUser(to);
 
@@ -337,7 +337,7 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
             } else if (hasRole(SETTLEMENT_ROLE, to) && msg.sender == to) {
                 sellEntry = true;
             } else if (msg.sender == to && systemTransferContextAllowed[to][TransferContext.Kind.STAKING_DEPOSIT]) {
-                stakingDeposit = true;
+                isStakingDeposit = true;
             } else {
                 revert DirectSystemInteractionForbidden(from, to, msg.sender);
             }
@@ -355,7 +355,7 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
 
         if (liquidityDeposit) {
             costBasisManager.onLiquidityDeposit(from, value);
-        } else if (stakingDeposit) {
+        } else if (isStakingDeposit) {
             costBasisManager.onStakingDeposit(from, value);
         } else if (_activeContext == TransferContext.Kind.LIQUIDITY_WITHDRAWAL) {
             costBasisManager.onLiquidityWithdrawal(to, value);

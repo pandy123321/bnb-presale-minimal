@@ -7,10 +7,10 @@ import { FullMath } from "../libraries/FullMath.sol";
 
 contract PancakeV2TwapOracle is IPangu2TwapOracle {
     enum WindowStatus {
-        UNINITIALIZED,  // 0: no anchor yet
-        ACCUMULATING,   // 1: anchor set, waiting for full twapWindow
-        READY,          // 2: at least one completed window, TWAP available
-        LIQUIDITY_LOW   // 3: reserves below minimum — fail-closed
+        UNINITIALIZED, // 0: no anchor yet
+        ACCUMULATING, // 1: anchor set, waiting for full twapWindow
+        READY, // 2: at least one completed window, TWAP available
+        LIQUIDITY_LOW // 3: reserves below minimum — fail-closed
     }
 
     bool public immutable tokenIsToken0;
@@ -64,27 +64,46 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
     event OracleRecovered();
 
     constructor(
-        address token_, address wbnb_, address factory_, address pair_,
-        uint32 twapWindow_, uint16 maximumSpotTwapDeviationBps_,
-        uint112 minTokenReserve_, uint112 minWbnbReserve_
+        address token_,
+        address wbnb_,
+        address factory_,
+        address pair_,
+        uint32 twapWindow_,
+        uint16 maximumSpotTwapDeviationBps_,
+        uint112 minTokenReserve_,
+        uint112 minWbnbReserve_
     ) {
-        _requireContract(token_); _requireContract(wbnb_);
-        _requireContract(factory_); _requireContract(pair_);
+        _requireContract(token_);
+        _requireContract(wbnb_);
+        _requireContract(factory_);
+        _requireContract(pair_);
         if (twapWindow_ == 0 || maximumSpotTwapDeviationBps_ > BPS_DENOMINATOR) revert InvalidAmount();
         if (minTokenReserve_ == 0 || minWbnbReserve_ == 0) revert InvalidAmount();
-        token = token_; wbnb = wbnb_; factory = IPancakeFactory(factory_); pair = IPancakePair(pair_);
-        twapWindow = twapWindow_; maximumSpotTwapDeviationBps = maximumSpotTwapDeviationBps_;
-        minTokenReserve = minTokenReserve_; minWbnbReserve = minWbnbReserve_;
+        token = token_;
+        wbnb = wbnb_;
+        factory = IPancakeFactory(factory_);
+        pair = IPancakePair(pair_);
+        twapWindow = twapWindow_;
+        maximumSpotTwapDeviationBps = maximumSpotTwapDeviationBps_;
+        minTokenReserve = minTokenReserve_;
+        minWbnbReserve = minWbnbReserve_;
         address pairToken0 = IPancakePair(pair_).token0();
         address pairToken1 = IPancakePair(pair_).token1();
-        if (!((pairToken0 == token_ && pairToken1 == wbnb_) || (pairToken0 == wbnb_ && pairToken1 == token_))) revert InvalidPair();
+        if (!((pairToken0 == token_ && pairToken1 == wbnb_) || (pairToken0 == wbnb_ && pairToken1 == token_))) {
+            revert InvalidPair();
+        }
         if (IPancakeFactory(factory_).getPair(token_, wbnb_) != pair_) revert InvalidPair();
         tokenIsToken0 = pairToken0 == token_;
     }
 
     function _getMappedReserves(uint112 r0, uint112 r1) private view returns (uint112 tokenRes, uint112 wbnbRes) {
-        if (tokenIsToken0) { tokenRes = r0; wbnbRes = r1; }
-        else { tokenRes = r1; wbnbRes = r0; }
+        if (tokenIsToken0) {
+            tokenRes = r0;
+            wbnbRes = r1;
+        } else {
+            tokenRes = r1;
+            wbnbRes = r0;
+        }
     }
 
     function _reservesAboveMinimum(uint112 tokenRes, uint112 wbnbRes) private view returns (bool) {
@@ -92,7 +111,9 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
     }
 
     /// MAXIMUM_TWAP_AGE = 5 × twapWindow; after this TWAP is considered stale and rejected.
-    function _maxTwapAge() private view returns (uint256) { return uint256(twapWindow) * 5; }
+    function _maxTwapAge() private view returns (uint256) {
+        return uint256(twapWindow) * 5;
+    }
 
     function update() external {
         (uint112 r0, uint112 r1, uint32 ts) = pair.getReserves();
@@ -109,53 +130,69 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
         uint256 p0 = pair.price0CumulativeLast();
         uint256 p1 = pair.price1CumulativeLast();
 
+        // ── Counterfactual cumulatives at block.timestamp ──
+        // Even without swap/mint/burn/sync the cumulative price advances at
+        //   dC/dt = reserve1/reserve0 × Q112  (price0)
+        //   dC/dt = reserve0/reserve1 × Q112  (price1)
+        // We project the pair's last-observed cumulative forward to block.timestamp.
+        (uint256 cfP0, uint256 cfP1) = _counterfactualCumulatives(r0, r1, p0, p1, ts);
+
         if (status == WindowStatus.LIQUIDITY_LOW) {
-            anchor = Observation({ timestamp: ts, price0CumulativeLast: p0, price1CumulativeLast: p1 });
+            anchor = Observation({
+                timestamp: uint32(block.timestamp), price0CumulativeLast: cfP0, price1CumulativeLast: cfP1
+            });
             status = WindowStatus.ACCUMULATING;
-            emit OracleRecovered(); emit OracleAnchored(ts, p0, p1);
+            emit OracleRecovered();
+            emit OracleAnchored(uint32(block.timestamp), cfP0, cfP1);
             return;
         }
 
         if (status == WindowStatus.UNINITIALIZED) {
-            anchor = Observation({ timestamp: ts, price0CumulativeLast: p0, price1CumulativeLast: p1 });
+            anchor = Observation({
+                timestamp: uint32(block.timestamp), price0CumulativeLast: cfP0, price1CumulativeLast: cfP1
+            });
             status = WindowStatus.ACCUMULATING;
-            emit OracleAnchored(ts, p0, p1);
+            emit OracleAnchored(uint32(block.timestamp), cfP0, cfP1);
             return;
         }
 
-        uint32 elapsed32;
-        unchecked { elapsed32 = ts - anchor.timestamp; }
-        if (elapsed32 >= twapWindow) {
-            uint256 elapsed = uint256(elapsed32);
-            lastTwapElapsed = elapsed;
-            uint256 p0Delta; uint256 p1Delta;
-            unchecked {
-                p0Delta = p0 - anchor.price0CumulativeLast;
-                p1Delta = p1 - anchor.price1CumulativeLast;
-            }
-            if (p0Delta == 0 || p1Delta == 0) {
-                // No swap in window — use counterfactual cumulative price from reserves
-                // TWAP = reserves × Q112 ÷ counterpart (same as constant-reserve average)
-                (uint112 tR, uint112 wR) = _getMappedReserves(r0, r1);
-                lastTwapPrice0Accumulator = (uint256(wR) * Q112) / uint256(tR);
-                // For p1 accumulator: token1 price in token0
-                lastTwapPrice1Accumulator = (uint256(tR) * Q112) / uint256(wR);
-            } else {
-                lastTwapPrice0Accumulator = p0Delta / elapsed;
-                lastTwapPrice1Accumulator = p1Delta / elapsed;
-            }
-            anchor = Observation({ timestamp: ts, price0CumulativeLast: p0, price1CumulativeLast: p1 });
-            lastTwapObservedAtBlock = uint40(block.number);
-            lastTwapCompletedAt = block.timestamp;
-            status = WindowStatus.READY;
-            emit TwapWindowCompleted(elapsed, lastTwapPrice0Accumulator, lastTwapPrice1Accumulator);
+        // ── TWAP window completion check (counterfactual: uses block.timestamp) ──
+        uint256 windowElapsed = block.timestamp - anchor.timestamp;
+        if (windowElapsed < twapWindow) return;
+
+        lastTwapElapsed = windowElapsed;
+
+        // p0Delta / p1Delta are always in Pancake V2's native direction:
+        //   price0 = reserve1/reserve0   price1 = reserve0/reserve1
+        uint256 p0Delta;
+        uint256 p1Delta;
+        unchecked {
+            p0Delta = cfP0 - anchor.price0CumulativeLast;
+            p1Delta = cfP1 - anchor.price1CumulativeLast;
         }
+
+        lastTwapPrice0Accumulator = p0Delta / windowElapsed;
+        lastTwapPrice1Accumulator = p1Delta / windowElapsed;
+
+        // Shift anchor forward to block.timestamp with counterfactual cumulatives
+        anchor =
+            Observation({ timestamp: uint32(block.timestamp), price0CumulativeLast: cfP0, price1CumulativeLast: cfP1 });
+
+        lastTwapObservedAtBlock = uint40(block.number);
+        lastTwapCompletedAt = block.timestamp;
+        status = WindowStatus.READY;
+        emit TwapWindowCompleted(windowElapsed, lastTwapPrice0Accumulator, lastTwapPrice1Accumulator);
     }
 
     function validatedQuote(address baseToken, address quoteToken, uint128 baseAmount)
-        external view override returns (Quote memory q)
+        external
+        view
+        override
+        returns (Quote memory q)
     {
-        if (!((baseToken == token && quoteToken == wbnb) || (baseToken == wbnb && quoteToken == token))) revert InvalidPair();
+        if (!((baseToken == token && quoteToken == wbnb) || (baseToken == wbnb && quoteToken == token))) {
+            revert InvalidPair();
+        }
         if (baseAmount == 0) revert InvalidAmount();
 
         (uint112 r0, uint112 r1,) = pair.getReserves();
@@ -208,6 +245,26 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
             harmonicMeanLiquidity: 0,
             observedAtBlock: lastTwapObservedAtBlock > 0 ? lastTwapObservedAtBlock : uint40(block.number)
         });
+    }
+
+    /// @notice Project pair cumulative prices forward to block.timestamp using current reserves.
+    /// @dev   r0/r1 are raw pair reserves (uint112 from getReserves).  Price is always
+    ///        computed in Pancake V2 direction:  price0 = r1/r0,  price1 = r0/r1.
+    ///        Uses unchecked arithmetic following Pancake V2 overflow convention.
+    function _counterfactualCumulatives(uint112 r0, uint112 r1, uint256 pairP0, uint256 pairP1, uint32 ts)
+        private
+        view
+        returns (uint256 cfP0, uint256 cfP1)
+    {
+        uint256 cfTime = block.timestamp - ts;
+        if (cfTime == 0) return (pairP0, pairP1);
+        uint256 r0u = uint256(r0);
+        uint256 r1u = uint256(r1);
+        unchecked {
+            // r1 * Q112 ≤ 2^112 × 2^112 = 2^224 < 2^256 — safe
+            cfP0 = pairP0 + (r1u * Q112 / r0u) * cfTime;
+            cfP1 = pairP1 + (r0u * Q112 / r1u) * cfTime;
+        }
     }
 
     function _requireContract(address account) private view {
