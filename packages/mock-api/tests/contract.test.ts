@@ -259,6 +259,17 @@ describe("Admin API", () => {
     validateEnvelope(env, "/admin/auth/login");
   });
 
+  it("POST /admin/auth/login rejects wrong password", async () => {
+    const res = await fetch(`${BASE_URL}/admin-api/v1/projects/pangu2/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "admin@pangu2.io", password: "wrong" }),
+    });
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error?.code).toBe("AUTH_FAILED");
+  });
+
   it("GET /admin/auth/me", async () => {
     const env = await fetchEnvelope<unknown>("/admin-api/v1/projects/pangu2/auth/me", {
       headers: { Authorization: "Bearer admin-session-token" },

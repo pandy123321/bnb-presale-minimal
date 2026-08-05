@@ -128,6 +128,7 @@ contract DeployPangu2 is Script {
         // ── 5. Transfer Contexts ──
         token.setSystemTransferContext(address(distributor), TransferContext.Kind.DIVIDEND_CLAIM, true);
         token.setSystemTransferContext(address(locker), TransferContext.Kind.SYSTEM_CREDIT_UNKNOWN, true);
+        token.setSystemTransferContext(address(staking), TransferContext.Kind.STAKING_DEPOSIT, true);
         token.setSystemTransferContext(address(staking), TransferContext.Kind.STAKING_PRINCIPAL_RETURN, true);
         token.setSystemTransferContext(address(staking), TransferContext.Kind.STAKING_REWARD, true);
 
@@ -201,6 +202,7 @@ contract DeployPangu2 is Script {
         require(costBasis.dividendDistributor() == address(distributor), "costBasis distributor mismatch");
         require(token.systemTransferContextAllowed(address(distributor), TransferContext.Kind.DIVIDEND_CLAIM), "distributor missing DIVIDEND_CLAIM");
         require(token.systemTransferContextAllowed(address(locker), TransferContext.Kind.SYSTEM_CREDIT_UNKNOWN), "locker missing SYSTEM_CREDIT_UNKNOWN");
+        require(token.systemTransferContextAllowed(address(staking), TransferContext.Kind.STAKING_DEPOSIT), "staking missing DEPOSIT");
         require(token.systemTransferContextAllowed(address(staking), TransferContext.Kind.STAKING_PRINCIPAL_RETURN), "staking missing PRINCIPAL_RETURN");
         require(token.systemTransferContextAllowed(address(staking), TransferContext.Kind.STAKING_REWARD), "staking missing REWARD");
         require(!token.isPair(pair), "pair must NOT be enabled yet");

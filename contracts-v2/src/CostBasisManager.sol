@@ -6,41 +6,51 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ICostBasisManager } from "./interfaces/ICostBasisManager.sol";
 import { CostMath } from "./libraries/CostMath.sol";
 
-/// @notice Tracks user token cost in WBNB wei and LP liquidity positions.
-/// @dev UNKNOWN is fail-closed and never becomes KNOWN through an administrator operation.
-///      V2 fork note: retains V3-style tokenId-based LP position tracking.
-///      This model will be refactored to match V2 ERC-20 LP tokens in a future iteration.
+/// @notice 用户代币成本跟踪合约，以 WBNB wei 为单位记录用户持仓成本
+///         并管理 LP 流动性头寸。
+///
+///         三种持仓状态：
+///         - NONE：    无持仓
+///         - KNOWN：   成本已知（通过 TradeRouter 买入）→ 可计算盈亏税率
+///         - UNKNOWN： 成本未知（来源不明）→ 固定 10% 最高税率
+///
+///         核心安全规则：
+///         UNKNOWN 是 fail-closed 的 —— 永远不能通过管理员操作变为 KNOWN。
+///         V2 分支说明：保留了 V3 风格的 tokenId 型 LP 头寸追踪。
 contract CostBasisManager is AccessControl, ICostBasisManager {
     bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
 
-    bytes32 public constant REASON_BUY = keccak256("BUY");
-    bytes32 public constant REASON_ZERO_COST = keccak256("ZERO_COST");
-    bytes32 public constant REASON_SELL = keccak256("SELL");
-    bytes32 public constant REASON_TRANSFER = keccak256("TRANSFER");
-    bytes32 public constant REASON_LIQUIDITY_DEPOSIT = keccak256("LIQUIDITY_DEPOSIT");
-    bytes32 public constant REASON_LIQUIDITY_WITHDRAWAL = keccak256("LIQUIDITY_WITHDRAWAL");
-    bytes32 public constant REASON_LIQUIDITY_FEE = keccak256("LIQUIDITY_FEE");
-    bytes32 public constant REASON_LP_LOSS = keccak256("LP_LOSS");
+    // 仓位变更原因常数
+    bytes32 public constant REASON_BUY = keccak256("BUY"); // 买入
+    bytes32 public constant REASON_ZERO_COST = keccak256("ZERO_COST"); // 零成本接收（分红领取）
+    bytes32 public constant REASON_SELL = keccak256("SELL"); // 卖出
+    bytes32 public constant REASON_TRANSFER = keccak256("TRANSFER"); // 用户间转账
+    bytes32 public constant REASON_LIQUIDITY_DEPOSIT = keccak256("LIQUIDITY_DEPOSIT"); // LP 存入
+    bytes32 public constant REASON_LIQUIDITY_WITHDRAWAL = keccak256("LIQUIDITY_WITHDRAWAL"); // LP 取回
+    bytes32 public constant REASON_LIQUIDITY_FEE = keccak256("LIQUIDITY_FEE"); // LP 手续费
+    bytes32 public constant REASON_LP_LOSS = keccak256("LP_LOSS"); // LP 损失
+    bytes32 public constant REASON_STAKING_DEPOSIT = keccak256("STAKING_DEPOSIT"); // Staking 存入
 
-    address public immutable token;
-    address public tradeRouter;
-    address public dividendDistributor;
-    address public liquidityGateway;
-    bool public operatorsConfigured;
-    bool public liquidityGatewayConfigured;
+    address public immutable token; // PANGU2 token 地址
+    address public tradeRouter; // TradeRouter 地址（一次性配置）
+    address public dividendDistributor; // DividendDistributor 地址（一次性配置）
+    address public liquidityGateway; // 流动性网关地址（一次性配置）
+    bool public operatorsConfigured; // 运营商是否已配置
+    bool public liquidityGatewayConfigured; // 流动性网关是否已配置
 
-    // Per-user position (aggregate)
+    // 用户持仓头寸（聚合）
     mapping(address => Position) private _positions;
-    // Per-tokenId LP position — keyed by (owner, tokenId) to avoid enumeration issues (V3 model retained for V2 MVP)
+    // 按 tokenId 的 LP 头寸（保留 V3 模型用于 V2 最小可行产品）
     mapping(address => mapping(uint256 => Position)) private _lpPositions;
-    // Track per-owner LP totals
+    // 按用户追踪 LP 总额
     mapping(address => uint256) public lpTrackedTotal;
     mapping(address => uint256) public lpCostTotal;
-    // Pending LP deposit values — filled by onLiquidityDeposit, consumed by bindLpTokenId
+    // 待定 LP 存入值 —— 由 onLiquidityDeposit 填充，由 bindLpTokenId 消费
     mapping(address => uint256) private _pendingLpTokens;
     mapping(address => uint256) private _pendingLpCost;
-    mapping(address => bool) public systemAddress;
+    mapping(address => bool) public systemAddress; // 系统地址（不参与成本追踪）
 
+    // ─────────────────── 错误定义 ───────────────────
     error ZeroAddress();
     error AddressHasNoCode(address account);
     error InvalidAmount();
@@ -51,6 +61,7 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
     error LiquidityGatewayAlreadyConfigured();
     error UnauthorizedLiquidityGateway(address caller);
 
+    // ─────────────────── 事件 ───────────────────
     event PositionChanged(
         address indexed account,
         uint256 oldCostWbnbWei,
@@ -98,26 +109,25 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         _grantRole(GOVERNANCE_ROLE, governance);
     }
 
+    // ─────────────────── 权限修饰器 ───────────────────
     modifier onlyToken() {
         if (msg.sender != token) revert UnauthorizedHook(msg.sender);
         _;
     }
-
     modifier onlyTradeRouter() {
         if (msg.sender != tradeRouter) revert UnauthorizedHook(msg.sender);
         _;
     }
-
     modifier onlyDividendDistributor() {
         if (msg.sender != dividendDistributor) revert UnauthorizedHook(msg.sender);
         _;
     }
-
     modifier onlyLiquidityGateway() {
         if (msg.sender != liquidityGateway) revert UnauthorizedLiquidityGateway(msg.sender);
         _;
     }
 
+    // ─────────────────── 一次性配置 ───────────────────
     function configureOperators(address tradeRouter_, address dividendDistributor_) external onlyRole(GOVERNANCE_ROLE) {
         if (operatorsConfigured) revert OperatorsAlreadyConfigured();
         _requireContract(tradeRouter_);
@@ -137,6 +147,7 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         emit LiquidityGatewayConfigured(gateway_);
     }
 
+    // ─────────────────── 查询函数 ───────────────────
     function positionOf(address account) external view override returns (Position memory) {
         return _effectiveUserPosition(account, _positions[account]);
     }
@@ -154,6 +165,7 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         return _lpPositions[account][tokenId];
     }
 
+    /// 按比例计算卖出的成本。UNKNOWN 状态返回 (0, UNKNOWN)，Router 会固定使用 10% 税率。
     function proportionalCost(address account, uint256 tokenAmount)
         external
         view
@@ -168,10 +180,11 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         return (CostMath.proportionalFloor(p.costWbnbWei, tokenAmount, p.trackedBalance), status);
     }
 
-    // ────────────────────────────────────────────────────────────
-    // User position hooks (unchanged from original — kept stable)
-    // ────────────────────────────────────────────────────────────
+    // ─────────────────── 用户仓位钩子 ───────────────────
 
+    /// 记录买入：只能由 Token 合约调用
+    /// 如果买入前仓位与链上余额一致且为 KNOWN → 累加成本
+    /// 如果不一致 → 标记为 UNKNOWN（保护机制：状态漂移时 fail-closed）
     function recordBuy(address account, uint256 costWbnbWei, uint256 netTokenAmount) external override onlyToken {
         if (account == address(0)) revert ZeroAddress();
         if (systemAddress[account]) revert SystemAccount();
@@ -182,15 +195,18 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         uint256 actualBefore = actualAfter - netTokenAmount;
         Position memory newP;
         if (_isKnownAndConsistent(oldP, actualBefore)) {
+            // 仓位一致 → 正常累加成本
             newP = Position({
                 costWbnbWei: oldP.costWbnbWei + costWbnbWei, trackedBalance: actualAfter, status: PositionStatus.KNOWN
             });
         } else {
+            // 仓位不一致 → 标记 UNKNOWN
             newP = _unknownAt(actualAfter);
         }
         _storeUser(account, oldP, newP, REASON_BUY);
     }
 
+    /// 记录零成本接收（分红领取）：只能由 DividendDistributor 调用
     function recordZeroCost(address account, uint256 tokenAmount) external override onlyDividendDistributor {
         if (account == address(0)) revert ZeroAddress();
         if (systemAddress[account]) revert SystemAccount();
@@ -201,9 +217,9 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         uint256 actualBefore = actualAfter - tokenAmount;
         Position memory newP;
         if (_isKnownAndConsistent(oldP, actualBefore)) {
-            newP = Position({
-                costWbnbWei: oldP.costWbnbWei, trackedBalance: actualAfter, status: PositionStatus.KNOWN
-            });
+            // 零成本增加余额，成本不变
+            newP =
+                Position({ costWbnbWei: oldP.costWbnbWei, trackedBalance: actualAfter, status: PositionStatus.KNOWN });
         } else {
             newP = _unknownAt(actualAfter);
         }
@@ -218,6 +234,7 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         _storeUser(account, oldP, _unknownAt(IERC20(token).balanceOf(account)), reason);
     }
 
+    /// 系统信用未知（BuybackLocker release 等场景）→ 强制标记 UNKNOWN
     function onSystemCreditUnknown(address account, uint256 tokenAmount, bytes32 reason) external override onlyToken {
         if (account == address(0)) revert ZeroAddress();
         if (systemAddress[account]) revert SystemAccount();
@@ -226,6 +243,8 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         _storeUser(account, oldP, _unknownAt(IERC20(token).balanceOf(account)), reason);
     }
 
+    /// 消费卖出仓位：只能由 TradeRouter 调用
+    /// 返回已消费的成本和卖出前的状态，Router 据此选择 4% 或 10% 税率
     function consumeSell(address account, uint256 tokenAmount)
         external
         override
@@ -238,11 +257,13 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         uint256 actualAfter = IERC20(token).balanceOf(account);
         uint256 actualBefore = actualAfter + tokenAmount;
         if (!_isKnownAndConsistent(oldP, actualBefore)) {
+            // 仓位不一致 → UNKNOWN → 固定 10% 税率
             previousStatus = PositionStatus.UNKNOWN;
             _storeUser(account, oldP, _unknownAt(actualAfter), REASON_SELL);
             return (0, previousStatus);
         }
         previousStatus = PositionStatus.KNOWN;
+        // 按比例扣除成本
         consumedCostWbnbWei = tokenAmount == oldP.trackedBalance
             ? oldP.costWbnbWei
             : CostMath.proportionalFloor(oldP.costWbnbWei, tokenAmount, oldP.trackedBalance);
@@ -256,10 +277,22 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         _storeUser(account, oldP, newP, REASON_SELL);
     }
 
-    // ────────────────────────────────────────────────────────────
-    // FIXED: UNKNOWN source always pollutes receiver — no KNOWN bypass
-    // ────────────────────────────────────────────────────────────
+    // ──────────────────────────────────────────────
+    // 用户间转账 —— UNKNOWN 污染规则（P0 安全修复）
+    // ──────────────────────────────────────────────
 
+    /// 核心修复：UNKNOWN 来源的代币永远污染接收方 —— 无 KNOWN 绕过
+    ///
+    /// 攻击场景（已修复）：
+    ///   A 有 100 PANGU，成本 100 BNB，当前价值 50 BNB，状态 KNOWN
+    ///   B 转入 100 个 UNKNOWN PANGU 给 A
+    ///   旧逻辑：A 保持 KNOWN，成本不变 → 打折后按 4% 卖出（逃过了 10% 税率）
+    ///   新逻辑：A 被迫变为 UNKNOWN → 按 10% 卖出（无法逃税）
+    ///
+    /// 三种情况：
+    ///   情况 1（KNOWN → KNOWN）：按比例迁移成本
+    ///   情况 2（UNKNOWN → 任何）：接收方永远强制变为 UNKNOWN
+    ///   情况 3（KNOWN → UNKNOWN/NONE）：发送方扣除成本，接收方 UNKNOWN
     function onUserTransfer(address from, address to, uint256 tokenAmount) external override onlyToken {
         if (from == address(0) || to == address(0)) revert ZeroAddress();
         if (tokenAmount == 0 || from == to) return;
@@ -276,7 +309,7 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         bool fromKnown = _isKnownAndConsistent(fromOld, fromBefore);
         bool toKnown = _isKnownAndConsistent(toOld, toBefore);
 
-        // Case 1: BOTH known → proportional cost transfer
+        // 情况 1：双方都是 KNOWN → 按比例迁移成本
         if (fromKnown && toKnown) {
             uint256 movedCost = tokenAmount == fromOld.trackedBalance
                 ? fromOld.costWbnbWei
@@ -297,10 +330,8 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
             return;
         }
 
-        // Case 2: UNKNOWN source → receiver ALWAYS becomes UNKNOWN (pollution rule)
-        // This prevents attackers from diluting a KNOWN high-cost position with
-        // UNKNOWN tokens to escape the 10% tax bracket. Once UNKNOWN enters the
-        // position, the entire mixed balance is treated as UNKNOWN for selling.
+        // 情况 2：发送方是 UNKNOWN → 接收方永远强制变为 UNKNOWN
+        // 这是核心安全规则：攻击者不能用 UNKNOWN 代币稀释 KNOWN 仓位来逃税
         if (!fromKnown) {
             _storeUser(from, fromOld, _unknownAt(fromAfter), REASON_TRANSFER);
             _storeUser(to, toOld, _unknownAt(toAfter), REASON_TRANSFER);
@@ -308,8 +339,8 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
             return;
         }
 
-        // Case 3: KNOWN from → UNKNOWN to (or NONE to): sender proportional cost deducted, receiver unknown
-        // fromKnown && !toKnown (fromKnown=true already guaranteed by reaching here)
+        // 情况 3：KNOWN → UNKNOWN（或 NONE）
+        // 发送方按比例扣除成本，接收方保持 UNKNOWN
         {
             uint256 movedCost = tokenAmount == fromOld.trackedBalance
                 ? fromOld.costWbnbWei
@@ -327,10 +358,9 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         }
     }
 
-    // ────────────────────────────────────────────────────────────
-    // LP interactions: deposit, withdrawal, fee (per-tokenId)
-    // ────────────────────────────────────────────────────────────
+    // ─────────────────── LP 交互 ───────────────────
 
+    /// 流动性存入：从用户仓位中扣除对应成本和代币，标记为待定 LP
     function onLiquidityDeposit(address account, uint256 tokenAmount) external override onlyToken {
         if (account == address(0)) revert ZeroAddress();
         if (systemAddress[account]) revert SystemAccount();
@@ -354,7 +384,6 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
             _storeUser(account, userOld, userNew, REASON_LIQUIDITY_DEPOSIT);
             _pendingLpTokens[account] = tokenAmount;
             _pendingLpCost[account] = movedCost;
-            // Aggregate LP totals track the full pending deposit until bindLpTokenId settles
             lpTrackedTotal[account] += tokenAmount;
             lpCostTotal[account] += movedCost;
         } else {
@@ -364,8 +393,34 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         }
     }
 
-    /// @dev Called after mint to bind actual tokenUsed and cost to a tokenId.
-    ///      LP cost comes from user's PANGU acquisition cost (pending deposit), NEVER from wbnbUsed.
+    /// Staking 存入：按比例从用户仓位扣除成本，不跟踪 LP
+    function onStakingDeposit(address account, uint256 tokenAmount) external override onlyToken {
+        if (account == address(0)) revert ZeroAddress();
+        if (systemAddress[account]) revert SystemAccount();
+        if (tokenAmount == 0) revert InvalidAmount();
+
+        Position memory userOld = _positions[account];
+        uint256 actualAfter = IERC20(token).balanceOf(account);
+        uint256 actualBefore = actualAfter + tokenAmount;
+
+        if (_isKnownAndConsistent(userOld, actualBefore)) {
+            uint256 movedCost = tokenAmount == userOld.trackedBalance
+                ? userOld.costWbnbWei
+                : CostMath.proportionalFloor(userOld.costWbnbWei, tokenAmount, userOld.trackedBalance);
+            Position memory userNew = actualAfter == 0
+                ? _none()
+                : Position({
+                    costWbnbWei: userOld.costWbnbWei - movedCost,
+                    trackedBalance: actualAfter,
+                    status: PositionStatus.KNOWN
+                });
+            _storeUser(account, userOld, userNew, REASON_STAKING_DEPOSIT);
+        } else {
+            _storeUser(account, userOld, _unknownAt(actualAfter), REASON_STAKING_DEPOSIT);
+        }
+    }
+
+    /// 绑定 LP tokenId（由流动性网关在 mint 后调用）
     function bindLpTokenId(address account, uint256 tokenId, uint256 tokenUsed, uint256 wbnbUsed)
         external
         onlyLiquidityGateway
@@ -381,7 +436,6 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
 
         if (totalDeposited == 0 || totalPendingCost == 0) return;
 
-        // LP cost is proportional to tokenUsed out of totalDeposited (the rest stays in lpCostTotal for refund)
         uint256 lpCost = tokenUsed == totalDeposited
             ? totalPendingCost
             : CostMath.proportionalFloor(totalPendingCost, tokenUsed, totalDeposited);
@@ -389,7 +443,6 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         Position memory lpPos =
             Position({ costWbnbWei: lpCost, trackedBalance: tokenUsed, status: PositionStatus.KNOWN });
         _lpPositions[account][tokenId] = lpPos;
-        // Aggregate totals already set in onLiquidityDeposit; this just creates the per-tokenId position
         emit LpPositionChanged(
             account,
             tokenId,
@@ -403,6 +456,7 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         );
     }
 
+    /// 流动性取回
     function onLiquidityWithdrawal(address account, uint256 tokenAmount) external override onlyToken {
         if (account == address(0)) revert ZeroAddress();
         if (systemAddress[account]) revert SystemAccount();
@@ -414,13 +468,11 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         uint256 actualBefore = actualAfter - tokenAmount;
 
         bool knownUser = _isKnownAndConsistent(userOld, actualBefore);
-
         if (!knownUser) {
             _storeUser(account, userOld, _unknownAt(actualAfter), REASON_LIQUIDITY_WITHDRAWAL);
             return;
         }
 
-        // Principal withdrawal: move tracked LP balance down
         uint256 returnedTracked = tokenAmount;
         if (returnedTracked > lpTrackedTotal[account]) returnedTracked = lpTrackedTotal[account];
 
@@ -428,10 +480,8 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
             uint256 returnedCost = returnedTracked == lpTrackedTotal[account]
                 ? lpCostTotal[account]
                 : CostMath.proportionalFloor(lpCostTotal[account], returnedTracked, lpTrackedTotal[account]);
-
             lpTrackedTotal[account] -= returnedTracked;
             lpCostTotal[account] -= returnedCost;
-
             Position memory userNew = actualAfter == 0
                 ? _none()
                 : Position({
@@ -441,15 +491,14 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
                 });
             _storeUser(account, userOld, userNew, REASON_LIQUIDITY_WITHDRAWAL);
         } else {
-            Position memory userNew =
-                Position({
+            Position memory userNew = Position({
                 costWbnbWei: userOld.costWbnbWei, trackedBalance: actualAfter, status: PositionStatus.KNOWN
             });
             _storeUser(account, userOld, userNew, REASON_LIQUIDITY_WITHDRAWAL);
         }
     }
 
-    /// @dev Consumes a specific LP position by tokenId (full exit — clears it).
+    /// 消费特定 tokenId 的 LP 头寸（完全退出并清除）
     function consumeLpTokenId(address account, uint256 tokenId, uint256 actualTokenReturned)
         external
         onlyLiquidityGateway
@@ -457,21 +506,17 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
     {
         Position memory lpPos = _lpPositions[account][tokenId];
         if (lpPos.trackedBalance == 0) return (0, 0);
-
         clearedTracked = lpPos.trackedBalance;
         clearedCost = lpPos.costWbnbWei;
 
-        // Track LP loss if actual returned < tracked
         if (actualTokenReturned < clearedTracked) {
             uint256 lost = clearedTracked - actualTokenReturned;
             uint256 lostCost = CostMath.proportionalFloor(clearedCost, lost, clearedTracked);
             emit LpLossRecorded(account, tokenId, lost, lostCost);
-            // Only clear up to what we can account for
             clearedTracked = actualTokenReturned;
             clearedCost = clearedCost > lostCost ? clearedCost - lostCost : 0;
         }
 
-        // Remove this specific tokenId
         delete _lpPositions[account][tokenId];
         if (lpTrackedTotal[account] >= clearedTracked) lpTrackedTotal[account] -= clearedTracked;
         if (lpCostTotal[account] >= clearedCost) lpCostTotal[account] -= clearedCost;
@@ -489,7 +534,7 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         );
     }
 
-    /// @dev Migrate LP cost when NFT ownership transfers.
+    /// LP 成本迁移（NFT 所有权转移时）
     function migrateLpCost(address from, address to, uint256 tokenId)
         external
         onlyLiquidityGateway
@@ -507,21 +552,17 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         if (lpCostTotal[from] >= costWbnbWei) lpCostTotal[from] -= costWbnbWei;
         lpTrackedTotal[to] += trackedTokens;
         lpCostTotal[to] += costWbnbWei;
-
         emit LpCostMigrated(from, to, tokenId, costWbnbWei, trackedTokens);
     }
 
-    /// @dev Fee collection: ZERO COST — never moves LP principal or cost.
+    /// 手续费领取：零成本 —— 永不移动 LP 本金或成本
     function onLiquidityFeeCollection(address account, uint256 tokenAmount) external override onlyToken {
         if (account == address(0)) revert ZeroAddress();
         if (tokenAmount == 0) return;
-
         Position memory userOld = _positions[account];
         uint256 actualAfter = IERC20(token).balanceOf(account);
         if (actualAfter < tokenAmount) revert InvalidPositionState();
         uint256 actualBefore = actualAfter - tokenAmount;
-
-        // Keep existing cost unchanged — fees are zero-cost
         if (_isKnownAndConsistent(userOld, actualBefore)) {
             Position memory userNew = Position({
                 costWbnbWei: userOld.costWbnbWei, trackedBalance: actualAfter, status: PositionStatus.KNOWN
@@ -541,20 +582,18 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         emit SystemAddressUpdated(account, enabled);
     }
 
-    // ────────────────────────────────────────────────────────────
-    // Internal helpers
-    // ────────────────────────────────────────────────────────────
+    // ─────────────────── 内部辅助函数 ───────────────────
 
+    /// 获取用户有效仓位（与链上余额对比，不一致则标记 UNKNOWN）
     function _effectiveUserPosition(address account, Position memory stored) private view returns (Position memory) {
         uint256 actual = IERC20(token).balanceOf(account);
         if (actual == stored.trackedBalance) return stored;
         return _unknownAt(actual);
     }
 
+    /// 检查仓位是否与链上余额一致且为 KNOWN
     function _isKnownAndConsistent(Position memory p, uint256 actualBalance) private pure returns (bool) {
-        if (actualBalance == 0) {
-            return p.trackedBalance == 0 && p.costWbnbWei == 0 && p.status == PositionStatus.NONE;
-        }
+        if (actualBalance == 0) return p.trackedBalance == 0 && p.costWbnbWei == 0 && p.status == PositionStatus.NONE;
         return p.trackedBalance == actualBalance && p.status == PositionStatus.KNOWN;
     }
 
@@ -582,6 +621,7 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         );
     }
 
+    /// 仓位校验：确保状态一致性
     function _validate(Position memory p) private pure {
         if (
             (p.trackedBalance == 0 && (p.costWbnbWei != 0 || p.status != PositionStatus.NONE))

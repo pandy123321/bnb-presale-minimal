@@ -87,17 +87,20 @@ notepad .env
 输出示例:
 
 ```
-=== PANGU2 V2 Deployed ===
-Token: 0x...
-TradeRouter: 0x...
-DividendDistributor: 0x...
-SupportPool: 0x...
-FeeVault: 0x...
-BuybackLocker: 0x...
-Pangu2Staking: 0x...
-V2Pair: 0x...
-V2Adapter: 0x...
-V2Oracle: 0x...
+=== PANGU2 V2 Deployed (2026-08-05) ===
+Token: 0xaf2bD8bF6b1a0E6B94c2b10150F9184D142eef1C
+TradeRouter: 0x16f5418A4A2D7D8675228fe2230A565e595954fe
+DividendDistributor: 0x6265b64de9a3f7198E40082ea82BAcCAfD1E14CB
+SupportPool: 0x91F8cEe7E08E5DC5f30d0582085af1fDE791D0A9
+FeeVault: 0xEF17753B7c690800EA65449A26491887c32536c8
+BuybackLocker: 0xBeDc42556ea3312dd643dcE133ed3b5bB5a1C957
+CostBasisManager: 0x384492a27ECC0Eb0A2b35FdE719fbb6ae2b4DbAF
+Pangu2Staking: 0x6CA7044Baf9336c572F1EE049a3288099c23e894
+V2Pair: 0x0Fe75c3460ed320649e133C1AA454881bC6c8b2E
+V2Adapter: 0xb3F319303655C61559593cb2968e438F789c79D5
+V2Oracle: 0xf16c14B412E69dA6793497AAdf52e38284BcF300
+Deployer: 0x6E257B171338BDe98fa1eA3aa62C41AfB0864C53
+Governance: 0x6E257B171338BDe98fa1eA3aa62C41AfB0864C53
 ```
 
 **记下所有地址。** 部署后存为环境变量:
@@ -144,7 +147,155 @@ Oracle 需要完整 `twapWindow`。**中途不要修改储备。**
 
 ---
 
-## 10. 手工测试
+## 10. 部署后配置（合约→项目）
+
+部署完成后，需要把合约地址写入以下 **5 个文件**，项目才能跑起来。
+
+### 10.1 contracts-v2\.env
+
+Bootstrap / Finalize 脚本需要这些变量：
+
+```env
+# 追加到 contracts-v2\.env 末尾
+# ⚠️ 值来自 Stage 1 的输出
+PANGU2_TOKEN=<Token 地址>
+PANGU2_ORACLE=<V2Oracle 地址>
+PANGU2_PAIR=<V2Pair 地址>
+```
+
+---
+
+### 10.2 backend\.env（Laravel API）
+
+```env
+# 复制 backend\.env.example → backend\.env，然后改下面的值：
+
+# ── 数据库（本地 PostgreSQL）──
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=bnb_presale
+DB_USERNAME=postgres
+DB_PASSWORD=<你设的 Postgres 密码>
+
+# 如果你用 Docker Compose：
+# DB_HOST=postgres
+# DB_USERNAME=bnb
+# DB_PASSWORD=bnb_dev_pass
+
+# ── Redis ──
+REDIS_HOST=127.0.0.1
+# 如果用 Docker Compose: REDIS_HOST=redis
+
+# ── 链配置 ──
+PANGU2_CHAIN_ID=97
+PANGU2_CHAIN_NAME=BSC-Testnet
+PANGU2_RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545
+PANGU2_SUPPORTED_NETWORKS=97
+PANGU2_DEPLOYMENT_BLOCK=<部署交易的区块号>
+
+# ── 合约地址（⚠️ 全部来自 Stage 1 输出）──
+PANGU2_TOKEN_ADDRESS=<Token 地址>
+PANGU2_TRADE_ROUTER_ADDRESS=<TradeRouter 地址>
+PANGU2_DIVIDEND_DISTRIBUTOR_ADDRESS=<DividendDistributor 地址>
+PANGU2_SUPPORT_POOL_ADDRESS=<SupportPool 地址>
+PANGU2_BUYBACK_LOCKER_ADDRESS=<BuybackLocker 地址>
+PANGU2_FEE_VAULT_ADDRESS=<FeeVault 地址>
+PANGU2_COST_BASIS_MANAGER_ADDRESS=<CostBasisManager 地址>
+PANGU2_STAKING_ADDRESS=<Pangu2Staking 地址>
+PANGU2_WBNB_ADDRESS=0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd
+
+# ── Admin 种子 ──
+SEED_ADMIN_PASSWORD=123456
+SEED_ADMIN_EMAIL=admin@pangu2.local
+SEED_ADMIN_NAME=Super Admin
+```
+
+---
+
+### 10.3 apps\dapp\.env（用户 DApp 前端，新建文件）
+
+```env
+# 文件路径: E:\github\bnb\bnb-presale-minimal\apps\dapp\.env
+VITE_CHAIN_ID=97
+VITE_RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545
+VITE_API_BASE_URL=http://localhost:8080/api
+VITE_TOKEN_ADDRESS=<Token 地址>
+VITE_TRADE_ROUTER_ADDRESS=<TradeRouter 地址>
+VITE_STAKING_ADDRESS=<Pangu2Staking 地址>
+```
+
+---
+
+### 10.4 apps\admin\.env（Admin 后台，新建文件）
+
+```env
+# 文件路径: E:\github\bnb\bnb-presale-minimal\apps\admin\.env
+VITE_API_BASE_URL=http://localhost:8080/api
+VITE_CHAIN_ID=97
+```
+
+---
+
+### 10.5 services\chain-worker\.env（链上事件索引，新建文件）
+
+```env
+# 文件路径: E:\github\bnb\bnb-presale-minimal\services\chain-worker\.env
+CHAIN_ID=97
+CHAIN_WORKER_RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545
+RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545
+
+CHAIN_WORKER_TRADE_ROUTER_ADDRESS=<TradeRouter 地址>
+CHAIN_WORKER_DIVIDEND_ADDRESS=<DividendDistributor 地址>
+DEPLOYMENT_BLOCK=<部署交易区块号>
+
+DATABASE_HOST=127.0.0.1
+DATABASE_PORT=5432
+DATABASE_NAME=bnb_presale
+DATABASE_USER=postgres
+DATABASE_PASSWORD=<你设的 Postgres 密码>
+
+START_BLOCK=<部署交易区块号>
+SCAN_BATCH_SIZE=1000
+CONFIRMATION_BLOCKS=12
+REORG_DEPTH=20
+
+WORKER_ID=worker-01
+LEASE_TTL_SECONDS=120
+SCAN_INTERVAL_SECONDS=15
+```
+
+---
+
+### 10.6 启动命令
+
+配置填完后，按以下顺序启动：
+
+```powershell
+# 1. 数据库 + 后端（Docker Compose 方式）
+cd E:\github\bnb\bnb-presale-minimal
+docker compose up -d postgres redis
+docker compose up -d backend nginx queue scheduler
+
+# 2. 数据库迁移 + Admin 种子
+docker compose exec backend php artisan migrate
+docker compose exec backend php artisan db:seed --class=AdminSeeder
+
+# 3. 前端
+cd E:\github\bnb\bnb-presale-minimal
+pnpm install
+cd apps\admin && pnpm dev     # Admin → http://localhost:5174
+# 新开终端：
+cd apps\dapp && pnpm dev      # DApp  → http://localhost:5173
+
+# 4. Chain Worker（可选）
+cd services\chain-worker
+pnpm install
+pnpm dev
+```
+
+---
+
+## 11. 手工测试
 
 ### 买卖
 

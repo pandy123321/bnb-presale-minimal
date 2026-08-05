@@ -11,7 +11,7 @@ describe("E2E Admin Slice", () => {
   it("POST /auth/login returns admin token", async () => {
     const res = await fetch(`${BASE}/auth/login`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "admin@pangu2.io", password: "test" }),
+      body: JSON.stringify({ email: "admin@pangu2.io", password: "password" }),
     });
     expect(res.status).toBe(200);
     const body = await res.json();

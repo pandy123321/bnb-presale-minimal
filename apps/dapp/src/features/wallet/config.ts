@@ -13,7 +13,7 @@ export const wagmiConfig = createConfig({
   connectors: [injected()],
   transports: {
     [anvil.id]: http(),
-    [bscTestnet.id]: http(),
+    [bscTestnet.id]: http("https://data-seed-prebsc-1-s1.binance.org:8545"),
     [bsc.id]: http(),
   },
 });

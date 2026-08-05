@@ -1,4 +1,3 @@
-<script setup lang="ts">
 import { ref, onUnmounted, readonly } from "vue";
 
 /**
@@ -48,4 +47,4 @@ export function useMarket() {
     startPolling,
   };
 }
-</script>
+

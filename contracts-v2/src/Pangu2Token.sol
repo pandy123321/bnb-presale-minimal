@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {FullMath} from "./libraries/FullMath.sol";
-import {ICostBasisManager} from "./interfaces/ICostBasisManager.sol";
-import {IFeeVault} from "./interfaces/IFeeVault.sol";
-import {TransferContext} from "./libraries/TransferContext.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
+import { FullMath } from "./libraries/FullMath.sol";
+import { ICostBasisManager } from "./interfaces/ICostBasisManager.sol";
+import { IFeeVault } from "./interfaces/IFeeVault.sol";
+import { TransferContext } from "./libraries/TransferContext.sol";
 
 contract Pangu2Token is ERC20, AccessControl, Pausable {
-
     bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
     bytes32 public constant SETTLEMENT_ROLE = keccak256("SETTLEMENT_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
@@ -19,7 +18,7 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
     uint16 public constant BPS_DENOMINATOR = 10_000;
     uint16 public constant BUY_TAX_BPS = 400;
     uint16 public constant NORMAL_SELL_TAX_BPS = 400;
-    uint16 public constant PROFIT_SELL_TAX_BPS = 1_000;
+    uint16 public constant PROFIT_SELL_TAX_BPS = 1000;
     uint16 public constant PROFIT_SUPPORT_BPS = 900;
     uint16 public constant PROFIT_BURN_BPS = 100;
     uint256 public constant MIN_SELL_AMOUNT = 100;
@@ -55,15 +54,9 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
     event SystemAddressUpdated(address indexed account, bool enabled);
     event LiquidityManagerUpdated(address indexed account, bool enabled);
     event LiquidityContextsRevoked(address indexed account);
-    event SystemTransferContextUpdated(
-        address indexed account, TransferContext.Kind indexed kind, bool enabled
-    );
+    event SystemTransferContextUpdated(address indexed account, TransferContext.Kind indexed kind, bool enabled);
     event TokensPurchased(
-        address indexed buyer,
-        uint256 amountIn,
-        uint256 grossTokens,
-        uint256 taxTokens,
-        uint256 netTokens
+        address indexed buyer, uint256 amountIn, uint256 grossTokens, uint256 taxTokens, uint256 netTokens
     );
     event TokensSold(
         address indexed seller,
@@ -76,9 +69,7 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
     );
     event ProtocolBurn(address indexed operator, uint256 amount);
 
-    constructor(address initialHolder, address governance, address emergencyAccount)
-        ERC20("PANGU2", "PANGU2")
-    {
+    constructor(address initialHolder, address governance, address emergencyAccount) ERC20("PANGU2", "PANGU2") {
         if (initialHolder == address(0) || governance == address(0) || emergencyAccount == address(0)) {
             revert ZeroAddress();
         }
@@ -116,8 +107,9 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
     }
 
     function setSystemAddress(address account, bool enabled) external onlyRole(GOVERNANCE_ROLE) {
-        if (enabled) _requireContract(account);
-        else {
+        if (enabled) {
+            _requireContract(account);
+        } else {
             if (account == address(0)) revert ZeroAddress();
             if (coreConfigured && (account == address(costBasisManager) || account == address(feeVault))) {
                 revert CoreSystemAddressImmutable(account);
@@ -151,18 +143,14 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
     {
         if (!isSystemAddress[account]) revert DirectSystemInteractionForbidden(account, account, msg.sender);
         if (
-            kind != TransferContext.Kind.LIQUIDITY_WITHDRAWAL
-                && kind != TransferContext.Kind.LIQUIDITY_FEE_COLLECTION
-                && kind != TransferContext.Kind.DIVIDEND_CLAIM
-                && kind != TransferContext.Kind.SYSTEM_CREDIT_UNKNOWN
-                && kind != TransferContext.Kind.STAKING_DEPOSIT
-                && kind != TransferContext.Kind.STAKING_PRINCIPAL_RETURN
+            kind != TransferContext.Kind.LIQUIDITY_WITHDRAWAL && kind != TransferContext.Kind.LIQUIDITY_FEE_COLLECTION
+                && kind != TransferContext.Kind.DIVIDEND_CLAIM && kind != TransferContext.Kind.SYSTEM_CREDIT_UNKNOWN
+                && kind != TransferContext.Kind.STAKING_DEPOSIT && kind != TransferContext.Kind.STAKING_PRINCIPAL_RETURN
                 && kind != TransferContext.Kind.STAKING_REWARD
         ) revert InvalidTransferContext(kind);
         if (
-            (kind == TransferContext.Kind.LIQUIDITY_WITHDRAWAL
-                || kind == TransferContext.Kind.LIQUIDITY_FEE_COLLECTION)
-            && !isLiquidityManager[account]
+            (kind == TransferContext.Kind.LIQUIDITY_WITHDRAWAL || kind == TransferContext.Kind.LIQUIDITY_FEE_COLLECTION)
+                && !isLiquidityManager[account]
         ) {
             revert TransferContextNotAllowed(account, kind);
         }
@@ -183,9 +171,8 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
 
         // Re-check role at execution time, not just at grant time
         if (
-            (kind == TransferContext.Kind.LIQUIDITY_WITHDRAWAL
-                || kind == TransferContext.Kind.LIQUIDITY_FEE_COLLECTION)
-            && !isLiquidityManager[msg.sender]
+            (kind == TransferContext.Kind.LIQUIDITY_WITHDRAWAL || kind == TransferContext.Kind.LIQUIDITY_FEE_COLLECTION)
+                && !isLiquidityManager[msg.sender]
         ) revert TransferContextNotAllowed(msg.sender, kind);
 
         if (!isSystemAddress[msg.sender] || !systemTransferContextAllowed[msg.sender][kind]) {
@@ -210,7 +197,9 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
     }
 
     function previewSellTax(uint256 sellAmount, uint16 taxBps)
-        public pure returns (uint256 supportAmount, uint256 burnAmount, uint256 swapAmount)
+        public
+        pure
+        returns (uint256 supportAmount, uint256 burnAmount, uint256 swapAmount)
     {
         if (sellAmount < MIN_SELL_AMOUNT) revert InvalidAmount();
         if (taxBps != NORMAL_SELL_TAX_BPS && taxBps != PROFIT_SELL_TAX_BPS) revert UnsupportedTaxRate(taxBps);
@@ -228,7 +217,10 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
     // ── Settlement ──
 
     function settleBuy(address buyer, uint256 grossAmount, uint256 costWbnbWei)
-        external onlyRole(SETTLEMENT_ROLE) whenNotPaused returns (uint256 taxAmount, uint256 netAmount)
+        external
+        onlyRole(SETTLEMENT_ROLE)
+        whenNotPaused
+        returns (uint256 taxAmount, uint256 netAmount)
     {
         if (!coreConfigured) revert CoreNotConfigured();
         if (buyer == address(0)) revert ZeroAddress();
@@ -244,20 +236,29 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
     }
 
     function settleSell(address seller, uint256 sellAmount, uint16 taxBps)
-        external onlyRole(SETTLEMENT_ROLE) whenNotPaused returns (uint256 supportAmount, uint256 burnAmount, uint256 swapAmount)
+        external
+        onlyRole(SETTLEMENT_ROLE)
+        whenNotPaused
+        returns (uint256 supportAmount, uint256 burnAmount, uint256 swapAmount)
     {
-        if (!coreConfigured) revert CoreNotConfigured();
+        if (!coreConfigured) {
+            revert CoreNotConfigured();
+        }
         if (seller == address(0)) revert ZeroAddress();
         if (sellAmount == 0) revert InvalidAmount();
         if (taxBps != NORMAL_SELL_TAX_BPS && taxBps != PROFIT_SELL_TAX_BPS) revert UnsupportedTaxRate(taxBps);
         (supportAmount, burnAmount, swapAmount) = previewSellTax(sellAmount, taxBps);
         _update(msg.sender, address(feeVault), supportAmount);
-        if (burnAmount != 0) { _burn(msg.sender, burnAmount); emit ProtocolBurn(msg.sender, burnAmount); }
+        if (burnAmount != 0) {
+            _burn(msg.sender, burnAmount);
+            emit ProtocolBurn(msg.sender, burnAmount);
+        }
         feeVault.credit(IFeeVault.Bucket.SUPPORT, supportAmount);
     }
 
     function emitSellSettlementAmountOut(address seller, uint256 tokenIn, uint16 taxBps, uint256 amountOut)
-        external onlyRole(SETTLEMENT_ROLE)
+        external
+        onlyRole(SETTLEMENT_ROLE)
     {
         if (seller == address(0)) revert ZeroAddress();
         if (tokenIn == 0) revert InvalidAmount();
@@ -266,10 +267,36 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
         emit TokensSold(seller, tokenIn, taxBps, supportAmount, burnAmount, swapAmount, amountOut);
     }
 
+    // ── Staking Deposit ──
+
+    /// Controlled staking deposit: pulls tokens from user to Staking contract.
+    /// Only callable by a system address with STAKING_DEPOSIT context permission.
+    function stakingDeposit(address from, uint256 amount) external whenNotPaused returns (bool) {
+        if (!coreConfigured) revert CoreNotConfigured();
+        if (from == address(0)) revert ZeroAddress();
+        if (amount == 0) revert InvalidAmount();
+        if (
+            !isSystemAddress[msg.sender]
+                || !systemTransferContextAllowed[msg.sender][TransferContext.Kind.STAKING_DEPOSIT]
+        ) {
+            revert TransferContextNotAllowed(msg.sender, TransferContext.Kind.STAKING_DEPOSIT);
+        }
+        if (isSystemAddress[from] || isPair[from]) {
+            revert DirectSystemInteractionForbidden(from, msg.sender, msg.sender);
+        }
+        _update(from, msg.sender, amount);
+        return true;
+    }
+
     // ── Pause ──
 
-    function pause() external onlyRole(PAUSER_ROLE) { _pause(); }
-    function unpause() external onlyRole(UNPAUSER_ROLE) { _unpause(); }
+    function pause() external onlyRole(PAUSER_ROLE) {
+        _pause();
+    }
+
+    function unpause() external onlyRole(UNPAUSER_ROLE) {
+        _unpause();
+    }
 
     // ── Transfer hooks ──
 
@@ -290,6 +317,7 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
 
         bool liquidityDeposit;
         bool sellEntry;
+        bool stakingDeposit;
         bool fromUser = _isUser(from);
         bool toUser = _isUser(to);
 
@@ -308,6 +336,8 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
                 liquidityDeposit = true;
             } else if (hasRole(SETTLEMENT_ROLE, to) && msg.sender == to) {
                 sellEntry = true;
+            } else if (msg.sender == to && systemTransferContextAllowed[to][TransferContext.Kind.STAKING_DEPOSIT]) {
+                stakingDeposit = true;
             } else {
                 revert DirectSystemInteractionForbidden(from, to, msg.sender);
             }
@@ -325,6 +355,8 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
 
         if (liquidityDeposit) {
             costBasisManager.onLiquidityDeposit(from, value);
+        } else if (stakingDeposit) {
+            costBasisManager.onStakingDeposit(from, value);
         } else if (_activeContext == TransferContext.Kind.LIQUIDITY_WITHDRAWAL) {
             costBasisManager.onLiquidityWithdrawal(to, value);
         } else if (_activeContext == TransferContext.Kind.LIQUIDITY_FEE_COLLECTION) {

@@ -240,8 +240,22 @@ const MOCK_ADMIN = {
   email: "admin@pangu2.io",
   role: "SUPER_ADMIN" as const,
 };
+const MOCK_ADMIN_PASSWORD = "password";
 
-app.post("/admin-api/v1/projects/pangu2/auth/login", (_req, res) => {
+app.post("/admin-api/v1/projects/pangu2/auth/login", (req, res) => {
+  const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+  const password = typeof req.body?.password === "string" ? req.body.password : "";
+
+  if (!email || !password) {
+    res.status(422).json(errorEnvelope("VALIDATION_ERROR", "Email and password are required.", false));
+    return;
+  }
+
+  if (email !== MOCK_ADMIN.email || password !== MOCK_ADMIN_PASSWORD) {
+    res.status(401).json(errorEnvelope("AUTH_FAILED", "Invalid credentials.", false));
+    return;
+  }
+
   res.json(envelope({
     token: "admin-session-token",
     admin: MOCK_ADMIN,

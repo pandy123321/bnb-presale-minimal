@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {IPangu2Staking} from "./interfaces/IPangu2Staking.sol";
-import {IPangu2Token} from "./interfaces/IPangu2Token.sol";
-import {TransferContext} from "./libraries/TransferContext.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+import { IPangu2Staking } from "./interfaces/IPangu2Staking.sol";
+import { IPangu2Token } from "./interfaces/IPangu2Token.sol";
+import { TransferContext } from "./libraries/TransferContext.sol";
 
 contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
     using SafeERC20 for IERC20;
@@ -21,16 +21,16 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
     mapping(address => uint256) public userTotalStaked;
 
     // ── Reward state ──
-    uint256 public availableRewardReserve;   // funded tokens not yet committed to any period
-    uint256 public accruedRewardLiability;  // rewards already emitted by periods but not yet claimed
-    uint256 public totalRewardPaid;         // lifetime rewards paid
+    uint256 public availableRewardReserve; // funded tokens not yet committed to any period
+    uint256 public accruedRewardLiability; // rewards already emitted by periods but not yet claimed
+    uint256 public totalRewardPaid; // lifetime rewards paid
 
-    uint256 public rewardRate;              // tokens per second (globally across all stakers)
-    uint256 public periodFinish;            // when current reward period ends (0 = inactive)
+    uint256 public rewardRate; // tokens per second (globally across all stakers)
+    uint256 public periodFinish; // when current reward period ends (0 = inactive)
     uint256 public lastUpdateTime;
-    uint256 public rewardPerTokenStored;    // scaled 1e18
+    uint256 public rewardPerTokenStored; // scaled 1e18
 
-    uint256 public constant MAX_REWARD_RATE = 115740740740740; // ~1 token/day at 18 decimals
+    uint256 public constant MAX_REWARD_RATE = 115_740_740_740_740; // ~1 token/day at 18 decimals
     uint16 public constant EARLY_UNSTAKE_PENALTY_BPS = 1000;
     uint64 public constant MAX_LOCK_SECONDS = 730 days;
     uint256 public constant MIN_STAKE = 1 ether;
@@ -177,25 +177,26 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
     // ── Core Actions ──────────────────────────
 
     function stake(uint256 amount, uint64 lockSeconds)
-        external nonReentrant updateReward(msg.sender) returns (uint256 positionId)
+        external
+        nonReentrant
+        updateReward(msg.sender)
+        returns (uint256 positionId)
     {
         if (amount < MIN_STAKE) revert InvalidAmount();
         if (lockSeconds == 0 || lockSeconds > MAX_LOCK_SECONDS) revert InvalidLockDuration();
 
+        // Controlled stake via Token's STAKING_DEPOSIT path — preserves Cost Basis
         uint256 beforeBalance = IERC20(address(token)).balanceOf(address(this));
-        IERC20(address(token)).safeTransferFrom(msg.sender, address(this), amount);
+        token.stakingDeposit(msg.sender, amount);
         uint256 received = IERC20(address(token)).balanceOf(address(this)) - beforeBalance;
         if (received < MIN_STAKE) revert InvalidAmount();
 
         uint64 unlockAt = uint64(block.timestamp) + lockSeconds;
         positionId = _positions[msg.sender].length;
 
-        _positions[msg.sender].push(StakePosition({
-            amount: received,
-            lockedAt: uint64(block.timestamp),
-            unlockAt: unlockAt,
-            claimed: false
-        }));
+        _positions[msg.sender].push(
+            StakePosition({ amount: received, lockedAt: uint64(block.timestamp), unlockAt: unlockAt, claimed: false })
+        );
 
         userPositionCount[msg.sender] = positionId + 1;
         userTotalStaked[msg.sender] += received;
@@ -204,9 +205,7 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
         emit Staked(msg.sender, received, unlockAt, positionId);
     }
 
-    function unstake(uint256 positionId)
-        external nonReentrant updateReward(msg.sender) returns (uint256 amount)
-    {
+    function unstake(uint256 positionId) external nonReentrant updateReward(msg.sender) returns (uint256 amount) {
         StakePosition storage pos = _requireOwnPosition(msg.sender, positionId);
         if (pos.claimed) revert AlreadyClaimed();
         if (block.timestamp < pos.unlockAt) revert StillLocked(pos.unlockAt);
@@ -221,14 +220,17 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
     }
 
     function earlyUnstake(uint256 positionId)
-        external nonReentrant updateReward(msg.sender) returns (uint256 amount, uint256 penalty)
+        external
+        nonReentrant
+        updateReward(msg.sender)
+        returns (uint256 amount, uint256 penalty)
     {
         StakePosition storage pos = _requireOwnPosition(msg.sender, positionId);
         if (pos.claimed) revert AlreadyClaimed();
         if (block.timestamp >= pos.unlockAt) revert("use unstake() instead");
 
         amount = pos.amount;
-        penalty = (amount * EARLY_UNSTAKE_PENALTY_BPS) / 10000;
+        penalty = (amount * EARLY_UNSTAKE_PENALTY_BPS) / 10_000;
         uint256 netAmount = amount - penalty;
 
         // Forfeit only THIS position's proportional rewards
@@ -258,7 +260,8 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
 
         // Protect ALL staked principal, not just the claiming user's
         uint256 availableForRewards = IERC20(address(token)).balanceOf(address(this)) > totalStaked
-            ? IERC20(address(token)).balanceOf(address(this)) - totalStaked : 0;
+            ? IERC20(address(token)).balanceOf(address(this)) - totalStaked
+            : 0;
         if (reward > availableForRewards) reward = availableForRewards;
 
         _unclaimedRewards[msg.sender] -= reward;

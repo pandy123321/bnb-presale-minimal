@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {TransferContext} from "../libraries/TransferContext.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { TransferContext } from "../libraries/TransferContext.sol";
 
 interface IPangu2Token is IERC20 {
     function BUY_TAX_BPS() external view returns (uint16);
@@ -25,6 +25,7 @@ interface IPangu2Token is IERC20 {
         returns (uint256 supportAmount, uint256 burnAmount, uint256 swapAmount);
 
     function systemTransfer(address to, uint256 amount, TransferContext.Kind kind) external returns (bool);
+    function stakingDeposit(address from, uint256 amount) external returns (bool);
     function emitSellSettlementAmountOut(address seller, uint256 tokenIn, uint16 taxBps, uint256 amountOut) external;
 
     function isPair(address account) external view returns (bool);
