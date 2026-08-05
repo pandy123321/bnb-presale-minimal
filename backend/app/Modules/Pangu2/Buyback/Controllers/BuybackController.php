@@ -37,7 +37,7 @@ class BuybackController extends Controller
             ->get();
 
         if ($events->isEmpty()) {
-            return $this->mockBuybacks();
+            return ApiEnvelope::paginated([], 1, 20, 0, 'LIVE');
         }
 
         $data = $events->map(fn ($e) => [
@@ -76,7 +76,7 @@ class BuybackController extends Controller
             ->get();
 
         if ($batches->isEmpty()) {
-            return $this->mockLockerBatches();
+            return ApiEnvelope::paginated([], 1, 20, 0, 'LIVE');
         }
 
         $data = $batches->map(fn ($b) => [
@@ -95,25 +95,5 @@ class BuybackController extends Controller
     private function chainId(): int
     {
         return (int) config('pangu2.chain_id', 31337);
-    }
-
-    private function mockBuybacks(): JsonResponse
-    {
-        $data = [
-            ['batch_id' => 1247, 'amount_bnb_wei' => '10000000000000000', 'tokens_raw' => '4612000000000000000000', 'trigger' => '0x' . str_repeat('aa', 20), 'locker' => '0x' . str_repeat('bb', 20), 'timestamp' => now()->subMinutes(2)->toIso8601String()],
-            ['batch_id' => 1246, 'amount_bnb_wei' => '10000000000000000', 'tokens_raw' => '4598000000000000000000', 'trigger' => '0x' . str_repeat('cc', 20), 'locker' => '0x' . str_repeat('dd', 20), 'timestamp' => now()->subMinutes(3)->toIso8601String()],
-        ];
-
-        return ApiEnvelope::paginated($data, 1, 20, 2, 'LIVE');
-    }
-
-    private function mockLockerBatches(): JsonResponse
-    {
-        $data = [
-            ['batch_id' => 1247, 'tokens_raw' => '4612000000000000000000', 'locked_until' => now()->addDays(365)->toIso8601String(), 'duration_days' => 365, 'status' => 'locked'],
-            ['batch_id' => 1246, 'tokens_raw' => '4598000000000000000000', 'locked_until' => now()->addDays(364)->toIso8601String(), 'duration_days' => 365, 'status' => 'locked'],
-        ];
-
-        return ApiEnvelope::paginated($data, 1, 20, 2, 'LIVE');
     }
 }

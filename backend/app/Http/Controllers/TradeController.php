@@ -10,13 +10,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 
-/**
- * TradeController — Quote & Transaction API (MOCK stage).
- *
- * ABI unavailable. All quotes return source="mock" and MOCK_DATA.
- * When ABI becomes available, swap QuoteService for an adapter
- * that calls previewBuy / previewSell on the on-chain contract.
- */
 final class TradeController extends Controller
 {
     public function __construct(
@@ -25,8 +18,6 @@ final class TradeController extends Controller
 
     /**
      * POST /api/v1/projects/pangu2/quotes/buy
-     *
-     * Request: { amount_bnb_wei: "100000000000000000" }
      */
     public function buyQuote(Request $request): JsonResponse
     {
@@ -34,15 +25,19 @@ final class TradeController extends Controller
             'amount_bnb_wei' => ['required', 'string', 'regex:/^[1-9][0-9]*$/'],
         ]);
 
-        $data = $this->quote->getBuyQuote($validated['amount_bnb_wei']);
-
-        return ApiEnvelope::success($data, 'LIVE', $data['quote_block']);
+        try {
+            $data = $this->quote->getBuyQuote($validated['amount_bnb_wei']);
+            $status = $data['source'] !== 'mock' ? 'LIVE' : 'UNAVAILABLE';
+            return ApiEnvelope::success($data, $status, $data['quote_block'] ?? null);
+        } catch (\InvalidArgumentException $e) {
+            return ApiEnvelope::error('INVALID_AMOUNT', $e->getMessage());
+        } catch (\Throwable $e) {
+            return ApiEnvelope::error('QUOTE_FAILED', 'Unable to generate buy quote', true);
+        }
     }
 
     /**
      * POST /api/v1/projects/pangu2/quotes/sell
-     *
-     * Request: { amount_token_raw: "46235000000000000000000", wallet_address: "0x..." }
      */
     public function sellQuote(Request $request): JsonResponse
     {
@@ -51,48 +46,58 @@ final class TradeController extends Controller
             'wallet_address'   => ['required', 'string', 'max:42'],
         ]);
 
-        $data = $this->quote->getSellQuote($validated['amount_token_raw'], $validated['wallet_address']);
-
-        return ApiEnvelope::success($data, 'LIVE', $data['quote_block']);
+        try {
+            $data = $this->quote->getSellQuote($validated['amount_token_raw'], $validated['wallet_address']);
+            $status = $data['source'] !== 'mock' ? 'LIVE' : 'UNAVAILABLE';
+            return ApiEnvelope::success($data, $status, $data['quote_block'] ?? null);
+        } catch (\InvalidArgumentException $e) {
+            return ApiEnvelope::error('INVALID_AMOUNT', $e->getMessage());
+        } catch (\Throwable $e) {
+            return ApiEnvelope::error('QUOTE_FAILED', 'Unable to generate sell quote', true);
+        }
     }
 
     /**
      * GET /api/v1/projects/pangu2/wallets/{address}/transactions
      *
-     * Returns a fixed set of mock transactions for any address.
+     * Returns real transaction data from chain_raw_events or UNAVAILABLE.
      */
     public function transactions(string $address, Request $request): JsonResponse
     {
-        $mockBlock = '42816000';
+        $chainId = (int) config('pangu2.chain_id', 31337);
 
-        return ApiEnvelope::success([
-            [
-                'tx_hash'       => '0xe1b4f2a3c5d67890123456789abcdef01234567890abcdef0123456789abcdef',
-                'block_number'  => '42815900',
-                'type'          => 'buy',
-                'amount_in'     => '0.500000000000000000',
-                'amount_out'    => '231175000000000000000000',
-                'status'        => 'confirmed',
-                'timestamp'     => now()->subHours(2)->toIso8601String(),
-            ],
-            [
-                'tx_hash'       => '0xfe9876543210abcdef1234567890abcdef1234567890abcdef1234567890abcd',
-                'block_number'  => '42780000',
-                'type'          => 'buy',
-                'amount_in'     => '1.000000000000000000',
-                'amount_out'    => '462350000000000000000000',
-                'status'        => 'confirmed',
-                'timestamp'     => now()->subHours(5)->toIso8601String(),
-            ],
-            [
-                'tx_hash'       => '0xdcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210fe',
-                'block_number'  => '42650000',
-                'type'          => 'claim',
-                'amount_in'     => '0',
-                'amount_out'    => '42000000000000000000',
-                'status'        => 'confirmed',
-                'timestamp'     => now()->subDays(2)->toIso8601String(),
-            ],
-        ], 'LIVE', $mockBlock);
+        try {
+            $events = \DB::table('chain_raw_events')
+                ->where('chain_id', $chainId)
+                ->whereRaw('(decoded_data->>\'buyer\' = ? OR decoded_data->>\'seller\' = ?)', [$address, $address])
+                ->orderBy('block_number', 'desc')
+                ->limit(50)
+                ->get();
+
+            if ($events->isEmpty()) {
+                return ApiEnvelope::success([
+                    'message' => 'No transactions found for this address',
+                ], 'LIVE');
+            }
+
+            $items = [];
+            foreach ($events as $ev) {
+                $decoded = json_decode($ev->decoded_data, true) ?? [];
+                $items[] = [
+                    'tx_hash'      => $ev->transaction_hash,
+                    'block_number' => (string) $ev->block_number,
+                    'event_name'   => $ev->event_name,
+                    'decoded_data' => $decoded,
+                    'timestamp'    => $ev->block_timestamp,
+                    'status'       => $ev->status,
+                ];
+            }
+
+            return ApiEnvelope::success(['items' => $items], 'LIVE');
+        } catch (\Throwable) {
+            return ApiEnvelope::success([
+                'message' => 'Transaction data unavailable — chain worker not yet synced',
+            ], 'UNAVAILABLE');
+        }
     }
 }

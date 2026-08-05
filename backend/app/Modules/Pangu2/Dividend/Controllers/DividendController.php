@@ -21,7 +21,7 @@ class DividendController extends Controller
      * GET /api/v1/projects/pangu2/dividend/epochs/current
      *
      * Return the current epoch with tiers and allocations.
-     * Falls back to MOCK_DATA if no epoch exists in the database.
+     * Returns UNAVAILABLE if no epoch exists in the database.
      */
     public function current(): JsonResponse
     {
@@ -30,7 +30,11 @@ class DividendController extends Controller
             ->first();
 
         if (!$epoch) {
-            return $this->mockCurrentEpoch();
+            return ApiEnvelope::error(
+                'NO_EPOCH',
+                'No dividend epoch has been published yet. Data will become available after the first epoch is created.',
+                false, [], 503,
+            );
         }
 
         $tiers = $this->buildTiers($epoch->epoch_id);
@@ -195,20 +199,8 @@ class DividendController extends Controller
         return $tiers;
     }
 
-    private function mockCurrentEpoch(): JsonResponse
+    private function chainId(): int
     {
-        return ApiEnvelope::success([
-            'epoch_id'           => 28,
-            'snapshot_block'     => '42814660',
-            'total_dividend_raw' => '6420000000000000000000000',
-            'merkle_root'        => '0x76b100000000000000000000000000000000000000000000000000000000c4a8',
-            'tiers'              => [
-                ['name' => 'Tier 1', 'rank_range' => '1-10',  'share_percent' => 35],
-                ['name' => 'Tier 2', 'rank_range' => '11-30', 'share_percent' => 25],
-                ['name' => 'Tier 3', 'rank_range' => '31-60', 'share_percent' => 25],
-                ['name' => 'Tier 4', 'rank_range' => '61-100','share_percent' => 15],
-            ],
-            'status'             => 'claim_open',
-        ], 'LIVE');
+        return (int) config('pangu2.chain_id', 31337);
     }
 }

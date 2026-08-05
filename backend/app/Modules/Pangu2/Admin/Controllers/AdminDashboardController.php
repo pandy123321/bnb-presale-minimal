@@ -15,126 +15,72 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 
-/**
- * Admin Controller — Dashboard KPIs consuming data from B05+B06 modules.
- * All endpoints require admin authentication + RBAC.
- */
 class AdminDashboardController extends Controller
 {
-    /**
-     * GET /admin-api/v1/projects/pangu2/dashboard
-     *
-     * Aggregated KPIs from transaction projections, dividend epochs,
-     * buyback events, and locker batches.
-     */
     public function dashboard(): JsonResponse
     {
         $chainId = $this->chainId();
 
-        // ── Transaction KPIs ──
-        $totalTransactions = TransactionProjection::where('chain_id', $chainId)
-            ->where('status', 'confirmed')
-            ->count();
+        $totalTransactions = TransactionProjection::where('chain_id', $chainId)->where('status', 'confirmed')->count();
+        $totalBuy   = TransactionProjection::where('chain_id', $chainId)->where('type', 'buy')->where('status', 'confirmed')->count();
+        $totalSell  = TransactionProjection::where('chain_id', $chainId)->where('type', 'sell')->where('status', 'confirmed')->count();
 
-        $totalBuy = TransactionProjection::where('chain_id', $chainId)
-            ->where('type', 'buy')
-            ->where('status', 'confirmed')
-            ->count();
-
-        $totalSell = TransactionProjection::where('chain_id', $chainId)
-            ->where('type', 'sell')
-            ->where('status', 'confirmed')
-            ->count();
-
-        $uniqueWallets = TransactionProjection::where('chain_id', $chainId)
-            ->where('status', 'confirmed')
-            ->distinct('from_address')
-            ->count('from_address');
-
-        // ── Dividend KPIs ──
-        $currentEpoch = DividendEpoch::where('chain_id', $chainId)
-            ->orderBy('epoch_id', 'desc')
-            ->first();
-
-        $totalClaimed = DividendAllocation::where('chain_id', $chainId)
-            ->where('claimed', true)
-            ->count();
-
-        $totalAllocatedRaw = DividendAllocation::where('chain_id', $chainId)
-            ->sum('allocated_raw');
-
-        // ── Buyback KPIs ──
+        $currentEpoch = DividendEpoch::where('chain_id', $chainId)->orderBy('epoch_id', 'desc')->first();
+        $totalClaimed = DividendAllocation::where('chain_id', $chainId)->where('claimed', true)->count();
         $totalBuybacks = BuybackEvent::where('chain_id', $chainId)->count();
-        $totalBuybackBnbWei = BuybackEvent::where('chain_id', $chainId)->sum('bnb_amount_wei');
+        $activeBatches = LockerBatch::where('chain_id', $chainId)->where('status', 'locked')->count();
 
-        // ── Locker KPIs ──
-        $activeBatches = LockerBatch::where('chain_id', $chainId)
-            ->where('status', 'locked')
-            ->count();
-        $totalLockedRaw = LockerBatch::where('chain_id', $chainId)
-            ->where('status', 'locked')
-            ->sum('tokens_raw');
+        $hasData = $totalTransactions > 0 || ($currentEpoch !== null);
 
         return ApiEnvelope::success([
-            // Transaction
             'total_transactions'      => $totalTransactions,
             'total_buy'               => $totalBuy,
             'total_sell'              => $totalSell,
-            'unique_wallets'          => $uniqueWallets,
-            // Dividend
             'current_epoch_id'        => $currentEpoch?->epoch_id ?? 0,
             'current_epoch_status'    => $currentEpoch?->status ?? 'pending',
             'total_claimed'           => $totalClaimed,
-            'total_allocated_raw'     => $totalAllocatedRaw ?? '0',
-            // Buyback
             'total_buybacks'          => $totalBuybacks,
-            'total_buyback_bnb_wei'   => $totalBuybackBnbWei ?? '0',
-            // Locker
             'active_locker_batches'   => $activeBatches,
-            'total_locked_tokens_raw' => $totalLockedRaw ?? '0',
-            // RBAC context for the current admin
             'your_permissions'        => RbacMatrix::permissionsFor($this->currentRole()),
-        ], $currentEpoch ? 'LIVE' : 'LIVE');
+        ], $hasData ? 'LIVE' : 'UNAVAILABLE');
     }
 
     /**
      * GET /admin-api/v1/projects/pangu2/contracts
+     * Returns real contract addresses from pangu2 config — no fake addresses.
      */
     public function contracts(): JsonResponse
     {
-        return ApiEnvelope::success([
-            [
-                'name'              => 'Pangu2TradeRouter',
-                'address'           => '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-                'abi_version'       => '1.0.0',
-                'deployment_block'  => '42000000',
-                'status'            => 'ACTIVE',
-            ],
-            [
-                'name'              => 'DividendDistributor',
-                'address'           => '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-                'abi_version'       => '1.0.0',
-                'deployment_block'  => '42000001',
-                'status'            => 'ACTIVE',
-            ],
-            [
-                'name'              => 'SupportPool',
-                'address'           => '0xcccccccccccccccccccccccccccccccccccccccc',
-                'abi_version'       => '1.0.0',
-                'deployment_block'  => '42000002',
-                'status'            => 'ACTIVE',
-            ],
-            [
-                'name'              => 'BuybackLocker',
-                'address'           => '0xdddddddddddddddddddddddddddddddddddddddd',
-                'abi_version'       => '1.0.0',
-                'deployment_block'  => '42000003',
-                'status'            => 'ACTIVE',
-            ],
-        ], 'LIVE');
-    }
+        $chainId = (int) config('pangu2.chain_id', 31337);
 
-    // ── Helpers ──────────────────────────────
+        $contracts = [
+            ['name' => 'Pangu2Token',             'env' => 'token_address'],
+            ['name' => 'Pangu2TradeRouter',       'env' => 'trade_router_address'],
+            ['name' => 'DividendDistributor',     'env' => 'dividend_distributor_address'],
+            ['name' => 'SupportPool',             'env' => 'support_pool_address'],
+            ['name' => 'BuybackLocker',           'env' => 'buyback_locker_address'],
+            ['name' => 'FeeVault',                'env' => 'fee_vault_address'],
+            ['name' => 'CostBasisManager',        'env' => 'cost_basis_manager_address'],
+            ['name' => 'Pangu2Staking',           'env' => 'staking_address'],
+        ];
+
+        $hasAny = false;
+        $items = [];
+        foreach ($contracts as $c) {
+            $addr = config("pangu2.{$c['env']}", '');
+            if ($addr === '') continue;
+            $hasAny = true;
+            $items[] = [
+                'name'    => $c['name'],
+                'address' => $addr,
+                'chain_id'=> $chainId,
+                'status'  => 'ACTIVE',
+            ];
+        }
+
+        $status = $hasAny ? 'LIVE' : 'UNAVAILABLE';
+        return ApiEnvelope::success($items, $status);
+    }
 
     private function chainId(): int
     {
