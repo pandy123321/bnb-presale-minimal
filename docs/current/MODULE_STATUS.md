@@ -1,12 +1,14 @@
 # PANGU2 Module Status
 
-Adopted at baseline commit `f8df5c35`. Each repair iteration tracked via external audit records.
+Adopted at baseline commit `f8df5c35`. Active audit series: #302 (P2), #307 (P4), #313 (P5), #316 (P6).
 
 ```
+Phase 1-7 repair audit chain:
 Audit #89: f8df5c35 — 6 P1 (initial CI)
-Audit #92: ec958a42 — 2 P1 (fork timing + lockfile)
-Audit #93: c921c04 — 3 P1 (fork security + config + paths)
-Audit #94: 81ca79f — 4 P1/5 P2 (RPC secret + external PR + state model)
+Audit #302: bc278c7a — P2 Oracle CF TWAP (CHANGES_REQUIRED)
+Audit #307: f722a684 — P4 Mock-as-LIVE 5 controllers (CHANGES_REQUIRED)
+Audit #313: 58b5bd66 — P5 API contracts (CHANGES_REQUIRED)
+Audit #316: 4299870 — P6 DApp mock cleanup (PENDING)
 ```
 
 ## Status Definitions
