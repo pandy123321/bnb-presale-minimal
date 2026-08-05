@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onUnmounted } from "vue";
 const visible = ref(false); const message = ref("");
 let timer: ReturnType<typeof setTimeout> | null = null;
-function show(msg: string, ms = 2500) { message.value = msg; visible.value = true; if (timer) clearTimeout(timer); timer = setTimeout(() => { visible.value = false; }, ms); }
-function hide() { visible.value = false; if (timer) clearTimeout(timer); }
-defineExpose({ show, hide });
+function show(msg: string, ms = 2500): void { message.value = msg; visible.value = true; if (timer) clearTimeout(timer); timer = setTimeout(() => { visible.value = false; }, ms); }
+function hide(): void { visible.value = false; if (timer) clearTimeout(timer); }
+onUnmounted(() => { if (timer) clearTimeout(timer); });
+defineExpose<{ show: (msg: string, ms?: number) => void; hide: () => void }>({ show, hide });
 </script>
 <template>
   <Transition name="toast-fade"><div v-if="visible" class="toast show">{{ message }}</div></Transition>

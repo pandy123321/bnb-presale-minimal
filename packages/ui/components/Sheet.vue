@@ -5,10 +5,10 @@ const emit = defineEmits(["close"]);
 const visible = ref(false);
 const title = ref("");
 
-defineExpose({ open, close });
+function open(t?: string): void { title.value = t ?? ""; visible.value = true; }
+function close(): void { visible.value = false; emit("close"); }
 
-function open(t?: string) { title.value = t ?? ""; visible.value = true; }
-function close() { visible.value = false; emit("close"); }
+defineExpose<{ open: (title?: string) => void; close: () => void }>({ open, close });
 </script>
 <template>
   <Teleport to="body">
