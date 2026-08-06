@@ -13,32 +13,54 @@ const batches = ref<Array<Record<string, unknown>>>([]);
 const buybacksTotal = ref(0);
 const batchesTotal = ref(0);
 
-// ── Formatting helpers (BigInt-safe, no Number/parseFloat) ──
+// ── Formatting helpers (precision-safe decimal strings, no Number/parseFloat) ──
+const NATIVE_DECIMALS = 18;
 const TOKEN_DECIMALS = 18;
+const TOKEN_SYMBOL = "PANGU2";
 
-function formatBnb(wei: unknown): string {
-  const s = String(wei ?? "0");
-  if (s === "0") return "0 BNB";
-  const len = s.length;
-  if (len <= TOKEN_DECIMALS) {
-    const frac = s.padStart(TOKEN_DECIMALS, "0");
-    return `0.${frac.slice(0, 6)} BNB`;
+/** Validate and coerce to a non-empty unsigned decimal integer string */
+function validateAmount(raw: unknown): string {
+  if (raw === null || raw === undefined) throw new Error("amount is null/undefined");
+  if (typeof raw === "number" || typeof raw === "bigint") raw = String(raw);
+  if (typeof raw !== "string" || !/^[1-9]\d*$/.test(raw)) {
+    throw new Error(`Invalid on-chain amount: ${JSON.stringify(raw)}`);
   }
-  const intPart = s.slice(0, len - TOKEN_DECIMALS);
-  const fracPart = s.slice(len - TOKEN_DECIMALS, len - TOKEN_DECIMALS + 6);
-  return `${intPart}.${fracPart} BNB`;
+  return raw;
 }
 
+/** Format a native wei amount to BNB (18 decimals, max 6 fractional digits) */
+function formatBnb(raw: unknown): string {
+  try {
+    const s = validateAmount(raw);
+    if (s === "0") return "0 BNB";
+    const len = s.length;
+    if (len <= NATIVE_DECIMALS) {
+      // below 1 BNB — show "0.XXXX" with full available precision
+      const frac = s.padStart(NATIVE_DECIMALS, "0");
+      const trimmed = frac.slice(0, 6).replace(/0+$/, "");
+      return trimmed.length > 0 ? `0.${trimmed} BNB` : "<0.000001 BNB";
+    }
+    const intPart = s.slice(0, len - NATIVE_DECIMALS);
+    const fracPart = s.slice(len - NATIVE_DECIMALS, len - NATIVE_DECIMALS + 6).replace(/0+$/, "");
+    return fracPart.length > 0 ? `${intPart}.${fracPart} BNB` : `${intPart} BNB`;
+  } catch { return "\u2014"; }
+}
+
+/** Format a raw token amount to PANGU2 (18 decimals, max 4 fractional digits) */
 function formatToken(raw: unknown): string {
-  const s = String(raw ?? "0");
-  if (s === "0") return "0 PANGU2";
-  const len = s.length;
-  if (len <= TOKEN_DECIMALS) {
-    const frac = s.padStart(TOKEN_DECIMALS, "0");
-    return `0.${frac.slice(0, 4)} PANGU2`;
-  }
-  const intPart = s.slice(0, len - TOKEN_DECIMALS);
-  return `${intPart} PANGU2`;
+  try {
+    const s = validateAmount(raw);
+    if (s === "0") return `0 ${TOKEN_SYMBOL}`;
+    const len = s.length;
+    if (len <= TOKEN_DECIMALS) {
+      const frac = s.padStart(TOKEN_DECIMALS, "0");
+      const trimmed = frac.slice(0, 4).replace(/0+$/, "");
+      return trimmed.length > 0 ? `0.${trimmed} ${TOKEN_SYMBOL}` : `<0.0001 ${TOKEN_SYMBOL}`;
+    }
+    const intPart = s.slice(0, len - TOKEN_DECIMALS);
+    const fracPart = s.slice(len - TOKEN_DECIMALS, len - TOKEN_DECIMALS + 4).replace(/0+$/, "");
+    return fracPart.length > 0 ? `${intPart}.${fracPart} ${TOKEN_SYMBOL}` : `${intPart} ${TOKEN_SYMBOL}`;
+  } catch { return "\u2014"; }
 }
 
 async function fetchBuybacks() {
