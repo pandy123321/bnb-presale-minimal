@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import type { BuybackEventDto, LockerBatchDto } from "@pangu2/api-types";
 
 const PUBLIC_API = "/api/v1/projects/pangu2";
@@ -72,9 +72,52 @@ function formatToken(raw: unknown): FormattedAmount {
   }
 }
 
-function fmt(raw: unknown): string {
-  return (raw as FormattedAmount).text;
+// ── Pre-computed display rows with error tracking ──
+
+interface BuybackRow {
+  batch_id: number;
+  bnb: FormattedAmount;
+  tokens: FormattedAmount;
+  timestamp: string;
 }
+
+interface LockerRow {
+  batch_id: number;
+  tokens: FormattedAmount;
+  locked_until: string | null;
+  status: string;
+}
+
+const buybackRows = computed<BuybackRow[]>(() =>
+  buybacks.value.map((b) => ({
+    batch_id: b.batch_id,
+    bnb: formatBnb(b.amount_bnb_wei),
+    tokens: formatToken(b.tokens_raw),
+    timestamp: b.timestamp,
+  }))
+);
+
+const lockerRows = computed<LockerRow[]>(() =>
+  batches.value.map((b) => ({
+    batch_id: b.batch_id,
+    tokens: formatToken(b.tokens_raw),
+    locked_until: b.locked_until,
+    status: b.status,
+  }))
+);
+
+// Collect any formatting errors for the page-level error bar
+const formattingErrors = computed(() => {
+  const msgs: string[] = [];
+  for (const r of buybackRows.value) {
+    if (!r.bnb.valid) msgs.push(`Buyback #${r.batch_id} BNB: ${r.bnb.reason}`);
+    if (!r.tokens.valid) msgs.push(`Buyback #${r.batch_id} tokens: ${r.tokens.reason}`);
+  }
+  for (const r of lockerRows.value) {
+    if (!r.tokens.valid) msgs.push(`Locker #${r.batch_id} tokens: ${r.tokens.reason}`);
+  }
+  return msgs;
+});
 
 async function fetchBuybacks() {
   loadingBuybacks.value = true;
@@ -129,6 +172,10 @@ const noData = "\u2014";
       </div>
     </div>
 
+    <div v-if="formattingErrors.length > 0" class="format-warnings">
+      <div v-for="(msg, i) in formattingErrors" :key="i" class="format-warn">{{ msg }}</div>
+    </div>
+
     <div class="section-head"><h3>Buyback Batches</h3></div>
     <div class="card">
       <div class="card-body">
@@ -137,17 +184,17 @@ const noData = "\u2014";
           <b>Error</b><small>{{ buybackError }}</small>
           <button class="btn-text" @click="fetchBuybacks">Retry</button>
         </div>
-        <div v-else-if="buybacks.length === 0" class="empty-state">
+        <div v-else-if="buybackRows.length === 0" class="empty-state">
           <b>No buyback batches yet</b>
           <small>Data will appear once the chain worker confirms on-chain buyback events.</small>
         </div>
         <div v-else class="table">
           <div class="tr head"><span>Batch</span><span>BNB</span><span>Tokens</span><span>Time</span></div>
-          <div v-for="b in buybacks" :key="b.batch_id" class="tr">
-            <span>#{{ b.batch_id }}</span>
-            <span>{{ fmt(formatBnb(b.amount_bnb_wei)) }}</span>
-            <span>{{ fmt(formatToken(b.tokens_raw)) }}</span>
-            <span>{{ b.timestamp }}</span>
+          <div v-for="r in buybackRows" :key="r.batch_id" class="tr">
+            <span>#{{ r.batch_id }}</span>
+            <span :title="!r.bnb.valid ? r.bnb.reason : undefined" :class="{ 'fmt-err': !r.bnb.valid }">{{ r.bnb.text }}</span>
+            <span :title="!r.tokens.valid ? r.tokens.reason : undefined" :class="{ 'fmt-err': !r.tokens.valid }">{{ r.tokens.text }}</span>
+            <span>{{ r.timestamp }}</span>
           </div>
         </div>
       </div>
@@ -161,17 +208,17 @@ const noData = "\u2014";
           <b>Error</b><small>{{ batchError }}</small>
           <button class="btn-text" @click="fetchBatches">Retry</button>
         </div>
-        <div v-else-if="batches.length === 0" class="empty-state">
+        <div v-else-if="lockerRows.length === 0" class="empty-state">
           <b>No locker batches yet</b>
           <small>Locked tokens will appear once buybacks are executed and confirmed.</small>
         </div>
         <div v-else class="table">
           <div class="tr head"><span>Batch</span><span>Tokens</span><span>Locked Until</span><span>Status</span></div>
-          <div v-for="b in batches" :key="b.batch_id" class="tr">
-            <span>#{{ b.batch_id }}</span>
-            <span>{{ fmt(formatToken(b.tokens_raw)) }}</span>
-            <span>{{ b.locked_until ?? noData }}</span>
-            <span>{{ b.status }}</span>
+          <div v-for="r in lockerRows" :key="r.batch_id" class="tr">
+            <span>#{{ r.batch_id }}</span>
+            <span :title="!r.tokens.valid ? r.tokens.reason : undefined" :class="{ 'fmt-err': !r.tokens.valid }">{{ r.tokens.text }}</span>
+            <span>{{ r.locked_until ?? noData }}</span>
+            <span>{{ r.status }}</span>
           </div>
         </div>
       </div>
@@ -188,10 +235,13 @@ const noData = "\u2014";
 .hero-side small { color: var(--muted); font-size: 10px; }
 .section-head { margin: 24px 0 10px; }
 .section-head h3 { font-size: 15px; }
+.format-warnings { margin: 0 0 10px; }
+.format-warn { color: var(--red); font-size: 11px; padding: 4px 10px; background: rgba(255,60,60,.08); border-radius: 4px; margin-bottom: 2px; }
 .table { min-width: 600px; overflow: auto; }
 .tr { display: grid; grid-template-columns: repeat(4, minmax(100px, 1fr)); gap: 12px; align-items: center; min-height: 48px; padding: 8px 14px; border-bottom: 1px solid rgba(255,255,255,.05); font-size: 11px; }
 .tr.head { min-height: 38px; color: var(--muted); font-size: 10px; background: rgba(255,255,255,.018); }
 .tr:last-child { border-bottom: 0; }
+.fmt-err { border-bottom: 1px dashed var(--red); cursor: help; }
 .empty-state { padding: 24px; text-align: center; }
 .empty-state b { display: block; color: var(--muted); }
 .empty-state small { display: block; color: var(--muted); margin-top: 6px; font-size: 11px; }

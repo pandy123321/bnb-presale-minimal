@@ -168,7 +168,7 @@ export interface EpochInfo {
 
 /** Buyback event as returned by GET /api/v1/projects/pangu2/buybacks */
 export interface BuybackEventDto {
-  batch_id: string;
+  batch_id: number;
   amount_bnb_wei: string;
   tokens_raw: string;
   trigger: string;
@@ -178,7 +178,7 @@ export interface BuybackEventDto {
 
 /** Locker batch as returned by GET /api/v1/projects/pangu2/locker/batches */
 export interface LockerBatchDto {
-  batch_id: string;
+  batch_id: number;
   tokens_raw: string;
   locked_until: IsoTimestamp | null;
   duration_days: number;
