@@ -10,10 +10,18 @@ interface IPangu2Token is IERC20 {
     function PROFIT_SELL_TAX_BPS() external view returns (uint16);
     function MIN_SELL_AMOUNT() external view returns (uint256);
 
-    function previewBuyTax(uint256 grossAmount) external pure returns (uint256 taxAmount, uint256 netAmount);
+    function previewBuyTax(uint256 grossAmount) external view returns (uint256 taxAmount, uint256 netAmount);
+    function previewBuyTaxFor(address buyer, uint256 grossAmount)
+        external
+        view
+        returns (uint256 taxAmount, uint256 netAmount);
     function previewSellTax(uint256 sellAmount, uint16 taxBps)
         external
-        pure
+        view
+        returns (uint256 supportAmount, uint256 burnAmount, uint256 swapAmount);
+    function previewSellTaxFor(address seller, uint256 sellAmount, uint16 taxBps)
+        external
+        view
         returns (uint256 supportAmount, uint256 burnAmount, uint256 swapAmount);
 
     function settleBuy(address buyer, uint256 grossAmount, uint256 costWbnbWei)

@@ -117,7 +117,7 @@ contract Pangu2TradeRouter is AccessControl, Pausable, ReentrancyGuard {
     }
 
     function previewBuy(uint256 bnbAmount) external view returns (BuyPreview memory preview) {
-        return _previewBuy(bnbAmount);
+        return _previewBuy(address(0), bnbAmount);
     }
 
     function previewSell(address seller, uint256 tokenAmount) external view returns (SellPreview memory) {
@@ -134,7 +134,7 @@ contract Pangu2TradeRouter is AccessControl, Pausable, ReentrancyGuard {
         if (msg.value == 0 || minimumNetTokens == 0) revert InvalidAmount();
         _validateDeadline(deadline);
 
-        BuyPreview memory p = _previewBuy(msg.value);
+        BuyPreview memory p = _previewBuy(msg.sender, msg.value);
         uint256 minimumGrossTokens = FullMath.mulDivRoundingUp(
             minimumNetTokens, BPS_DENOMINATOR, BPS_DENOMINATOR - token.BUY_TAX_BPS()
         );
@@ -200,13 +200,15 @@ contract Pangu2TradeRouter is AccessControl, Pausable, ReentrancyGuard {
     }
 
 
-    function _previewBuy(uint256 bnbAmount) private view returns (BuyPreview memory preview) {
+    function _previewBuy(address buyer, uint256 bnbAmount) private view returns (BuyPreview memory preview) {
         if (bnbAmount == 0) revert InvalidAmount();
         if (bnbAmount > type(uint128).max) revert AmountExceedsUint128();
         IPangu2TwapOracle.Quote memory q =
             oracle.validatedQuote(address(wbnb), address(token), uint128(bnbAmount));
         uint256 grossTokens = q.amountOut;
-        (uint256 taxTokens, uint256 netTokens) = token.previewBuyTax(grossTokens);
+        (uint256 taxTokens, uint256 netTokens) = buyer != address(0)
+            ? token.previewBuyTaxFor(buyer, grossTokens)
+            : token.previewBuyTax(grossTokens);
         preview = BuyPreview({
             amountIn: bnbAmount,
             grossTokens: grossTokens,
@@ -231,7 +233,7 @@ contract Pangu2TradeRouter is AccessControl, Pausable, ReentrancyGuard {
             ? token.NORMAL_SELL_TAX_BPS()
             : token.PROFIT_SELL_TAX_BPS();
         (uint256 supportTokens, uint256 burnTokens, uint256 swapTokens) =
-            token.previewSellTax(tokenAmount, taxBps);
+            token.previewSellTaxFor(seller, tokenAmount, taxBps);
         if (swapTokens > type(uint128).max) revert AmountExceedsUint128();
         IPangu2TwapOracle.Quote memory postTaxQuote =
             oracle.validatedQuote(address(token), address(wbnb), uint128(swapTokens));
