@@ -1,5 +1,5 @@
 // PANGU2 Chain Worker — Database Layer
-// PostgreSQL client for raw events, cursors, projections, and outbox writes.
+// PostgreSQL client for raw events, cursors, projections, checkpoints and outbox writes.
 
 import { Pool, type PoolClient } from "pg";
 
@@ -50,9 +50,76 @@ export async function closePool(): Promise<void> {
   if (pool) { await pool.end(); pool = null; }
 }
 
+// ── Schema Version ──────────────────────────
+
+const REQUIRED_SCHEMA_VERSION = 2;
+
+export async function verifySchemaVersion(): Promise<void> {
+  const { rows } = await getPool().query(
+    `SELECT COALESCE(schema_version, 0) AS v FROM chain_cursors_settings LIMIT 1`,
+  );
+  const version = rows.length > 0 ? parseInt(rows[0].v) : 0;
+  if (version < REQUIRED_SCHEMA_VERSION) {
+    throw new Error(
+      `Schema version ${version} < ${REQUIRED_SCHEMA_VERSION}. Run migration first.`,
+    );
+  }
+}
+
+// ── Block Checkpoints ───────────────────────
+
+export async function insertBlockCheckpoint(
+  client: PoolClient,
+  chainId: number,
+  blockNumber: number,
+  blockHash: string,
+): Promise<void> {
+  await client.query(
+    `INSERT INTO chain_block_checkpoints (chain_id, block_number, block_hash, created_at)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (chain_id, block_number) DO UPDATE
+       SET block_hash = $3, created_at = NOW()`,
+    [chainId, blockNumber, blockHash],
+  );
+}
+
+export async function getBlockCheckpoint(
+  client: PoolClient,
+  chainId: number,
+  blockNumber: number,
+): Promise<string | null> {
+  const { rows } = await client.query(
+    `SELECT block_hash FROM chain_block_checkpoints
+     WHERE chain_id = $1 AND block_number = $2`,
+    [chainId, blockNumber],
+  );
+  return rows.length > 0 ? (rows[0].block_hash as string) : null;
+}
+
+/** Find blocks in range that have NO checkpoint — used for empty-block reorg detection */
+export async function findMissingCheckpoints(
+  client: PoolClient,
+  chainId: number,
+  fromBlock: number,
+  toBlock: number,
+): Promise<Array<{ blockNumber: number; storedHash: string }>> {
+  const { rows } = await client.query(
+    `SELECT DISTINCT e.block_number, cb.block_hash
+     FROM chain_raw_events e
+     LEFT JOIN chain_block_checkpoints cb
+       ON cb.chain_id = e.chain_id AND cb.block_number = e.block_number
+     WHERE e.chain_id = $1
+       AND e.block_number BETWEEN $2 AND $3
+       AND e.status = 'CONFIRMED'
+       AND cb.block_hash IS NULL
+     ORDER BY e.block_number`,
+    [chainId, fromBlock, toBlock],
+  );
+  return rows.map(r => ({ blockNumber: parseInt(r.block_number), storedHash: "" }));
+}
+
 // ── Cursor Operations ────────────────────────
 
-/** Returns full CursorRow or null. Caller reads .last_scanned_block */
 export async function getCursor(
   client: PoolClient | Pool,
   chainId: number,
@@ -80,7 +147,7 @@ export async function getCursor(
   return null;
 }
 
-/** upsertCursor with lease fencing: only the current lease generation may write */
+/** upsertCursor — triple-fenced: holder, generation, expires_at > NOW() */
 export async function upsertCursor(
   client: PoolClient,
   chainId: number,
@@ -88,6 +155,7 @@ export async function upsertCursor(
   blockNumber: number,
   blockHash: string | null,
   status: string = "HEALTHY",
+  workerId: string,
   leaseGeneration: number,
 ): Promise<boolean> {
   const { rowCount } = await client.query(
@@ -95,8 +163,10 @@ export async function upsertCursor(
      VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
      ON CONFLICT (chain_id, stream)
      DO UPDATE SET last_scanned_block = $3, last_scanned_block_hash = $4, status = $5, last_run_completed_at = NOW(), updated_at = NOW()
-     WHERE chain_cursors.lease_generation = $6`,
-    [chainId, stream, blockNumber, blockHash, status, leaseGeneration],
+     WHERE chain_cursors.lease_generation = $6
+       AND chain_cursors.lease_holder = $7
+       AND chain_cursors.lease_expires_at > NOW()`,
+    [chainId, stream, blockNumber, blockHash, status, leaseGeneration, workerId],
   );
   return (rowCount ?? 0) > 0;
 }
@@ -109,7 +179,6 @@ export async function acquireLease(
   workerId: string,
   ttlSeconds: number,
 ): Promise<{ leased: boolean; leaseGeneration: number }> {
-  // Upsert the cursor row if missing (cold-start)
   await getPool().query(
     `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, lease_generation)
      VALUES ($1, $2, 0, 'PENDING', 0)
@@ -117,7 +186,6 @@ export async function acquireLease(
     [chainId, stream],
   );
 
-  // Atomically: increment lease_generation + set holder if expired or free
   const { rowCount, rows } = await getPool().query(
     `UPDATE chain_cursors
      SET lease_holder = $3, lease_expires_at = NOW() + ($4 || ' seconds')::INTERVAL,
@@ -134,17 +202,20 @@ export async function acquireLease(
   return { leased: false, leaseGeneration: 0 };
 }
 
-/** releaseLease with workerId guard — only the holder can release */
+/** releaseLease — validates workerId AND lease_generation; only current holder can release */
 export async function releaseLease(
   chainId: number,
   stream: string,
   workerId: string,
+  leaseGeneration: number,
 ): Promise<void> {
   await getPool().query(
     `UPDATE chain_cursors
      SET lease_holder = NULL, lease_expires_at = NULL
-     WHERE chain_id = $1 AND stream = $2 AND lease_holder = $3`,
-    [chainId, stream, workerId],
+     WHERE chain_id = $1 AND stream = $2
+       AND lease_holder = $3
+       AND lease_generation = $4`,
+    [chainId, stream, workerId, leaseGeneration],
   );
 }
 
@@ -165,17 +236,10 @@ export async function insertRawEvents(
       `($${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++}::jsonb,$${idx++}::jsonb,$${idx++},'PENDING_CONFIRMATION')`,
     );
     values.push(
-      ev.chain_id,
-      ev.contract_address,
-      ev.event_name ?? "unknown",
-      ev.transaction_hash,
-      ev.log_index,
-      ev.block_number,
-      ev.block_hash,
-      ev.transaction_index ?? null,
-      ev.block_timestamp,
-      JSON.stringify(ev.decoded_data),
-      JSON.stringify(ev.topics),
+      ev.chain_id, ev.contract_address, ev.event_name ?? "unknown",
+      ev.transaction_hash, ev.log_index, ev.block_number, ev.block_hash,
+      ev.transaction_index ?? null, ev.block_timestamp,
+      JSON.stringify(ev.decoded_data), JSON.stringify(ev.topics),
       ev.raw_data ?? null,
     );
   }
@@ -188,8 +252,6 @@ export async function insertRawEvents(
   const result = await client.query(query, values);
   return result.rowCount ?? 0;
 }
-
-// ── Delete raw events + projection for reorg ──
 
 export async function deleteRawEvents(
   client: PoolClient,
@@ -233,11 +295,10 @@ export async function findReorgedBlocks(
   return rows.map(row => ({
     blockNumber: parseInt(row.block_number),
     storedHash: row.block_hash as string,
-    actualHash: "", // filled by caller via RPC
+    actualHash: "",
   }));
 }
 
-/** Mark all events in a block as REORGED */
 export async function markBlockReorged(
   client: PoolClient,
   chainId: number,
@@ -251,23 +312,47 @@ export async function markBlockReorged(
   return rowCount ?? 0;
 }
 
+/** Rewind cursor for a stream — only with valid lease_fencing */
+export async function rewindCursor(
+  client: PoolClient,
+  chainId: number,
+  stream: string,
+  rewindTo: number,
+  workerId: string,
+  leaseGeneration: number,
+): Promise<boolean> {
+  const { rowCount } = await client.query(
+    `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, updated_at)
+     VALUES ($1, $2, $3, 'REORG_RECOVERY', NOW())
+     ON CONFLICT (chain_id, stream)
+     DO UPDATE SET last_scanned_block = $3, status = 'REORG_RECOVERY', updated_at = NOW()
+     WHERE chain_cursors.lease_generation = $4
+       AND chain_cursors.lease_holder = $5
+       AND chain_cursors.lease_expires_at > NOW()`,
+    [chainId, stream, rewindTo, leaseGeneration, workerId],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
 // ── Confirmation ─────────────────────────────
 
-/** Confirm events once block depth >= CONFIRMATION_BLOCKS */
+/** Confirm events — validates canonical block hash before confirming */
 export async function confirmEvents(
   client: PoolClient,
   chainId: number,
   blockNumber: number,
+  canonicalHash: string,
 ): Promise<number> {
   const { rowCount } = await client.query(
     `UPDATE chain_raw_events SET status = 'CONFIRMED', confirmed_at = NOW(), updated_at = NOW()
-     WHERE chain_id = $1 AND block_number = $2 AND status = 'PENDING_CONFIRMATION'`,
-    [chainId, blockNumber],
+     WHERE chain_id = $1 AND block_number = $2
+       AND status = 'PENDING_CONFIRMATION'
+       AND block_hash = $3`,
+    [chainId, blockNumber, canonicalHash],
   );
   return rowCount ?? 0;
 }
 
-/** Get the oldest unconfirmed block number */
 export async function getOldestUnconfirmedBlock(
   client: PoolClient,
   chainId: number,
@@ -281,7 +366,6 @@ export async function getOldestUnconfirmedBlock(
   return rows.length > 0 ? parseInt(rows[0].block_number) : null;
 }
 
-/** Check if a lease is currently valid */
 export async function checkLeaseValid(
   client: PoolClient,
   chainId: number,
@@ -300,4 +384,37 @@ export async function checkLeaseValid(
   const expires = rows[0].lease_expires_at as Date | null;
   return gen === leaseGeneration && holder === workerId
     && expires !== null && expires > new Date();
+}
+
+/** Check that a cursor has an active lease (NOT NULL holder with unexpired lease) */
+export async function cursorHasActiveLease(
+  client: PoolClient,
+  chainId: number,
+  stream: string,
+): Promise<boolean> {
+  const { rows } = await client.query(
+    `SELECT lease_holder, lease_expires_at FROM chain_cursors
+     WHERE chain_id = $1 AND stream = $2`,
+    [chainId, stream],
+  );
+  if (rows.length === 0) return false;
+  const holder = rows[0].lease_holder as string | null;
+  const expires = rows[0].lease_expires_at as Date | null;
+  return holder !== null && expires !== null && expires > new Date();
+}
+
+// ── All-stream cursor query ──────────────────
+
+export async function getAllCursorStreams(
+  client: PoolClient,
+  chainId: number,
+): Promise<Array<{ stream: string; last_scanned_block: number }>> {
+  const { rows } = await client.query(
+    `SELECT stream, last_scanned_block FROM chain_cursors WHERE chain_id = $1`,
+    [chainId],
+  );
+  return rows.map(r => ({
+    stream: r.stream as string,
+    last_scanned_block: parseInt(r.last_scanned_block),
+  }));
 }

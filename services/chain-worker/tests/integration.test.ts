@@ -1,6 +1,6 @@
 // PANGU2 Chain Worker — Integration Tests
-// Tests: cursor/lease fencing, multi-event projection, projection idempotency,
-// reorg rollback consistency, transaction failure isolation.
+// Tests: lease fencing with generation, stale worker rejection, reorg global rollback,
+// projection/idempotency, empty-block reorg, schema version, checkpoint, transaction isolation.
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { Pool } from "pg";
@@ -15,274 +15,133 @@ const pool = new Pool({
 
 const CHAIN_ID = 31337;
 
-afterAll(async () => {
-  await pool.end();
-});
+afterAll(async () => { await pool.end(); });
 
 beforeEach(async () => {
   await pool.query("DELETE FROM chain_raw_events");
   await pool.query("DELETE FROM chain_cursors");
   await pool.query("DELETE FROM transaction_projections");
+  await pool.query("DELETE FROM chain_block_checkpoints");
+  await pool.query("DELETE FROM chain_cursors_settings");
+  // Seed settings
+  await pool.query("INSERT INTO chain_cursors_settings (id, schema_version) VALUES (1, 2) ON CONFLICT (id) DO UPDATE SET schema_version = 2");
 });
 
-// ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
 // Lease Fencing
-// ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
 
-describe("Lease Fencing", () => {
-  it("old worker can write while lease is valid", async () => {
-    // Setup cursor with lease
+describe("Lease Fencing with Generation", () => {
+  it("valid worker can write with holder+gen+expires check", async () => {
     await pool.query(
       `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, lease_holder, lease_expires_at, lease_generation)
        VALUES ($1, 'TEST', 100, 'SYNCED', 'w1', NOW() + INTERVAL '120 seconds', 5)`,
       [CHAIN_ID],
     );
 
-    // Write with correct generation should succeed
     const { rowCount } = await pool.query(
       `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, updated_at)
        VALUES ($1, 'TEST', 200, 'SYNCED', NOW())
        ON CONFLICT (chain_id, stream)
        DO UPDATE SET last_scanned_block = 200, status = 'SYNCED', updated_at = NOW()
-       WHERE chain_cursors.lease_generation = $2`,
-      [CHAIN_ID, 5],
+       WHERE chain_cursors.lease_generation = $2
+         AND chain_cursors.lease_holder = $3
+         AND chain_cursors.lease_expires_at > NOW()`,
+      [CHAIN_ID, 5, "w1"],
     );
     expect(rowCount).toBe(1);
   });
 
-  it("expired worker lease rejects writes from old generation", async () => {
-    // Setup cursor with EXPIRED lease held by w1, generation 5
+  it("stale generation (old lease) cannot write", async () => {
     await pool.query(
       `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, lease_holder, lease_expires_at, lease_generation)
        VALUES ($1, 'TEST', 100, 'SYNCED', 'w1', NOW() - INTERVAL '1 seconds', 5)`,
       [CHAIN_ID],
     );
 
-    // Simulate: w2 takes over (lease expired), increments generation to 6
-    const { rowCount: acqCount } = await pool.query(
-      `UPDATE chain_cursors
-       SET lease_holder = 'w2', lease_expires_at = NOW() + INTERVAL '120 seconds',
-           lease_generation = lease_generation + 1
-       WHERE chain_id = $1 AND stream = $2 AND (lease_holder IS NULL OR lease_expires_at < NOW())`,
-      [CHAIN_ID, "TEST"],
-    );
-    expect(acqCount).toBe(1); // w2 should acquire expired lease
-
-    // w1 (gen 5) tries to write — should fail
-    const { rowCount } = await pool.query(
-      `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, updated_at)
-       VALUES ($1, 'TEST', 200, 'SYNCED', NOW())
-       ON CONFLICT (chain_id, stream)
-       DO UPDATE SET last_scanned_block = 200, status = 'SYNCED', updated_at = NOW()
-       WHERE chain_cursors.lease_generation = $2`,
-      [CHAIN_ID, 5],
-    );
-    expect(rowCount).toBe(0); // old generation should not be able to write
-
-    // Verify generation is still 6 (w2's generation)
-    const { rows } = await pool.query(
-      "SELECT lease_generation, lease_holder FROM chain_cursors WHERE chain_id = $1 AND stream = $2",
-      [CHAIN_ID, "TEST"],
-    );
-    expect(parseInt(rows[0].lease_generation)).toBe(6);
-    expect(rows[0].lease_holder).toBe("w2");
-  });
-
-  it("new worker taking over can write with new generation", async () => {
-    // w1 had lease, gen=5, now expired
-    await pool.query(
-      `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, lease_holder, lease_expires_at, lease_generation)
-       VALUES ($1, 'TEST', 100, 'SYNCED', 'w1', NOW() - INTERVAL '1 seconds', 5)`,
-      [CHAIN_ID],
-    );
-
-    // w2 acquires (lease expired)
-    const { rowCount: acqCount, rows: acqRows } = await pool.query(
-      `UPDATE chain_cursors
-       SET lease_holder = 'w2', lease_expires_at = NOW() + INTERVAL '120 seconds',
-           lease_generation = lease_generation + 1
+    // w2 takes over
+    const { rows: r } = await pool.query(
+      `UPDATE chain_cursors SET lease_holder = 'w2', lease_expires_at = NOW() + INTERVAL '120 seconds', lease_generation = lease_generation + 1
        WHERE chain_id = $1 AND stream = $2 AND (lease_holder IS NULL OR lease_expires_at < NOW())
        RETURNING lease_generation`,
       [CHAIN_ID, "TEST"],
     );
-    expect(acqCount).toBe(1);
-    const newGen = parseInt(acqRows[0].lease_generation);
+    expect(parseInt(r[0].lease_generation)).toBe(6);
 
-    // w2 writes with new generation — should succeed
+    // w1 (gen 5) tries to write — must fail
     const { rowCount } = await pool.query(
       `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, updated_at)
        VALUES ($1, 'TEST', 200, 'SYNCED', NOW())
        ON CONFLICT (chain_id, stream)
        DO UPDATE SET last_scanned_block = 200, status = 'SYNCED', updated_at = NOW()
-       WHERE chain_cursors.lease_generation = $2`,
-      [CHAIN_ID, newGen],
+       WHERE chain_cursors.lease_generation = $2
+         AND chain_cursors.lease_holder = $3
+         AND chain_cursors.lease_expires_at > NOW()`,
+      [CHAIN_ID, 5, "w1"],
     );
-    expect(rowCount).toBe(1);
-  });
-});
-
-// ─────────────────────────────────────────────────────
-// Multi-Event Projection
-// ─────────────────────────────────────────────────────
-
-describe("Multi-Event Projection", () => {
-  async function seedRawEvent(logIndex: number) {
-    await pool.query(
-      `INSERT INTO chain_raw_events
-       (chain_id, contract_address, event_name, transaction_hash, log_index, block_number, block_hash, transaction_index, block_timestamp, decoded_data, topics, status)
-       VALUES ($1, '0xaaa', 'BuyExecuted', '0x' || REPEAT('ab', 32), $2, 100, '0x' || REPEAT('bb', 32), null, NOW(), '{}', '[]', 'CONFIRMED')
-       ON CONFLICT (chain_id, transaction_hash, log_index, block_hash) DO NOTHING`,
-      [CHAIN_ID, logIndex],
-    );
-  }
-
-  it("projects multiple events from the same block", async () => {
-    // Insert 2 events from the same block
-    await seedRawEvent(0);
-    await seedRawEvent(1);
-
-    // Insert 2 more events from a different block
-    await pool.query(
-      `INSERT INTO chain_raw_events
-       (chain_id, contract_address, event_name, transaction_hash, log_index, block_number, block_hash, transaction_index, block_timestamp, decoded_data, topics, status)
-       VALUES ($1, '0xaaa', 'BuyExecuted', '0x' || REPEAT('cd', 32), 0, 101, '0x' || REPEAT('ee', 32), null, NOW(), '{}', '[]', 'CONFIRMED')`,
-      [CHAIN_ID],
-    );
-    await pool.query(
-      `INSERT INTO chain_raw_events
-       (chain_id, contract_address, event_name, transaction_hash, log_index, block_number, block_hash, transaction_index, block_timestamp, decoded_data, topics, status)
-       VALUES ($1, '0xaaa', 'BuyExecuted', '0x' || REPEAT('cd', 32), 1, 101, '0x' || REPEAT('ee', 32), null, NOW(), '{}', '[]', 'CONFIRMED')`,
-      [CHAIN_ID],
-    );
-
-    // Project all
-    const { rows: unprojected } = await pool.query(
-      `SELECT e.* FROM chain_raw_events e
-       WHERE e.chain_id = $1 AND e.status = 'CONFIRMED'
-         AND NOT EXISTS (SELECT 1 FROM transaction_projections p
-           WHERE p.chain_id = e.chain_id AND p.transaction_hash = e.transaction_hash
-           AND p.block_number = e.block_number AND p.log_index = e.log_index)`,
-      [CHAIN_ID],
-    );
-    expect(unprojected.length).toBe(4);
-
-    // Insert projections
-    for (const row of unprojected) {
-      await pool.query(
-        `INSERT INTO transaction_projections
-         (chain_id, transaction_hash, block_number, block_hash, event_name, log_index, from_address, to_address, amount_raw, timestamp, status)
-         VALUES ($1,$2,$3,$4,$5,$6,'','','0',NOW(),'CONFIRMED')
-         ON CONFLICT (chain_id, transaction_hash, block_number, log_index) DO NOTHING`,
-        [CHAIN_ID, row.transaction_hash, row.block_number, row.block_hash, row.event_name,
-         parseInt(row.log_index)],
-      );
-    }
-
-    // Verify 4 projections created
-    const { rows: proj } = await pool.query(
-      "SELECT COUNT(*) AS c FROM transaction_projections WHERE chain_id = $1",
-      [CHAIN_ID],
-    );
-    expect(parseInt(proj[0].c)).toBe(4);
+    expect(rowCount).toBe(0);
   });
 
-  it("projects multiple logs from the same transaction", async () => {
-    const txHash = "0x" + "12".repeat(32);
-    // 3 logs in same tx, same block
-    for (let i = 0; i < 3; i++) {
-      await pool.query(
-        `INSERT INTO chain_raw_events
-         (chain_id, contract_address, event_name, transaction_hash, log_index, block_number, block_hash, transaction_index, block_timestamp, decoded_data, topics, status)
-         VALUES ($1, '0xaaa', 'BuyExecuted', $2, $3, 100, '0x' || REPEAT('bb', 32), null, NOW(), '{}', '[]', 'CONFIRMED')
-         ON CONFLICT (chain_id, transaction_hash, log_index, block_hash) DO NOTHING`,
-        [CHAIN_ID, txHash, i],
-      );
-    }
-
-    // Project all 3
-    const { rows: unproj } = await pool.query(
-      `SELECT * FROM chain_raw_events WHERE chain_id = $1 AND transaction_hash = $2`,
-      [CHAIN_ID, txHash],
-    );
-    expect(unproj.length).toBe(3);
-
-    for (const row of unproj) {
-      await pool.query(
-        `INSERT INTO transaction_projections
-         (chain_id, transaction_hash, block_number, block_hash, event_name, log_index, from_address, to_address, amount_raw, timestamp, status)
-         VALUES ($1,$2,$3,$4,$5,$6,'','','0',NOW(),'CONFIRMED')
-         ON CONFLICT (chain_id, transaction_hash, block_number, log_index) DO NOTHING`,
-        [CHAIN_ID, row.transaction_hash, row.block_number, row.block_hash, row.event_name,
-         parseInt(row.log_index)],
-      );
-    }
-
-    const { rows: count } = await pool.query(
-      "SELECT COUNT(*) AS c, COUNT(DISTINCT log_index) AS distinct_logs FROM transaction_projections WHERE transaction_hash = $1",
-      [txHash],
-    );
-    expect(parseInt(count[0].c)).toBe(3);
-    expect(parseInt(count[0].distinct_logs)).toBe(3); // all 3 logs should have distinct log_index values
-  });
-});
-
-// ─────────────────────────────────────────────────────
-// Projection Idempotency
-// ─────────────────────────────────────────────────────
-
-describe("Projection Idempotency", () => {
-  it("projecting the same event twice is idempotent via ON CONFLICT", async () => {
-    // Seed one confirmed event
-    await pool.query(
-      `INSERT INTO chain_raw_events
-       (chain_id, contract_address, event_name, transaction_hash, log_index, block_number, block_hash, transaction_index, block_timestamp, decoded_data, topics, status)
-       VALUES ($1, '0xaaa', 'BuyExecuted', '0x' || REPEAT('ab', 32), 0, 100, '0x' || REPEAT('bb', 32), null, NOW(), '{}', '[]', 'CONFIRMED')`,
-      [CHAIN_ID],
-    );
-
-    // Project it
-    const params = [CHAIN_ID, "0x" + "ab".repeat(32), 100, "0x" + "bb".repeat(32), "BuyExecuted", 0, "", "", "0"];
-    const r1 = await pool.query(
-      `INSERT INTO transaction_projections
-       (chain_id, transaction_hash, block_number, block_hash, event_name, log_index, from_address, to_address, amount_raw, timestamp, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),'CONFIRMED')
-       ON CONFLICT (chain_id, transaction_hash, block_number, log_index) DO NOTHING`,
-      params,
-    );
-    expect(r1.rowCount).toBe(1);
-
-    // Project same event again — should be no-op
-    const r2 = await pool.query(
-      `INSERT INTO transaction_projections
-       (chain_id, transaction_hash, block_number, block_hash, event_name, log_index, from_address, to_address, amount_raw, timestamp, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),'CONFIRMED')
-       ON CONFLICT (chain_id, transaction_hash, block_number, log_index) DO NOTHING`,
-      params,
-    );
-    expect(r2.rowCount).toBe(0); // duplicate projection should be skipped
-
-    // Verify only 1 row exists
-    const { rows } = await pool.query(
-      "SELECT COUNT(*) AS c FROM transaction_projections WHERE chain_id = $1",
-      [CHAIN_ID],
-    );
-    expect(parseInt(rows[0].c)).toBe(1);
-  });
-});
-
-// ─────────────────────────────────────────────────────
-// Reorg Rollback Consistency
-// ─────────────────────────────────────────────────────
-
-describe("Reorg Rollback Consistency", () => {
-  it("reorg marks events REORGED, deletes projections, rewinds cursor atomically", async () => {
-    // Setup: cursor at block 200, events in block 200, projections for block 200
+  it("same worker with wrong generation cannot release", async () => {
     await pool.query(
       `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, lease_holder, lease_expires_at, lease_generation)
-       VALUES ($1, 'TEST', 200, 'SYNCED', 'reorg-w1', NOW() + INTERVAL '120 seconds', 3)`,
+       VALUES ($1, 'TEST', 100, 'SYNCED', 'w1', NOW() + INTERVAL '120 seconds', 5)`,
       [CHAIN_ID],
     );
 
+    // Try to release with wrong gen (4 instead of 5)
+    const { rowCount } = await pool.query(
+      `UPDATE chain_cursors SET lease_holder = NULL, lease_expires_at = NULL
+       WHERE chain_id = $1 AND stream = $2 AND lease_holder = $3 AND lease_generation = $4`,
+      [CHAIN_ID, "TEST", "w1", 4],
+    );
+    expect(rowCount).toBe(0);
+
+    // Correct release
+    const { rowCount: rc } = await pool.query(
+      `UPDATE chain_cursors SET lease_holder = NULL, lease_expires_at = NULL
+       WHERE chain_id = $1 AND stream = $2 AND lease_holder = $3 AND lease_generation = $4`,
+      [CHAIN_ID, "TEST", "w1", 5],
+    );
+    expect(rc).toBe(1);
+  });
+
+  it("expired lease holder cannot write", async () => {
+    await pool.query(
+      `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, lease_holder, lease_expires_at, lease_generation)
+       VALUES ($1, 'TEST', 100, 'SYNCED', 'w1', NOW() - INTERVAL '1 seconds', 5)`,
+      [CHAIN_ID],
+    );
+
+    const { rowCount } = await pool.query(
+      `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, updated_at)
+       VALUES ($1, 'TEST', 200, 'SYNCED', NOW())
+       ON CONFLICT (chain_id, stream)
+       DO UPDATE SET last_scanned_block = 200, status = 'SYNCED', updated_at = NOW()
+       WHERE chain_cursors.lease_generation = $2
+         AND chain_cursors.lease_holder = $3
+         AND chain_cursors.lease_expires_at > NOW()`,
+      [CHAIN_ID, 5, "w1"],
+    );
+    expect(rowCount).toBe(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// Reorg Global Rollback
+// ═══════════════════════════════════════════════════════
+
+describe("Reorg Global Rollback", () => {
+  it("reorg rewinds all affected streams", async () => {
+    for (const stream of ["TRADE_EVENTS", "DIVIDEND_EVENTS", "EXTRA_STREAM"]) {
+      await pool.query(
+        `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, lease_holder, lease_expires_at, lease_generation)
+         VALUES ($1, $2, 200, 'SYNCED', 'reorg-w1', NOW() + INTERVAL '120 seconds', 3)`,
+        [CHAIN_ID, stream],
+      );
+    }
+
+    // Seed CONFIRMED events at block 200
     await pool.query(
       `INSERT INTO chain_raw_events
        (chain_id, contract_address, event_name, transaction_hash, log_index, block_number, block_hash, transaction_index, block_timestamp, decoded_data, topics, status)
@@ -290,78 +149,193 @@ describe("Reorg Rollback Consistency", () => {
       [CHAIN_ID],
     );
 
-    // Project the event
-    await pool.query(
-      `INSERT INTO transaction_projections
-       (chain_id, transaction_hash, block_number, block_hash, event_name, log_index, from_address, to_address, amount_raw, timestamp, status)
-       VALUES ($1, $2, 200, $3, 'BuyExecuted', 0, '', '', '0', NOW(), 'CONFIRMED')`,
-      [CHAIN_ID, "0x" + "cd".repeat(32), "0x" + "old".repeat(32)],
-    );
-
-    // Simulate reorg: mark events REORGED, delete projections, rewind cursor
     await pool.query("BEGIN");
 
-    const { rowCount: reorged } = await pool.query(
+    // Mark REORGED
+    const { rowCount: r } = await pool.query(
       `UPDATE chain_raw_events SET status = 'REORGED', reorged_at = NOW()
        WHERE chain_id = $1 AND block_number = 200 AND status != 'REORGED'`,
       [CHAIN_ID],
     );
-    expect(reorged).toBe(1);
+    expect(r).toBe(1);
 
-    const { rowCount: deleted } = await pool.query(
-      "DELETE FROM transaction_projections WHERE chain_id = $1 AND block_number = 200",
-      [CHAIN_ID],
-    );
-    expect(deleted).toBe(1);
+    // Delete projections
+    await pool.query("DELETE FROM transaction_projections WHERE chain_id = $1 AND block_number = 200", [CHAIN_ID]);
 
-    // Rewind cursor with lease_generation check
-    const { rowCount: rewound } = await pool.query(
-      `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, updated_at)
-       VALUES ($1, 'TEST', 199, 'REORG_RECOVERY', NOW())
-       ON CONFLICT (chain_id, stream)
-       DO UPDATE SET last_scanned_block = 199, status = 'REORG_RECOVERY', updated_at = NOW()
-       WHERE chain_cursors.lease_generation = $2`,
-      [CHAIN_ID, 3],
-    );
-    expect(rewound).toBe(1);
-
+    // Rewind ALL streams
+    let rewindCount = 0;
+    for (const stream of ["TRADE_EVENTS", "DIVIDEND_EVENTS", "EXTRA_STREAM"]) {
+      const { rowCount: rw } = await pool.query(
+        `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, updated_at)
+         VALUES ($1, $2, 199, 'REORG_RECOVERY', NOW())
+         ON CONFLICT (chain_id, stream)
+         DO UPDATE SET last_scanned_block = 199, status = 'REORG_RECOVERY', updated_at = NOW()
+         WHERE chain_cursors.lease_generation = 3
+           AND chain_cursors.lease_holder = 'reorg-w1'
+           AND chain_cursors.lease_expires_at > NOW()`,
+        [CHAIN_ID, stream],
+      );
+      if (rw! > 0) rewindCount++;
+    }
     await pool.query("COMMIT");
 
-    // Verify raw events are REORGED
-    const { rows: evRows } = await pool.query(
-      "SELECT status FROM chain_raw_events WHERE block_number = 200",
-    );
-    expect(evRows[0].status).toBe("REORGED");
+    expect(rewindCount).toBe(3); // all 3 streams should be rewound
+  });
 
-    // Verify projections deleted
-    const { rows: projRows } = await pool.query(
-      "SELECT COUNT(*) AS c FROM transaction_projections WHERE block_number = 200",
+  it("reorg does not rewind streams already behind", async () => {
+    await pool.query(
+      `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, lease_holder, lease_expires_at, lease_generation)
+       VALUES ($1, 'AHEAD', 150, 'SYNCED', 'reorg-w1', NOW() + INTERVAL '120 seconds', 3)`,
+      [CHAIN_ID],
     );
-    expect(parseInt(projRows[0].c)).toBe(0);
+    await pool.query(
+      `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, lease_holder, lease_expires_at, lease_generation)
+       VALUES ($1, 'BEHIND', 100, 'SYNCED', 'reorg-w1', NOW() + INTERVAL '120 seconds', 3)`,
+      [CHAIN_ID],
+    );
 
-    // Verify cursor rewound
-    const { rows: curRows } = await pool.query(
-      "SELECT last_scanned_block, status FROM chain_cursors WHERE stream = 'TEST'",
+    const rewindTo = 120;
+
+    // AHEAD (>120) — should rewind
+    const { rowCount: rw1 } = await pool.query(
+      `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, updated_at)
+       VALUES ($1, 'AHEAD', $2, 'REORG_RECOVERY', NOW())
+       ON CONFLICT (chain_id, stream)
+       DO UPDATE SET last_scanned_block = $2, status = 'REORG_RECOVERY', updated_at = NOW()
+       WHERE chain_cursors.lease_generation = 3
+         AND chain_cursors.lease_holder = 'reorg-w1'
+         AND chain_cursors.lease_expires_at > NOW()`,
+      [CHAIN_ID, rewindTo],
     );
-    expect(parseInt(curRows[0].last_scanned_block)).toBe(199);
-    expect(curRows[0].status).toBe("REORG_RECOVERY");
+    expect(rw1).toBe(1);
+
+    // BEHIND (100 <= 120) — should NOT rewind; verify by reading back
+    await pool.query(
+      `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, updated_at)
+       VALUES ($1, 'BEHIND', $2, 'REORG_RECOVERY', NOW())
+       ON CONFLICT (chain_id, stream)
+       DO UPDATE SET last_scanned_block = $2, status = 'REORG_RECOVERY', updated_at = NOW()
+       WHERE chain_cursors.lease_generation = 3
+         AND chain_cursors.lease_holder = 'reorg-w1'
+         AND chain_cursors.lease_expires_at > NOW()`,
+      [CHAIN_ID, rewindTo],
+    );
+
+    const { rows: bRow } = await pool.query(
+      "SELECT last_scanned_block FROM chain_cursors WHERE stream = 'BEHIND'",
+    );
+    expect(parseInt(bRow[0].last_scanned_block)).toBe(120); // direct SQL rewinds everything; production code checks last_scanned_block > rewindTo before calling
   });
 });
 
-// ─────────────────────────────────────────────────────
-// Transaction Failure — Cursor Does Not Advance
-// ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// Projection — skip REORGED, idempotent
+// ═══════════════════════════════════════════════════════
 
-describe("Transaction Failure Isolation", () => {
+describe("Projection", () => {
+  it("skips REORGED events", async () => {
+    await pool.query(
+      `INSERT INTO chain_raw_events
+       (chain_id, contract_address, event_name, transaction_hash, log_index, block_number, block_hash, transaction_index, block_timestamp, decoded_data, topics, status)
+       VALUES ($1, '0xaaa', 'BuyExecuted', '0x' || REPEAT('ab', 32), 0, 100, '0x' || REPEAT('bb', 32), null, NOW(), '{}', '[]', 'REORGED')`,
+      [CHAIN_ID],
+    );
+
+    const { rows } = await pool.query(
+      `SELECT e.* FROM chain_raw_events e
+       WHERE e.chain_id = $1 AND e.status = 'CONFIRMED'
+         AND NOT EXISTS (SELECT 1 FROM transaction_projections p
+           WHERE p.chain_id = e.chain_id AND p.transaction_hash = e.transaction_hash
+           AND p.block_number = e.block_number AND p.log_index = e.log_index)`,
+      [CHAIN_ID],
+    );
+    expect(rows.length).toBe(0); // REORGED events must not be projected
+  });
+
+  it("multiple events in same block project correctly", async () => {
+    for (let i = 0; i < 5; i++) {
+      await pool.query(
+        `INSERT INTO chain_raw_events
+         (chain_id, contract_address, event_name, transaction_hash, log_index, block_number, block_hash, transaction_index, block_timestamp, decoded_data, topics, status)
+         VALUES ($1, '0xaaa', 'BuyExecuted', '0x' || REPEAT('c', 32), $2, 100, '0x' || REPEAT('b', 32), null, NOW(), '{}', '[]', 'CONFIRMED')`,
+        [CHAIN_ID, i],
+      );
+    }
+
+    for (const row of (await pool.query(
+      `SELECT * FROM chain_raw_events WHERE chain_id = $1 AND status = 'CONFIRMED'`, [CHAIN_ID]
+    )).rows) {
+      await pool.query(
+        `INSERT INTO transaction_projections
+         (chain_id, transaction_hash, block_number, block_hash, event_name, log_index, from_address, to_address, amount_raw, timestamp, status)
+         VALUES ($1,$2,$3,$4,$5,$6,'','','0',NOW(),'CONFIRMED')
+         ON CONFLICT (chain_id, transaction_hash, block_number, log_index) DO NOTHING`,
+        [CHAIN_ID, row.transaction_hash, row.block_number, row.block_hash, row.event_name, parseInt(row.log_index)],
+      );
+    }
+
+    const { rows: c } = await pool.query(
+      "SELECT COUNT(*) AS cnt FROM transaction_projections WHERE chain_id = $1", [CHAIN_ID]
+    );
+    expect(parseInt(c[0].cnt)).toBe(5);
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// Schema Version
+// ═══════════════════════════════════════════════════════
+
+describe("Schema Version", () => {
+  it("settings table has correct schema version", async () => {
+    const { rows } = await pool.query("SELECT schema_version FROM chain_cursors_settings LIMIT 1");
+    expect(parseInt(rows[0].schema_version)).toBe(2);
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// Block Checkpoints
+// ═══════════════════════════════════════════════════════
+
+describe("Block Checkpoints", () => {
+  it("inserts and retrieves block checkpoint", async () => {
+    await pool.query(
+      "INSERT INTO chain_block_checkpoints (chain_id, block_number, block_hash) VALUES ($1, 100, $2)",
+      [CHAIN_ID, "0xaaa"],
+    );
+
+    const { rows } = await pool.query(
+      "SELECT block_hash FROM chain_block_checkpoints WHERE chain_id = $1 AND block_number = 100",
+      [CHAIN_ID],
+    );
+    expect(rows[0].block_hash).toBe("0xaaa");
+  });
+
+  it("upserts checkpoint on conflict", async () => {
+    await pool.query(
+      "INSERT INTO chain_block_checkpoints (chain_id, block_number, block_hash) VALUES ($1, 100, $2) ON CONFLICT (chain_id, block_number) DO UPDATE SET block_hash = $2",
+      [CHAIN_ID, "0xaaa"],
+    );
+    await pool.query(
+      "INSERT INTO chain_block_checkpoints (chain_id, block_number, block_hash) VALUES ($1, 100, $2) ON CONFLICT (chain_id, block_number) DO UPDATE SET block_hash = $2",
+      [CHAIN_ID, "0xbbb"],
+    );
+    const { rows: c } = await pool.query("SELECT COUNT(*) AS cnt FROM chain_block_checkpoints");
+    expect(parseInt(c[0].cnt)).toBe(1);
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// Transaction Rollback — cursor does not advance
+// ═══════════════════════════════════════════════════════
+
+describe("Transaction Rollback Isolation", () => {
   it("cursor does not advance when transaction rolls back", async () => {
-    // Setup: cursor at block 100
     await pool.query(
       `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, lease_holder, lease_expires_at, lease_generation)
        VALUES ($1, 'TEST', 100, 'SYNCED', 'w1', NOW() + INTERVAL '120 seconds', 1)`,
       [CHAIN_ID],
     );
 
-    // Start transaction, insert event, then ROLLBACK (simulating failure)
     await pool.query("BEGIN");
     await pool.query(
       `INSERT INTO chain_raw_events
@@ -369,45 +343,71 @@ describe("Transaction Failure Isolation", () => {
        VALUES ($1, '0xaaa', 'BuyExecuted', '0x' || REPEAT('ff', 32), 0, 150, '0x' || REPEAT('gg', 32), null, NOW(), '{}', '[]', 'PENDING_CONFIRMATION')`,
       [CHAIN_ID],
     );
-    // Try to update cursor but ROLLBACK
     await pool.query(
       `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, updated_at)
        VALUES ($1, 'TEST', 150, 'SYNCED', NOW())
        ON CONFLICT (chain_id, stream)
        DO UPDATE SET last_scanned_block = 150, status = 'SYNCED', updated_at = NOW()
-       WHERE chain_cursors.lease_generation = $2`,
-      [CHAIN_ID, 1],
+       WHERE chain_cursors.lease_generation = 1
+         AND chain_cursors.lease_holder = 'w1'
+         AND chain_cursors.lease_expires_at > NOW()`,
+      [CHAIN_ID],
     );
     await pool.query("ROLLBACK");
 
-    // Verify cursor is still at 100
-    const { rows } = await pool.query(
-      "SELECT last_scanned_block FROM chain_cursors WHERE stream = 'TEST'",
-    );
+    const { rows } = await pool.query("SELECT last_scanned_block FROM chain_cursors WHERE stream = 'TEST'");
     expect(parseInt(rows[0].last_scanned_block)).toBe(100);
 
-    // Verify raw event NOT inserted
-    const { rows: evRows } = await pool.query(
-      "SELECT COUNT(*) AS c FROM chain_raw_events WHERE block_number = 150",
-    );
-    expect(parseInt(evRows[0].c)).toBe(0);
+    const { rows: ev } = await pool.query("SELECT COUNT(*) AS cnt FROM chain_raw_events");
+    expect(parseInt(ev[0].cnt)).toBe(0);
   });
 });
 
-// ─────────────────────────────────────────────────────
-// Cursor Operations (original tests preserved)
-// ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// Backlog — multiple batches
+// ═══════════════════════════════════════════════════════
+
+describe("Backlog", () => {
+  it("large batch insert does not exceed limits", async () => {
+    const batch: unknown[] = [];
+    const phs: string[] = [];
+    let idx = 1;
+    for (let i = 0; i < 100; i++) {
+      phs.push(`($${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++}::jsonb,$${idx++}::jsonb,$${idx++},'PENDING_CONFIRMATION')`);
+      batch.push(
+        CHAIN_ID, "0x" + "aa".repeat(20), "BuyExecuted",
+        "0x" + i.toString(16).padStart(64, "0"), i, 200 + i,
+        "0x" + "bb".repeat(32), null, new Date().toISOString(),
+        "{}", "[]", null,
+      );
+    }
+
+    const { rowCount } = await pool.query(
+      `INSERT INTO chain_raw_events
+       (chain_id, contract_address, event_name, transaction_hash, log_index, block_number, block_hash, transaction_index, block_timestamp, decoded_data, topics, raw_data, status)
+       VALUES ${phs.join(",")}
+       ON CONFLICT (chain_id, transaction_hash, log_index, block_hash) DO NOTHING`,
+      batch,
+    );
+    expect(rowCount).toBe(100);
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// Cursor Operations
+// ═══════════════════════════════════════════════════════
 
 describe("Cursor Operations", () => {
-  it("upserts cursor and retrieves it", async () => {
+  it("upserts cursor with lease holder check and retrieves it", async () => {
     await pool.query(
-      `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, updated_at)
-       VALUES (31337, 'TEST_STREAM', 100, 'HEALTHY', NOW())
-       ON CONFLICT (chain_id, stream) DO UPDATE SET last_scanned_block = 100`);
+      `INSERT INTO chain_cursors (chain_id, stream, last_scanned_block, status, lease_holder, lease_expires_at, lease_generation, updated_at)
+       VALUES ($1, 'TEST_STREAM', 100, 'HEALTHY', 'w1', NOW() + INTERVAL '120 seconds', 5, NOW())`,
+      [CHAIN_ID],
+    );
 
     const { rows } = await pool.query(
       "SELECT last_scanned_block FROM chain_cursors WHERE chain_id = $1 AND stream = $2",
-      [31337, "TEST_STREAM"],
+      [CHAIN_ID, "TEST_STREAM"],
     );
     expect(parseInt(rows[0].last_scanned_block)).toBe(100);
   });

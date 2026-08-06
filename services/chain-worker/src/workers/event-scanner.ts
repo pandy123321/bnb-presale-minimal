@@ -9,7 +9,7 @@ import type { Abi } from "viem";
 import {
   getPool, getCursor, upsertCursor,
   acquireLease, releaseLease, insertRawEvents,
-  checkLeaseValid,
+  checkLeaseValid, insertBlockCheckpoint,
   type RawEventRow,
 } from "../db/client";
 import { toJsonSafe } from "../utils/json-safe";
@@ -65,7 +65,7 @@ async function scanAllStreams(): Promise<void> {
     const { leased, leaseGeneration } = await acquireLease(CHAIN_ID, stream.name, WORKER_ID, LEASE_TTL_SECONDS);
     if (!leased) continue;
     try { await scanStream(stream, leaseGeneration); }
-    finally { await releaseLease(CHAIN_ID, stream.name, WORKER_ID); }
+    finally { await releaseLease(CHAIN_ID, stream.name, WORKER_ID, leaseGeneration); }
   }
 }
 
@@ -121,7 +121,11 @@ async function scanStream(stream: ScanStream, leaseGeneration: number): Promise<
     const lastBlockHash = (toBlockObj.hash as string).toLowerCase();
 
     if (rawEvents.length > 0) await insertRawEvents(db, rawEvents);
-    const written = await upsertCursor(db, CHAIN_ID, stream.name, toBlock, lastBlockHash, "SYNCED", leaseGeneration);
+
+    // Write block checkpoint for reorg detection on empty blocks
+    await insertBlockCheckpoint(db, CHAIN_ID, toBlock, lastBlockHash);
+
+    const written = await upsertCursor(db, CHAIN_ID, stream.name, toBlock, lastBlockHash, "SYNCED", WORKER_ID, leaseGeneration);
     if (!written) {
       console.warn(`[Scanner] ${stream.name}: cursor update rejected — lease stale (gen=${leaseGeneration})`);
       await db.query("ROLLBACK");

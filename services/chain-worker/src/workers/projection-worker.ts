@@ -1,7 +1,7 @@
 // PANGU2 Chain Worker — Projection Worker
 // Projects CONFIRMED raw events into transaction_projections table.
-// Each CONFIRMED raw event projects independently — no block_number skip heuristic.
-// Unique key includes log_index to handle multiple events per transaction.
+// Each CONFIRMED raw event projects independently.
+// Unique key includes log_index. Skips REORGED events.
 
 import { getPool } from "../db/client";
 import { CHAIN_ID } from "../config";
@@ -16,8 +16,7 @@ async function processProjections(): Promise<void> {
   const pool = getPool();
   const db = await pool.connect();
   try {
-    // Find ALL unprojected CONFIRMED events using NOT EXISTS (no block_number skip)
-    // This ensures every single raw event is independently projected.
+    // Find unprojected CONFIRMED events — ignores REORGED
     const { rows } = await db.query(
       `SELECT e.* FROM chain_raw_events e
        WHERE e.chain_id = $1 AND e.status = 'CONFIRMED'

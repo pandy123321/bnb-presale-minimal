@@ -1,6 +1,6 @@
 // PANGU2 Chain Worker — Confirmation Worker
 // Confirms PENDING_CONFIRMATION events once block depth >= CONFIRMATION_BLOCKS.
-// Uses real RPC chain head (getBlockNumber) instead of cursor max for safety.
+// Validates canonical block hash via RPC before confirming each block.
 
 import { createPublicClient, http, type PublicClient } from "viem";
 import { getPool, confirmEvents } from "../db/client";
@@ -23,13 +23,11 @@ async function processConfirmations(): Promise<void> {
   const pool = getPool();
   const db = await pool.connect();
   try {
-    // Use real RPC chain head — not cursor max — for safety
     const rpcChainHead = Number(await c.getBlockNumber());
     const safeThreshold = rpcChainHead - CONFIRMATION_BLOCKS;
 
-    // Find unconfirmed blocks below the safe threshold
     const { rows } = await db.query(
-      `SELECT DISTINCT block_number FROM chain_raw_events
+      `SELECT DISTINCT block_number, block_hash FROM chain_raw_events
        WHERE chain_id = $1 AND status = 'PENDING_CONFIRMATION' AND block_number <= $2
        ORDER BY block_number ASC`,
       [CHAIN_ID, safeThreshold],
@@ -40,13 +38,27 @@ async function processConfirmations(): Promise<void> {
     let totalConfirmed = 0;
     for (const row of rows) {
       const bn = Number(row.block_number);
+      const storedHash = row.block_hash as string;
+
+      // Fetch canonical hash from RPC — never trust stored hash alone
+      const block = await c.getBlock({ blockNumber: BigInt(bn) }).catch(() => null);
+      if (!block) {
+        console.warn(`[Confirmation] block #${bn}: RPC fetch failed, skipping`);
+        continue;
+      }
+      const canonicalHash = (block.hash as string).toLowerCase();
+
       await db.query("BEGIN");
-      const count = await confirmEvents(db, CHAIN_ID, bn);
+      const count = await confirmEvents(db, CHAIN_ID, bn, canonicalHash);
       await db.query("COMMIT");
       totalConfirmed += count;
+
+      if (count === 0 && storedHash !== canonicalHash) {
+        console.warn(`[Confirmation] block #${bn}: hash mismatch (stored=${storedHash.slice(0,10)}, canonical=${canonicalHash.slice(0,10)}) — reorg likely`);
+      }
     }
     if (totalConfirmed > 0) {
-      console.log(`[Confirmation] ${totalConfirmed} events confirmed (chain head #${rpcChainHead}, threshold #${safeThreshold})`);
+      console.log(`[Confirmation] ${totalConfirmed} events confirmed (head #${rpcChainHead}, threshold #${safeThreshold})`);
     }
   } catch (e) {
     await db.query("ROLLBACK").catch(() => {});
