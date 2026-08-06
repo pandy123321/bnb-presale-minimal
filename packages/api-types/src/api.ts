@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════
 // PANGU2 — API Request/Response Types
 // Source: docs/schemas/openapi/pangu2-api-v1.yaml
+// Regenerate via project tooling; manual edits only for unsupported features.
 // ═══════════════════════════════════════════
 
 import type { EvmAddress, TxHash, WeiAmount, BlockNumberStr, IsoTimestamp } from "./primitives";

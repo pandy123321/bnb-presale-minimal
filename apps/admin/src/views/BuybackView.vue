@@ -23,13 +23,30 @@ type FormattedAmount =
   | { valid: true; text: string }
   | { valid: false; text: "\u2014"; reason: string };
 
+const AMOUNT_ERROR_LABELS: Record<string, string> = {
+  MISSING: "Missing amount",
+  INVALID_TYPE: "Invalid amount type",
+  INVALID_DECIMAL: "Invalid decimal amount",
+  FORMAT_ERROR: "Format error",
+};
+
+function amountErrorCode(e: unknown): string {
+  if (e instanceof Error) {
+    const msg = e.message;
+    if (msg.includes("null/undefined")) return "MISSING";
+    if (msg.includes("Invalid on-chain")) return "INVALID_DECIMAL";
+    return "FORMAT_ERROR";
+  }
+  return "INVALID_TYPE";
+}
+
 /** Validate a canonical on-chain amount: decimal unsigned integer string only */
 function validateAmount(raw: unknown): string {
   if (raw === null || raw === undefined) {
     throw new Error("amount is null/undefined");
   }
   if (typeof raw !== "string" || !/^(0|[1-9]\d*)$/.test(raw)) {
-    throw new Error(`Invalid on-chain amount: ${JSON.stringify(raw)}`);
+    throw new Error("Invalid on-chain amount");
   }
   return raw;
 }
@@ -49,7 +66,7 @@ function formatBnb(raw: unknown): FormattedAmount {
     const fracPart = s.slice(len - NATIVE_DECIMALS, len - NATIVE_DECIMALS + 6).replace(/0+$/, "");
     return { valid: true, text: fracPart.length > 0 ? `${intPart}.${fracPart} BNB` : `${intPart} BNB` };
   } catch (e: unknown) {
-    return { valid: false, text: "\u2014", reason: e instanceof Error ? e.message : "format error" };
+    return { valid: false, text: "\u2014", reason: amountErrorCode(e) };
   }
 }
 
@@ -68,7 +85,7 @@ function formatToken(raw: unknown): FormattedAmount {
     const fracPart = s.slice(len - TOKEN_DECIMALS, len - TOKEN_DECIMALS + 4).replace(/0+$/, "");
     return { valid: true, text: fracPart.length > 0 ? `${intPart}.${fracPart} ${TOKEN_SYMBOL}` : `${intPart} ${TOKEN_SYMBOL}` };
   } catch (e: unknown) {
-    return { valid: false, text: "\u2014", reason: e instanceof Error ? e.message : "format error" };
+    return { valid: false, text: "\u2014", reason: amountErrorCode(e) };
   }
 }
 
@@ -109,15 +126,21 @@ const lockerRows = computed<LockerRow[]>(() =>
 // Collect any formatting errors for the page-level error bar
 const formattingErrors = computed(() => {
   const msgs: string[] = [];
+  const label = (code: string) => AMOUNT_ERROR_LABELS[code] ?? code;
   for (const r of buybackRows.value) {
-    if (!r.bnb.valid) msgs.push(`Buyback #${r.batch_id} BNB: ${r.bnb.reason}`);
-    if (!r.tokens.valid) msgs.push(`Buyback #${r.batch_id} tokens: ${r.tokens.reason}`);
+    if (!r.bnb.valid) msgs.push(`Buyback #${r.batch_id} BNB: ${label(r.bnb.reason)}`);
+    if (!r.tokens.valid) msgs.push(`Buyback #${r.batch_id} tokens: ${label(r.tokens.reason)}`);
   }
   for (const r of lockerRows.value) {
-    if (!r.tokens.valid) msgs.push(`Locker #${r.batch_id} tokens: ${r.tokens.reason}`);
+    if (!r.tokens.valid) msgs.push(`Locker #${r.batch_id} tokens: ${label(r.tokens.reason)}`);
   }
   return msgs;
 });
+
+function fmtTitle(fa: FormattedAmount): string | undefined {
+  if (fa.valid) return undefined;
+  return AMOUNT_ERROR_LABELS[fa.reason] ?? fa.reason;
+}
 
 async function fetchBuybacks() {
   loadingBuybacks.value = true;
@@ -192,8 +215,8 @@ const noData = "\u2014";
           <div class="tr head"><span>Batch</span><span>BNB</span><span>Tokens</span><span>Time</span></div>
           <div v-for="r in buybackRows" :key="r.batch_id" class="tr">
             <span>#{{ r.batch_id }}</span>
-            <span :title="!r.bnb.valid ? r.bnb.reason : undefined" :class="{ 'fmt-err': !r.bnb.valid }">{{ r.bnb.text }}</span>
-            <span :title="!r.tokens.valid ? r.tokens.reason : undefined" :class="{ 'fmt-err': !r.tokens.valid }">{{ r.tokens.text }}</span>
+            <span :title="fmtTitle(r.bnb)" :class="{ 'fmt-err': !r.bnb.valid }">{{ r.bnb.text }}</span>
+            <span :title="fmtTitle(r.tokens)" :class="{ 'fmt-err': !r.tokens.valid }">{{ r.tokens.text }}</span>
             <span>{{ r.timestamp }}</span>
           </div>
         </div>
@@ -216,7 +239,7 @@ const noData = "\u2014";
           <div class="tr head"><span>Batch</span><span>Tokens</span><span>Locked Until</span><span>Status</span></div>
           <div v-for="r in lockerRows" :key="r.batch_id" class="tr">
             <span>#{{ r.batch_id }}</span>
-            <span :title="!r.tokens.valid ? r.tokens.reason : undefined" :class="{ 'fmt-err': !r.tokens.valid }">{{ r.tokens.text }}</span>
+            <span :title="fmtTitle(r.tokens)" :class="{ 'fmt-err': !r.tokens.valid }">{{ r.tokens.text }}</span>
             <span>{{ r.locked_until ?? noData }}</span>
             <span>{{ r.status }}</span>
           </div>

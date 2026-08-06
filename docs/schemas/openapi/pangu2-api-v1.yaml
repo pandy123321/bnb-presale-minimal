@@ -296,6 +296,21 @@ paths:
       responses:
         "200":
           description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/EnvelopeMetaRef"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/BuybackEvent"
+                      meta:
+                        allOf:
+                          - $ref: "#/components/schemas/EnvelopeMeta"
+                          - $ref: "#/components/schemas/PaginationMeta"
 
   /projects/pangu2/locker/batches:
     get:
@@ -310,6 +325,21 @@ paths:
       responses:
         "200":
           description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/EnvelopeMetaRef"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/LockerBatch"
+                      meta:
+                        allOf:
+                          - $ref: "#/components/schemas/EnvelopeMeta"
+                          - $ref: "#/components/schemas/PaginationMeta"
 
   # ── Staking ──
   /projects/pangu2/staking/earned:
@@ -710,6 +740,39 @@ components:
           type: integer
         last_page:
           type: integer
+
+    BuybackEvent:
+      type: object
+      required: [batch_id, amount_bnb_wei, tokens_raw, timestamp]
+      properties:
+        batch_id:
+          type: integer
+        amount_bnb_wei:
+          $ref: "#/components/schemas/WeiAmount"
+        tokens_raw:
+          $ref: "#/components/schemas/WeiAmount"
+        trigger:
+          $ref: "#/components/schemas/EvmAddress"
+        locker:
+          $ref: "#/components/schemas/EvmAddress"
+        timestamp:
+          $ref: "#/components/schemas/IsoTimestamp"
+
+    LockerBatch:
+      type: object
+      required: [batch_id, tokens_raw, status]
+      properties:
+        batch_id:
+          type: integer
+        tokens_raw:
+          $ref: "#/components/schemas/WeiAmount"
+        locked_until:
+          $ref: "#/components/schemas/IsoTimestamp"
+          nullable: true
+        duration_days:
+          type: integer
+        status:
+          type: string
 
     # ── Envelope Responses ──
     Envelope_Config:
