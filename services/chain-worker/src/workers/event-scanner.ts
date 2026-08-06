@@ -9,7 +9,7 @@ import type { Abi } from "viem";
 import {
   getPool, getCursor, upsertCursor,
   acquireLease, releaseLease, insertRawEvents,
-  checkLeaseValid, insertBlockCheckpoint,
+  checkLeaseValid, insertBlockCheckpoint, maintenanceLeaseActive,
   type RawEventRow,
 } from "../db/client";
 import { toJsonSafe } from "../utils/json-safe";

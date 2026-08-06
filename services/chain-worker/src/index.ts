@@ -1,6 +1,7 @@
 // PANGU2 Chain Worker — Entry Point
-// Starts Scanner, Confirmation Worker, Projection Worker, and Reorg Detector.
+// Verifies schema version before starting any workers.
 
+import { verifySchemaVersion } from "./db/client";
 import { start } from "./workers/event-scanner";
 import { startConfirmationWorker } from "./workers/confirmation-worker";
 import { startProjectionWorker } from "./workers/projection-worker";
@@ -11,10 +12,13 @@ async function main() {
   console.log("  PANGU2 Chain Worker");
   console.log("═════════════════════════════════");
 
-  await start();                    // Scanner
-  await startConfirmationWorker();  // Confirmation
-  await startProjectionWorker();    // Projection
-  await startReorgDetection();      // Reorg Detection
+  await verifySchemaVersion();
+  console.log("[Startup] Schema version OK");
+
+  await start();
+  await startConfirmationWorker();
+  await startProjectionWorker();
+  await startReorgDetection();
 }
 
 main().catch((err) => {

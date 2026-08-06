@@ -1,14 +1,17 @@
 // PANGU2 Chain Worker — Reorg Detector
-// Checks block hashes across ALL streams and block checkpoints.
-// On mismatch: marks raw events REORGED, deletes projections, rewinds ALL affected streams globally.
+// Hash-scoped: only marks stale hash events, not entire block number.
+// Global maintenance lease ensures scanner coordination.
+// Empty-block detection via checkpoint table (not raw events).
 
 import { createPublicClient, http, type PublicClient } from "viem";
+import { type PoolClient } from "pg";
 import {
-  getPool, findReorgedBlocks, findMissingCheckpoints, markBlockReorged,
-  deleteProjections, acquireLease, releaseLease, rewindCursor,
-  getAllCursorStreams, getBlockCheckpoint,
+  getPool, findReorgedBlocks, getBlockCheckpointsInRange,
+  markBlockReorgedHashScoped, markPendingsReorged, deleteProjectionsHashScoped,
+  acquireMaintenanceLease, releaseMaintenanceLease, validateMaintenanceLease,
+  rewindCursorMaintenance, getAllScannerStreams,
 } from "../db/client";
-import { CHAIN_ID, RPC_URL, REORG_DEPTH, WORKER_ID, LEASE_TTL_SECONDS, rpcLogLabel } from "../config";
+import { CHAIN_ID, RPC_URL, REORG_DEPTH, WORKER_ID, LEASE_TTL_SECONDS } from "../config";
 
 let rpc: PublicClient | null = null;
 function getRpc(): PublicClient {
@@ -26,62 +29,99 @@ async function checkReorgs(): Promise<void> {
   const c = getRpc();
   const currentBlock = Number(await c.getBlockNumber());
   const fromBlock = Math.max(0, currentBlock - REORG_DEPTH);
+
   const holdId = `reorg-${WORKER_ID}`;
-  const { leased, leaseGeneration } = await acquireLease(CHAIN_ID, "REORG_GLOBAL", holdId, LEASE_TTL_SECONDS);
+  const { leased, leaseGeneration } = await acquireMaintenanceLease(CHAIN_ID, holdId, LEASE_TTL_SECONDS);
   if (!leased) return;
 
   const pool = getPool();
   const db = await pool.connect();
   try {
-    const suspect = await findReorgedBlocks(db, CHAIN_ID, fromBlock, currentBlock);
-    const emptySuspect = await findMissingCheckpoints(db, CHAIN_ID, fromBlock, currentBlock);
+    // Validate the maintenance lease is still held
+    if (!await validateMaintenanceLease(db, CHAIN_ID, holdId, leaseGeneration)) {
+      console.warn("[Reorg] maintenance lease invalidated");
+      return;
+    }
 
+    // 1. Hash-scoped check: raw events with stored hashes
+    const suspect = await findReorgedBlocks(db, CHAIN_ID, fromBlock, currentBlock);
     for (const s of suspect) {
       const block = await c.getBlock({ blockNumber: BigInt(s.blockNumber) }).catch(() => null);
       if (!block) continue;
       const actualHash = (block.hash as string).toLowerCase();
       if (actualHash !== s.storedHash) {
-        await handleReorg(db, CHAIN_ID, s.blockNumber, holdId, leaseGeneration);
+        await handleReorg(db, CHAIN_ID, s.blockNumber, s.storedHash, holdId, leaseGeneration);
       }
     }
 
-    for (const s of emptySuspect) {
-      const block = await c.getBlock({ blockNumber: BigInt(s.blockNumber) }).catch(() => null);
+    // 2. Empty-block detection: checkpoints in range
+    const checkpoints = await getBlockCheckpointsInRange(db, CHAIN_ID, fromBlock, currentBlock);
+    for (const cp of checkpoints) {
+      // Skip blocks already found in raw-events suspect (dedup)
+      if (suspect.some(s => s.blockNumber === cp.blockNumber)) continue;
+      const block = await c.getBlock({ blockNumber: BigInt(cp.blockNumber) }).catch(() => null);
       if (!block) continue;
       const actualHash = (block.hash as string).toLowerCase();
-      const cpHash = await getBlockCheckpoint(db, CHAIN_ID, s.blockNumber);
-      if (cpHash && cpHash !== actualHash) {
-        console.log(`[Reorg] empty block #${s.blockNumber}: checkpoint mismatch`);
-        await handleReorg(db, CHAIN_ID, s.blockNumber, holdId, leaseGeneration);
+      if (actualHash !== cp.storedHash) {
+        console.log(`[Reorg] empty block #${cp.blockNumber}: checkpoint mismatch, stored=${cp.storedHash.slice(0,10)}, actual=${actualHash.slice(0,10)}`);
+        await handleReorg(db, CHAIN_ID, cp.blockNumber, cp.storedHash, holdId, leaseGeneration);
       }
     }
   } finally {
     db.release();
-    await releaseLease(CHAIN_ID, "REORG_GLOBAL", holdId, leaseGeneration);
+    await releaseMaintenanceLease(CHAIN_ID, holdId, leaseGeneration);
   }
 }
 
 async function handleReorg(
-  db: import("pg").PoolClient,
-  chainId: number, blockNumber: number, workerId: string, leaseGeneration: number,
+  db: PoolClient, chainId: number, blockNumber: number, staleHash: string,
+  holdId: string, leaseGeneration: number,
 ): Promise<void> {
-  await db.query("BEGIN");
-  const reorged = await markBlockReorged(db, chainId, blockNumber);
-  const deletedProj = await deleteProjections(db, chainId, blockNumber);
+  try {
+    await db.query("BEGIN");
 
-  const allStreams = await getAllCursorStreams(db, chainId);
-  const rewindTo = blockNumber - 1;
-  let rewoundCount = 0;
-
-  for (const stream of allStreams) {
-    if (stream.last_scanned_block > rewindTo) {
-      const ok = await rewindCursor(db, chainId, stream.stream, rewindTo, workerId, leaseGeneration);
-      if (ok) rewoundCount++;
+    // Re-validate maintenance lease inside transaction
+    if (!await validateMaintenanceLease(db, chainId, holdId, leaseGeneration)) {
+      console.warn("[Reorg] lease expired during reorg, rolling back");
+      await db.query("ROLLBACK");
+      return;
     }
+
+    // 1. Mark stale-hash events as REORGED (CONFIRMED + PENDING)
+    const cReorged = await markBlockReorgedHashScoped(db, chainId, blockNumber, staleHash);
+    const pReorged = await markPendingsReorged(db, chainId, blockNumber, staleHash);
+
+    // 2. Delete projections for stale hash only
+    const deletedProj = await deleteProjectionsHashScoped(db, chainId, blockNumber, staleHash);
+
+    // 3. Rewind ALL scanner streams
+    const streams = await getAllScannerStreams(db, chainId);
+    const rewindTo = blockNumber - 1;
+    let rewoundCount = 0;
+    let failCount = 0;
+
+    for (const s of streams) {
+      if (s.last_scanned_block > rewindTo) {
+        const ok = await rewindCursorMaintenance(db, chainId, s.stream, rewindTo);
+        if (ok) rewoundCount++; else failCount++;
+      }
+    }
+
+    // Fail if any stream that needed rewind failed
+    if (failCount > 0) {
+      console.error(`[Reorg] ${failCount} streams failed to rewind, rolling back`);
+      await db.query("ROLLBACK");
+      return;
+    }
+
+    await db.query("COMMIT");
+    console.log(
+      `[Reorg] block #${blockNumber} hash=${staleHash.slice(0,10)}: ` +
+      `${cReorged} CONFIRMED + ${pReorged} PENDING marked REORGED, ${deletedProj} projections deleted, ` +
+      `${rewoundCount} streams rewound to ${rewindTo}`,
+    );
+  } catch (e) {
+    await db.query("ROLLBACK").catch(() => {});
+    throw e;
   }
-  await db.query("COMMIT");
-  console.log(
-    `[Reorg] block #${blockNumber}: ${reorged} events REORGED, ${deletedProj} projections deleted, ` +
-    `${rewoundCount} streams rewound to ${rewindTo}`,
-  );
 }
