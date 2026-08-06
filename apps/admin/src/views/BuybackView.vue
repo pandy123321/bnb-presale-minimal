@@ -13,13 +13,41 @@ const batches = ref<Array<Record<string, unknown>>>([]);
 const buybacksTotal = ref(0);
 const batchesTotal = ref(0);
 
+// ── Formatting helpers (BigInt-safe, no Number/parseFloat) ──
+const TOKEN_DECIMALS = 18;
+
+function formatBnb(wei: unknown): string {
+  const s = String(wei ?? "0");
+  if (s === "0") return "0 BNB";
+  const len = s.length;
+  if (len <= TOKEN_DECIMALS) {
+    const frac = s.padStart(TOKEN_DECIMALS, "0");
+    return `0.${frac.slice(0, 6)} BNB`;
+  }
+  const intPart = s.slice(0, len - TOKEN_DECIMALS);
+  const fracPart = s.slice(len - TOKEN_DECIMALS, len - TOKEN_DECIMALS + 6);
+  return `${intPart}.${fracPart} BNB`;
+}
+
+function formatToken(raw: unknown): string {
+  const s = String(raw ?? "0");
+  if (s === "0") return "0 PANGU2";
+  const len = s.length;
+  if (len <= TOKEN_DECIMALS) {
+    const frac = s.padStart(TOKEN_DECIMALS, "0");
+    return `0.${frac.slice(0, 4)} PANGU2`;
+  }
+  const intPart = s.slice(0, len - TOKEN_DECIMALS);
+  return `${intPart} PANGU2`;
+}
+
 async function fetchBuybacks() {
   loadingBuybacks.value = true;
   buybackError.value = null;
   try {
     const res = await fetch(`${PUBLIC_API}/buybacks?page=1&per_page=20`);
     const body = await res.json();
-    if (body.error) throw new Error(body.error.message);
+    if (!res.ok || body.error) throw new Error(body.error?.message ?? `HTTP ${res.status}`);
     buybacks.value = Array.isArray(body.data) ? body.data : [];
     buybacksTotal.value = body.meta?.total ?? 0;
   } catch (e: unknown) {
@@ -35,7 +63,7 @@ async function fetchBatches() {
   try {
     const res = await fetch(`${PUBLIC_API}/locker/batches?page=1&per_page=20`);
     const body = await res.json();
-    if (body.error) throw new Error(body.error.message);
+    if (!res.ok || body.error) throw new Error(body.error?.message ?? `HTTP ${res.status}`);
     batches.value = Array.isArray(body.data) ? body.data : [];
     batchesTotal.value = body.meta?.total ?? 0;
   } catch (e: unknown) {
@@ -66,7 +94,6 @@ const noData = "\u2014";
       </div>
     </div>
 
-    <!-- Buyback Batches -->
     <div class="section-head"><h3>Buyback Batches</h3></div>
     <div class="card">
       <div class="card-body">
@@ -80,20 +107,17 @@ const noData = "\u2014";
           <small>Data will appear once the chain worker confirms on-chain buyback events.</small>
         </div>
         <div v-else class="table">
-          <div class="tr head">
-            <span>Batch</span><span>BNB</span><span>Tokens</span><span>Time</span>
-          </div>
+          <div class="tr head"><span>Batch</span><span>BNB</span><span>Tokens</span><span>Time</span></div>
           <div v-for="b in buybacks" :key="b.batch_id" class="tr">
             <span>#{{ b.batch_id }}</span>
-            <span>{{ b.amount_bnb_wei }} BNB</span>
-            <span>{{ b.tokens_raw }} P2</span>
+            <span>{{ formatBnb(b.amount_bnb_wei) }}</span>
+            <span>{{ formatToken(b.tokens_raw) }}</span>
             <span>{{ b.timestamp }}</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Locker Batches -->
     <div class="section-head"><h3>Locker Batches</h3></div>
     <div class="card">
       <div class="card-body">
@@ -107,12 +131,10 @@ const noData = "\u2014";
           <small>Locked tokens will appear once buybacks are executed and confirmed.</small>
         </div>
         <div v-else class="table">
-          <div class="tr head">
-            <span>Batch</span><span>Tokens</span><span>Locked Until</span><span>Status</span>
-          </div>
+          <div class="tr head"><span>Batch</span><span>Tokens</span><span>Locked Until</span><span>Status</span></div>
           <div v-for="b in batches" :key="b.batch_id" class="tr">
             <span>#{{ b.batch_id }}</span>
-            <span>{{ b.tokens_raw }} P2</span>
+            <span>{{ formatToken(b.tokens_raw) }}</span>
             <span>{{ b.locked_until ?? noData }}</span>
             <span>{{ b.status }}</span>
           </div>

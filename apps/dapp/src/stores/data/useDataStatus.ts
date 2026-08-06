@@ -80,6 +80,8 @@ export const useDataStatusStore = defineStore("dataStatus", () => {
    */
   function evaluateFreshness(): void {
     if (lastUpdatedAt.value === 0) return;
+    // Only degrade LIVE/STALE — never override MOCK_DATA, SYNCING, or UNAVAILABLE
+    if (status.value !== DataStatus.LIVE && status.value !== DataStatus.STALE) return;
     const age = Date.now() - lastUpdatedAt.value;
 
     if (age >= DEGRADED_THRESHOLD_MS) {
