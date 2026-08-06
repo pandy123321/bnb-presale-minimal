@@ -28,13 +28,11 @@ class SystemStatusTest extends TestCase
         Config::set('pangu2.freshness_degraded_blocks', 200);
         Config::set('pangu2.deployment_block', '42000000');
 
-        // Default: RPC is responsive so tests that don't care about RPC
-        // don't accidentally make real HTTP calls.
+        // Default: RPC is responsive with matching chainId
         Http::fake([
-            'http://127.0.0.1:8545' => Http::response([
-                'jsonrpc' => '2.0',
-                'result'  => '0x28fa66',
-                'id'      => 1,
+            'http://127.0.0.1:8545' => fn ($request) => $this->mockRpcResponse($request, [
+                'eth_blockNumber' => ['result' => '0x28fa66'],
+                'eth_chainId'     => ['result' => '0x7a69'],
             ]),
         ]);
     }
@@ -46,10 +44,9 @@ class SystemStatusTest extends TestCase
     public function test_config_endpoint_returns_200(): void
     {
         Http::fake([
-            'http://127.0.0.1:8545' => Http::response([
-                'jsonrpc' => '2.0',
-                'result'  => '0x28fa66',
-                'id'      => 1,
+            'http://127.0.0.1:8545' => fn ($request) => $this->mockRpcResponse($request, [
+                'eth_blockNumber' => ['result' => '0x28fa66'],
+                'eth_chainId'     => ['result' => '0x7a69'],
             ]),
         ]);
 
@@ -68,7 +65,14 @@ class SystemStatusTest extends TestCase
 
     public function test_system_status_endpoint_returns_200(): void
     {
+        Http::fake([
+            'http://127.0.0.1:8545' => fn ($request) => $this->mockRpcResponse($request, [
+                'eth_blockNumber' => ['result' => '0x1388'],
+                'eth_chainId'     => ['result' => '0x7a69'],
+            ]),
+        ]);
         $this->seedSyncCursor(31337, 5000, 4998);
+        $this->seedConfirmedEvent();
 
         $res = $this->getJson('/api/v1/projects/pangu2/system-status');
 
@@ -306,6 +310,7 @@ class SystemStatusTest extends TestCase
     public function test_fresh_data_when_block_lag_within_threshold(): void
     {
         $this->seedSyncCursor(31337, 5000, 4990); // lag = 10
+        $this->seedConfirmedEvent();
 
         $res = $this->getJson('/api/v1/projects/pangu2/system-status');
 
@@ -320,6 +325,7 @@ class SystemStatusTest extends TestCase
         Config::set('pangu2.freshness_degraded_blocks', 200);
 
         $this->seedSyncCursor(31337, 5000, 4970); // lag = 30
+        $this->seedConfirmedEvent();
 
         $res = $this->getJson('/api/v1/projects/pangu2/system-status');
 
@@ -334,6 +340,7 @@ class SystemStatusTest extends TestCase
         Config::set('pangu2.freshness_degraded_blocks', 200);
 
         $this->seedSyncCursor(31337, 5000, 4700); // lag = 300
+        $this->seedConfirmedEvent();
 
         $res = $this->getJson('/api/v1/projects/pangu2/system-status');
 
@@ -415,10 +422,9 @@ class SystemStatusTest extends TestCase
     public function test_rpc_ok_when_primary_responds(): void
     {
         Http::fake([
-            'http://127.0.0.1:8545' => Http::response([
-                'jsonrpc' => '2.0',
-                'result'  => '0x1',
-                'id'      => 1,
+            'http://127.0.0.1:8545' => fn ($request) => $this->mockRpcResponse($request, [
+                'eth_blockNumber' => ['result' => '0x1'],
+                'eth_chainId'     => ['result' => '0x7a69'],
             ]),
         ]);
 
@@ -434,10 +440,9 @@ class SystemStatusTest extends TestCase
 
         Http::fake([
             'http://127.0.0.1:8545' => Http::response('', 500),
-            'http://backup:8545'    => Http::response([
-                'jsonrpc' => '2.0',
-                'result'  => '0x1',
-                'id'      => 1,
+            'http://backup:8545'    => fn ($request) => $this->mockRpcResponse($request, [
+                'eth_blockNumber' => ['result' => '0x1'],
+                'eth_chainId'     => ['result' => '0x7a69'],
             ]),
         ]);
 
@@ -480,14 +485,14 @@ class SystemStatusTest extends TestCase
     public function test_system_status_includes_rpc_status(): void
     {
         Http::fake([
-            'http://127.0.0.1:8545' => Http::response([
-                'jsonrpc' => '2.0',
-                'result'  => '0x28fa66',
-                'id'      => 1,
+            'http://127.0.0.1:8545' => fn ($request) => $this->mockRpcResponse($request, [
+                'eth_blockNumber' => ['result' => '0x64'],
+                'eth_chainId'     => ['result' => '0x7a69'],
             ]),
         ]);
 
         $this->seedSyncCursor(31337, 100, 100);
+        $this->seedConfirmedEvent();
 
         $res = $this->getJson('/api/v1/projects/pangu2/system-status');
 
@@ -496,19 +501,81 @@ class SystemStatusTest extends TestCase
     }
 
     // ===================================================================
+    // Response shape
+    // ===================================================================
+
+    public function test_streams_key_present_in_status_response(): void
+    {
+        Http::fake([
+            'http://127.0.0.1:8545' => fn ($request) => $this->mockRpcResponse($request, [
+                'eth_blockNumber' => ['result' => '0x64'],
+                'eth_chainId'     => ['result' => '0x7a69'],
+            ]),
+        ]);
+
+        $this->seedSyncCursor(31337, 100, 100);
+        $this->seedConfirmedEvent();
+
+        $res = $this->getJson('/api/v1/projects/pangu2/system-status');
+        $res->assertOk();
+        // New stream-by-stream breakdown should be present
+        $res->assertJsonPath('data.streams.TRADE_EVENTS.last_scanned_block', 100);
+        $res->assertJsonPath('data.streams.DIVIDEND_EVENTS.last_scanned_block', 100);
+    }
+
+    // ===================================================================
     // Helpers
     // ===================================================================
 
     private function seedSyncCursor(int $chainId, int $latestChainBlock, int $lastScannedBlock): void
     {
-        \Illuminate\Support\Facades\DB::table('chain_sync_cursors')->insert([
-            'chain_id'             => $chainId,
-            'stream'               => 'default',
-            'last_scanned_block'   => $lastScannedBlock,
-            'latest_chain_block'   => $latestChainBlock,
-            'status'               => 'ACTIVE',
-            'created_at'           => now(),
-            'updated_at'           => now(),
+        foreach (['TRADE_EVENTS', 'DIVIDEND_EVENTS'] as $stream) {
+            \Illuminate\Support\Facades\DB::table('chain_sync_cursors')->insert([
+                'chain_id'             => $chainId,
+                'stream'               => $stream,
+                'last_scanned_block'   => $lastScannedBlock,
+                'latest_chain_block'   => $latestChainBlock,
+                'status'               => 'SYNCED',
+                'created_at'           => now(),
+                'updated_at'           => now(),
+            ]);
+        }
+    }
+
+    /** Seed one CONFIRMED event for LIVE freshness tests */
+    private function seedConfirmedEvent(): void
+    {
+        \Illuminate\Support\Facades\DB::table('chain_raw_events')->insert([
+            'chain_id'          => 31337,
+            'contract_address'  => '0x' . str_repeat('aa', 20),
+            'event_name'        => 'BuyExecuted',
+            'transaction_hash'  => '0x' . str_repeat('ab', 32),
+            'log_index'         => 0,
+            'block_number'      => 4990,
+            'block_hash'        => '0x' . str_repeat('bb', 32),
+            'block_timestamp'   => now(),
+            'decoded_data'      => '{}',
+            'topics'            => '[]',
+            'status'            => 'CONFIRMED',
+        ]);
+    }
+
+    private function mockRpcResponse($request, array $methodResults): \Illuminate\Http\Client\Response
+    {
+        $body = json_decode((string) $request->body(), true);
+        $method = $body['method'] ?? '';
+
+        if (isset($methodResults[$method])) {
+            return \Illuminate\Support\Facades\Http::response(array_merge([
+                'jsonrpc' => '2.0',
+                'id'      => $body['id'] ?? 1,
+            ], $methodResults[$method]));
+        }
+
+        return \Illuminate\Support\Facades\Http::response([
+            'jsonrpc' => '2.0',
+            'result'  => '0x0',
+            'id'      => $body['id'] ?? 1,
         ]);
     }
 }

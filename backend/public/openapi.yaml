@@ -1,0 +1,871 @@
+openapi: "3.1.0"
+info:
+  title: PANGU2 Public API
+  version: "1.0.0"
+  description: |
+    PANGU2 project public API.
+
+    ## Envelope
+    All successful responses use the `ApiEnvelope` structure.
+    All errors use the same envelope with `success: false`.
+
+    ## Data Status
+    | Value | Meaning |
+    |-------|---------|
+    | LIVE | Real on-chain data, synchronized |
+    | STALE | Data behind by 21-200 blocks |
+    | DEGRADED | Data significantly behind or worker error |
+    | SYNCING | Initial sync in progress |
+    | UNAVAILABLE | Mock data, missing contracts, or source unavailable |
+
+    ## Amounts
+    All blockchain amounts are **decimal integer strings** (wei-level precision).
+    Never use hex-encoded uint256.
+
+servers:
+  - url: http://localhost:8000/api/v1/projects/pangu2
+    description: Local development
+
+paths:
+  /config:
+    get:
+      operationId: getConfig
+      summary: Environment and chain info
+      responses:
+        "200":
+          description: Config payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigResponse"
+
+  /system-status:
+    get:
+      operationId: getSystemStatus
+      summary: System health (sync, queue, anomalies)
+      responses:
+        "200":
+          description: System status payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemStatusResponse"
+
+  /contracts:
+    get:
+      operationId: getContracts
+      summary: Contract registry
+      responses:
+        "200":
+          description: Contract entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContractsResponse"
+
+  /auth/csrf:
+    get:
+      operationId: getCsrf
+      summary: CSRF token initialization
+      responses:
+        "200":
+          description: CSRF initialized
+
+  /auth/nonce:
+    post:
+      operationId: createNonce
+      summary: Get a nonce for wallet authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [wallet_address]
+              properties:
+                wallet_address:
+                  type: string
+                  pattern: "^0x[a-fA-F0-9]{40}$"
+                  description: EVM wallet address
+      responses:
+        "200":
+          description: Nonce created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NonceResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /auth/verify:
+    post:
+      operationId: verifyWallet
+      summary: Verify EIP-191 signature and create session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [wallet_address, nonce, signature]
+              properties:
+                wallet_address:
+                  type: string
+                  pattern: "^0x[a-fA-F0-9]{40}$"
+                nonce:
+                  type: string
+                  maxLength: 128
+                  description: Previously issued nonce (from /auth/nonce)
+                signature:
+                  type: string
+                  maxLength: 256
+                  description: EIP-191 personal_sign signature of the nonce
+      responses:
+        "200":
+          description: Wallet verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifyResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/AuthError"
+
+  /auth/logout:
+    post:
+      operationId: walletLogout
+      summary: Invalidate wallet session
+      responses:
+        "200":
+          description: Logged out
+
+  /quotes/buy:
+    post:
+      operationId: createBuyQuote
+      summary: Get a buy quote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount_bnb_wei]
+              properties:
+                amount_bnb_wei:
+                  type: string
+                  pattern: "^[1-9][0-9]*$"
+                  description: BNB amount in wei (decimal integer string)
+      responses:
+        "200":
+          description: Buy quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuyQuoteResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /quotes/sell:
+    post:
+      operationId: createSellQuote
+      summary: Get a sell quote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount_token_raw, wallet_address]
+              properties:
+                amount_token_raw:
+                  type: string
+                  pattern: "^[1-9][0-9]*$"
+                  description: Token amount in raw units (decimal integer string)
+                wallet_address:
+                  type: string
+                  minLength: 42
+                  maxLength: 42
+                  description: EVM wallet address
+      responses:
+        "200":
+          description: Sell quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SellQuoteResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /wallets/{address}/transactions:
+    get:
+      operationId: getWalletTransactions
+      summary: Transaction history for a wallet
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^0x[a-fA-F0-9]{40}$"
+      responses:
+        "200":
+          description: Transaction list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionsResponse"
+
+  /dividend/epochs/current:
+    get:
+      operationId: getCurrentDividendEpoch
+      summary: Current dividend epoch
+      responses:
+        "200":
+          description: Current epoch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DividendEpochResponse"
+
+  /dividend/epochs/{epochId}:
+    get:
+      operationId: getDividendEpoch
+      summary: Specific dividend epoch
+      parameters:
+        - name: epochId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Epoch details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DividendEpochResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  /dividend/epochs/{epochId}/proof/{address}:
+    get:
+      operationId: getDividendProof
+      summary: Merkle proof for dividend claim
+      parameters:
+        - name: epochId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^0x[a-fA-F0-9]{40}$"
+      responses:
+        "200":
+          description: Merkle proof
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DividendProofResponse"
+
+  /buybacks:
+    get:
+      operationId: getBuybacks
+      summary: Buyback events
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Buyback list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuybackListResponse"
+
+  /locker/batches:
+    get:
+      operationId: getLockerBatches
+      summary: Locker batch status
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Locker batch list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LockerBatchResponse"
+
+  /staking/earned:
+    get:
+      operationId: getStakingEarned
+      summary: Get unclaimed staking rewards for an address
+      parameters:
+        - name: address
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: "^0x[a-fA-F0-9]{40}$"
+      responses:
+        "200":
+          description: Earned rewards
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StakingEarnedResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailableError"
+
+  /staking/positions:
+    get:
+      operationId: getStakingPositions
+      summary: Get staking positions for an address
+      parameters:
+        - name: address
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: "^0x[a-fA-F0-9]{40}$"
+        - name: cursor
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 20
+      responses:
+        "200":
+          description: Staking positions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StakingPositionsResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailableError"
+
+  /staking/status:
+    get:
+      operationId: getStakingStatus
+      summary: Global staking contract status
+      responses:
+        "200":
+          description: Staking status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StakingStatusResponse"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailableError"
+
+components:
+  schemas:
+    ApiEnvelope:
+      type: object
+      required: [success, data, meta, error]
+      properties:
+        success:
+          type: boolean
+        data:
+          nullable: true
+        meta:
+          $ref: "#/components/schemas/Meta"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+
+    Meta:
+      type: object
+      required: [project, project_id, environment, chain_id, data_status, block_number, generated_at, schema_version]
+      properties:
+        project:
+          type: string
+          enum: [PANGU2]
+        project_id:
+          type: string
+          enum: [pangu2]
+        environment:
+          type: string
+          enum: [LOCAL, TESTING, STAGING, PRODUCTION]
+        chain_id:
+          type: integer
+        data_status:
+          type: string
+          enum: [LIVE, STALE, DEGRADED, SYNCING, UNAVAILABLE]
+        block_number:
+          type: string
+          nullable: true
+        generated_at:
+          type: string
+          format: date-time
+        schema_version:
+          type: string
+          enum: ["1.0.0"]
+
+    ErrorDetail:
+      type: object
+      required: [code, message, retryable, details]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        retryable:
+          type: boolean
+        details:
+          type: array
+          items:
+            type: object
+
+    ConfigResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [project, environment, chain_id, chain_name, rpc_status, supported_networks]
+              properties:
+                project:
+                  type: string
+                environment:
+                  type: string
+                chain_id:
+                  type: integer
+                chain_name:
+                  type: string
+                rpc_status:
+                  type: string
+                  enum: [OK, DEGRADED, DOWN]
+                supported_networks:
+                  type: array
+                  items:
+                    type: integer
+
+    SystemStatusResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [latest_chain_block, last_scanned_block, block_lag, rpc_status, queue_status, open_anomalies]
+              properties:
+                latest_chain_block:
+                  type: string
+                  description: Decimal integer string
+                last_scanned_block:
+                  type: string
+                block_lag:
+                  type: integer
+                rpc_status:
+                  type: string
+                  enum: [OK, DEGRADED, DOWN]
+                queue_status:
+                  type: string
+                  enum: [HEALTHY, DEGRADED, UNKNOWN]
+                open_anomalies:
+                  type: integer
+                streams:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    properties:
+                      last_scanned_block:
+                        type: integer
+                      status:
+                        type: string
+
+    ContractsResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/ContractEntry"
+
+    ContractEntry:
+      type: object
+      required: [name, address, abi_version, deployment_block, status]
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+          pattern: "^0x[a-fA-F0-9]{40}$"
+        abi_version:
+          type: string
+        deployment_block:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, PAUSED, FINALIZED, UNKNOWN, UNAVAILABLE]
+
+    NonceResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [nonce, expires_at]
+              properties:
+                nonce:
+                  type: string
+                expires_at:
+                  type: string
+                  format: date-time
+
+    VerifyResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [token, address, expires_at]
+              properties:
+                token:
+                  type: string
+                address:
+                  type: string
+                expires_at:
+                  type: string
+                  format: date-time
+
+    BuyQuoteResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [amount_in_wei, gross_tokens_raw, tax_rate, tax_tokens_raw, net_tokens_raw, min_receive_raw, quote_block, expires_at, source]
+              properties:
+                amount_in_wei:
+                  type: string
+                gross_tokens_raw:
+                  type: string
+                tax_rate:
+                  type: string
+                tax_tokens_raw:
+                  type: string
+                net_tokens_raw:
+                  type: string
+                min_receive_raw:
+                  type: string
+                quote_block:
+                  type: string
+                expires_at:
+                  type: string
+                  format: date-time
+                source:
+                  type: string
+                  enum: [contract_preview, mock, unavailable, error, unknown]
+
+    SellQuoteResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [amount_in_raw, gross_bnb_wei, tax_rate, tax_tokens_raw, tax_destination, net_bnb_wei, min_receive_wei, quote_block, expires_at, source]
+              properties:
+                amount_in_raw:
+                  type: string
+                gross_bnb_wei:
+                  type: string
+                tax_rate:
+                  type: string
+                tax_tokens_raw:
+                  type: string
+                tax_destination:
+                  type: string
+                net_bnb_wei:
+                  type: string
+                min_receive_wei:
+                  type: string
+                quote_block:
+                  type: string
+                expires_at:
+                  type: string
+                  format: date-time
+                source:
+                  type: string
+                  enum: [contract_preview, mock, unavailable, error, unknown]
+
+    TransactionsResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/TransactionEntry"
+                message:
+                  type: string
+
+    TransactionEntry:
+      type: object
+      properties:
+        tx_hash:
+          type: string
+        block_number:
+          type: string
+        event_name:
+          type: string
+        decoded_data:
+          type: object
+        timestamp:
+          type: string
+        status:
+          type: string
+
+    DividendEpochResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+
+    DividendProofResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+
+    BuybackListResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+            meta:
+              allOf:
+                - $ref: "#/components/schemas/Meta"
+                - type: object
+                  properties:
+                    current_page:
+                      type: integer
+                    per_page:
+                      type: integer
+                    total:
+                      type: integer
+                    last_page:
+                      type: integer
+
+    LockerBatchResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+
+    StakingEarnedResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [address, earned]
+              properties:
+                address:
+                  type: string
+                  pattern: "^0x[a-fA-F0-9]{40}$"
+                earned:
+                  type: string
+                  description: Decimal integer string (uint256 as decimal, NOT hex)
+
+    StakingPositionsResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [address, positions, returnedCount, onchainCount, cursor, limit, nextCursor, isComplete, failedPositionIds]
+              properties:
+                address:
+                  type: string
+                positions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/StakePosition"
+                returnedCount:
+                  type: integer
+                onchainCount:
+                  type: integer
+                cursor:
+                  type: integer
+                limit:
+                  type: integer
+                nextCursor:
+                  type: integer
+                  nullable: true
+                isComplete:
+                  type: boolean
+                failedPositionIds:
+                  type: array
+                  items:
+                    type: integer
+
+    StakePosition:
+      type: object
+      required: [positionId, amount, lockedAt, unlockAt, claimed]
+      properties:
+        positionId:
+          type: integer
+        amount:
+          type: string
+          description: Decimal integer string (uint256 as decimal)
+        lockedAt:
+          type: string
+          description: Unix timestamp as decimal string
+        unlockAt:
+          type: string
+          description: Unix timestamp as decimal string
+        claimed:
+          type: boolean
+
+    StakingStatusResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [totalStaked, rewardRate, periodFinish, availableRewardReserve]
+              properties:
+                totalStaked:
+                  type: string
+                  description: Decimal integer string (uint256 as decimal)
+                rewardRate:
+                  type: string
+                  description: Decimal integer string (uint256 as decimal)
+                periodFinish:
+                  type: string
+                  description: Unix timestamp as decimal string
+                availableRewardReserve:
+                  type: string
+                  description: Decimal integer string (uint256 as decimal)
+
+  responses:
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ApiEnvelope"
+              - type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: ["VALIDATION_FAILED"]
+                      message:
+                        type: string
+    AuthError:
+      description: Authentication failed
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ApiEnvelope"
+              - type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: ["AUTH_FAILED"]
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ApiEnvelope"
+    ServiceUnavailableError:
+      description: Service unavailable
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ApiEnvelope"
+              - type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: ["STAKING_CONFIG_ERROR", "STAKING_RPC_UNAVAILABLE"]
+
+tags:
+  - name: System
+    description: Config, status, contracts
+  - name: Auth
+    description: Wallet authentication
+  - name: Trade
+    description: Buy/sell quotes and transaction history
+  - name: Dividend
+    description: Dividend epochs and Merkle proofs
+  - name: Buyback
+    description: Buyback events and locker batches
+  - name: Staking
+    description: Staking contract data

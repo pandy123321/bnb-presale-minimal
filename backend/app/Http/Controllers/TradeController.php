@@ -26,8 +26,9 @@ final class TradeController extends Controller
         ]);
 
         try {
-            $data = $this->quote->getBuyQuote($validated['amount_bnb_wei']);
-            $status = $data['source'] !== 'mock' ? 'LIVE' : 'UNAVAILABLE';
+            $data   = $this->quote->getBuyQuote($validated['amount_bnb_wei']);
+            $source = $data['source'] ?? 'unknown';
+            $status = $this->quote->sourceStatus($source);
             return ApiEnvelope::success($data, $status, $data['quote_block'] ?? null);
         } catch (\InvalidArgumentException $e) {
             return ApiEnvelope::error('INVALID_AMOUNT', $e->getMessage());
@@ -47,8 +48,9 @@ final class TradeController extends Controller
         ]);
 
         try {
-            $data = $this->quote->getSellQuote($validated['amount_token_raw'], $validated['wallet_address']);
-            $status = $data['source'] !== 'mock' ? 'LIVE' : 'UNAVAILABLE';
+            $data   = $this->quote->getSellQuote($validated['amount_token_raw'], $validated['wallet_address']);
+            $source = $data['source'] ?? 'unknown';
+            $status = $this->quote->sourceStatus($source);
             return ApiEnvelope::success($data, $status, $data['quote_block'] ?? null);
         } catch (\InvalidArgumentException $e) {
             return ApiEnvelope::error('INVALID_AMOUNT', $e->getMessage());
@@ -60,16 +62,37 @@ final class TradeController extends Controller
     /**
      * GET /api/v1/projects/pangu2/wallets/{address}/transactions
      *
-     * Returns real transaction data from chain_raw_events or UNAVAILABLE.
+     * Returns transaction data from chain_raw_events or UNAVAILABLE if unsynced.
      */
     public function transactions(string $address, Request $request): JsonResponse
     {
         $chainId = (int) config('pangu2.chain_id', 31337);
 
+        // Validate address format
+        if (!preg_match('/^0x[a-fA-F0-9]{40}$/', $address)) {
+            return ApiEnvelope::error('INVALID_ADDRESS', 'Address must be a valid EVM address');
+        }
+
         try {
+            // Only return if we have CONFIRMED events — empty table = unsynced
+            $confirmedCount = \DB::table('chain_raw_events')
+                ->where('chain_id', $chainId)
+                ->where('status', 'CONFIRMED')
+                ->count();
+
+            if ($confirmedCount === 0) {
+                return ApiEnvelope::success([
+                    'message' => 'Transaction data unavailable — chain worker not yet synced',
+                ], 'UNAVAILABLE');
+            }
+
             $events = \DB::table('chain_raw_events')
                 ->where('chain_id', $chainId)
-                ->whereRaw('(decoded_data->>\'buyer\' = ? OR decoded_data->>\'seller\' = ?)', [$address, $address])
+                ->where('status', 'CONFIRMED')
+                ->where(function ($q) use ($address) {
+                    $q->whereRaw("decoded_data->>'buyer' = ?", [$address])
+                      ->orWhereRaw("decoded_data->>'seller' = ?", [$address]);
+                })
                 ->orderBy('block_number', 'desc')
                 ->limit(50)
                 ->get();

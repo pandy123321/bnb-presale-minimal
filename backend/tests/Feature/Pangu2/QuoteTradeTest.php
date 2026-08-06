@@ -25,7 +25,7 @@ class QuoteTradeTest extends TestCase
         $res->assertOk();
         $res->assertJsonPath('data.source', 'mock');
         $res->assertJsonPath('data.tax_rate', '4.00%');
-        $res->assertJsonPath('meta.data_status', 'MOCK_DATA');
+        $res->assertJsonPath('meta.data_status', 'UNAVAILABLE');
         $res->assertJsonPath('error', null);
 
         // All amounts are string
@@ -118,7 +118,7 @@ class QuoteTradeTest extends TestCase
         $res->assertJsonPath('data.source', 'mock');
         $res->assertJsonPath('data.tax_rate', '4%');
         $res->assertJsonPath('data.tax_destination', '4%→SupportPool');
-        $res->assertJsonPath('meta.data_status', 'MOCK_DATA');
+        $res->assertJsonPath('meta.data_status', 'UNAVAILABLE');
         $res->assertJsonPath('error', null);
 
         $this->assertIsString($res->json('data.amount_in_raw'));
@@ -179,7 +179,7 @@ class QuoteTradeTest extends TestCase
         $res = $this->getJson(self::TX_URI);
 
         $res->assertOk();
-        $res->assertJsonPath('meta.data_status', 'MOCK_DATA');
+        $res->assertJsonPath('meta.data_status', 'UNAVAILABLE');
         $res->assertJsonPath('error', null);
         $this->assertIsArray($res->json('data'));
         $this->assertGreaterThan(0, count($res->json('data')));
@@ -240,7 +240,7 @@ class QuoteTradeTest extends TestCase
             $this->assertArrayHasKey('project', $json['meta']);
             $this->assertArrayHasKey('environment', $json['meta']);
             $this->assertArrayHasKey('data_status', $json['meta']);
-            $this->assertEquals('MOCK_DATA', $json['meta']['data_status']);
+            $this->assertEquals('UNAVAILABLE', $json['meta']['data_status']);
         }
     }
 

@@ -17,7 +17,7 @@ class TradeQuoteTest extends TestCase
         ]);
 
         $res->assertOk();
-        $this->assertEquals('MOCK_DATA', $res->json('meta.data_status'));
+        $this->assertEquals('UNAVAILABLE', $res->json('meta.data_status'));
         $this->assertEquals('mock', $res->json('data.source'));
         $this->assertEquals('4.00', $res->json('data.tax_rate'));
 
@@ -104,7 +104,7 @@ class TradeQuoteTest extends TestCase
         $this->assertEquals('4.00', $res->json('data.tax_rate'));
         $this->assertEquals('dividend_pool', $res->json('data.tax_destination'));
         $this->assertEquals('mock', $res->json('data.source'));
-        $this->assertEquals('MOCK_DATA', $res->json('meta.data_status'));
+        $this->assertEquals('UNAVAILABLE', $res->json('meta.data_status'));
     }
 
     public function test_sell_quote_large_amount_returns_10_percent(): void
@@ -151,7 +151,7 @@ class TradeQuoteTest extends TestCase
         $res->assertOk();
         $this->assertIsArray($res->json('data'));
         $this->assertCount(3, $res->json('data'));
-        $this->assertEquals('MOCK_DATA', $res->json('meta.data_status'));
+        $this->assertEquals('UNAVAILABLE', $res->json('meta.data_status'));
     }
 
     public function test_transactions_all_confirmed(): void

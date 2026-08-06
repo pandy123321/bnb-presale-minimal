@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Core\ContractRegistry\Services;
 
 use App\Modules\Core\ContractRegistry\Models\ContractRegistry;
+use App\Modules\Core\Chain\Services\ChainConfigService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -12,14 +13,16 @@ use Illuminate\Support\Facades\Log;
  * Manages the contract registry: reads from DB, falls back to config when
  * a contract is not yet registered, and never returns hardcoded production
  * addresses.
+ *
+ * Validation rules:
+ *  - Address must match 0x + 40 hex chars
+ *  - chain_id must match the configured chain
+ *  - Bytecode at the address must exist (contract deployed)
  */
 final class ContractRegistryService
 {
     /**
      * Get all contract entries for the current environment and chain.
-     *
-     * Merges env-level config keys (CONTRACT_*_ADDRESS) as fallback entries
-     * when no DB row exists yet.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -34,7 +37,6 @@ final class ContractRegistryService
             ->get()
             ->keyBy('name');
 
-        // Merge env-fallback contracts that are not yet in the DB
         return array_values(
             $this->mergeFallbacks($dbContracts->toArray(), $environment, $chainId)
         );
@@ -64,6 +66,45 @@ final class ContractRegistryService
     }
 
     /**
+     * Validate a contract address has bytecode deployed.
+     * Uses the configured RPC to check eth_getCode.
+     */
+    public function hasBytecode(string $address): bool
+    {
+        try {
+            $rpcUrl = config('pangu2.rpc_url');
+            if (empty($rpcUrl)) return false;
+
+            $response = \Illuminate\Support\Facades\Http::timeout(5)
+                ->withHeaders(['Content-Type' => 'application/json'])
+                ->post($rpcUrl, [
+                    'jsonrpc' => '2.0',
+                    'method'  => 'eth_getCode',
+                    'params'  => [$address, 'latest'],
+                    'id'      => 1,
+                ]);
+
+            if (!$response->successful()) return false;
+
+            $body = $response->json();
+            $code = $body['result'] ?? '0x';
+
+            // No code or empty code → not deployed
+            return is_string($code) && $code !== '0x' && !empty(str_replace('0', '', substr($code, 2)));
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Validate an EVM address format.
+     */
+    public function isValidAddress(string $address): bool
+    {
+        return preg_match('/^0x[a-fA-F0-9]{40}$/', $address) === 1;
+    }
+
+    /**
      * Record an audit entry for contract registry mutations.
      */
     public function audit(string $action, ?int $contractId, ?array $before, ?array $after): void
@@ -81,8 +122,7 @@ final class ContractRegistryService
             ]);
         } catch (\Throwable $e) {
             Log::warning('ContractRegistryService: audit write failed', [
-                'action' => $action,
-                'error'  => $e->getMessage(),
+                'action' => $action, 'error'  => $e->getMessage(),
             ]);
         }
     }
@@ -110,12 +150,17 @@ final class ContractRegistryService
             $envKey     = $pair['env_key'];
             $abiVersion = $pair['abi_version'];
 
-            if (isset($seen[$name])) {
-                continue;
-            }
+            if (isset($seen[$name])) continue;
 
             $address = env($envKey);
-            if (empty($address)) {
+            if (empty($address)) continue;
+
+            // Validate address format
+            if (!$this->isValidAddress($address)) {
+                Log::warning('ContractRegistry: env address invalid format', [
+                    'name'    => $name,
+                    'address' => $address,
+                ]);
                 continue;
             }
 
@@ -128,9 +173,7 @@ final class ContractRegistryService
             ];
         }
 
-        // If a named contract has zero entries (not in DB and not in env),
-        // return it as UNAVAILABLE so the API consumer can surface it.
-        // The hard rule: "未配置的合约返回 UNAVAILABLE".
+        // Any known contract not in DB or env → UNAVAILABLE
         foreach ($this->knownContractNames() as $name) {
             if (!isset($result[$name])) {
                 $result[$name] = [
@@ -149,14 +192,12 @@ final class ContractRegistryService
     private function findFallback(string $name, string $environment, int $chainId): ?array
     {
         foreach ($this->getEnvContractKeys() as $pair) {
-            if ($pair['name'] !== $name) {
-                continue;
-            }
+            if ($pair['name'] !== $name) continue;
 
             $address = env($pair['env_key']);
-            if (empty($address)) {
-                return null;
-            }
+            if (empty($address)) return null;
+
+            if (!$this->isValidAddress($address)) return null;
 
             return [
                 'name'             => $name,
@@ -167,7 +208,6 @@ final class ContractRegistryService
             ];
         }
 
-        // Not configured anywhere → UNAVAILABLE
         return [
             'name'             => $name,
             'address'          => '0x0000000000000000000000000000000000000000',
@@ -177,9 +217,6 @@ final class ContractRegistryService
         ];
     }
 
-    /**
-     * Known contract names in the system.
-     */
     private function knownContractNames(): array
     {
         return [
@@ -188,12 +225,11 @@ final class ContractRegistryService
             'WBNB',
             'DividendDistributor',
             'SupportPool',
+            'Pangu2Staking',
+            'Pangu2TradeRouter',
         ];
     }
 
-    /**
-     * Env key → contract name mapping with expected ABI versions.
-     */
     private function getEnvContractKeys(): array
     {
         return [
