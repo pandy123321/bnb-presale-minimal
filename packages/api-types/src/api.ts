@@ -164,6 +164,27 @@ export interface EpochInfo {
   status: EpochStatus;
 }
 
+// ── Buyback & Locker ──
+
+/** Buyback event as returned by GET /api/v1/projects/pangu2/buybacks */
+export interface BuybackEventDto {
+  batch_id: string;
+  amount_bnb_wei: string;
+  tokens_raw: string;
+  trigger: string;
+  locker: string;
+  timestamp: IsoTimestamp;
+}
+
+/** Locker batch as returned by GET /api/v1/projects/pangu2/locker/batches */
+export interface LockerBatchDto {
+  batch_id: string;
+  tokens_raw: string;
+  locked_until: IsoTimestamp | null;
+  duration_days: number;
+  status: string;
+}
+
 // ── Admin ──
 
 export interface AdminLoginRequest {

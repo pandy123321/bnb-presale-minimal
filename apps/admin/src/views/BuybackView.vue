@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
+import type { BuybackEventDto, LockerBatchDto } from "@pangu2/api-types";
 
 const PUBLIC_API = "/api/v1/projects/pangu2";
 
@@ -8,8 +9,8 @@ const loadingBatches = ref(true);
 const buybackError = ref<string | null>(null);
 const batchError = ref<string | null>(null);
 
-const buybacks = ref<Array<Record<string, unknown>>>([]);
-const batches = ref<Array<Record<string, unknown>>>([]);
+const buybacks = ref<BuybackEventDto[]>([]);
+const batches = ref<LockerBatchDto[]>([]);
 const buybacksTotal = ref(0);
 const batchesTotal = ref(0);
 
@@ -18,49 +19,61 @@ const NATIVE_DECIMALS = 18;
 const TOKEN_DECIMALS = 18;
 const TOKEN_SYMBOL = "PANGU2";
 
-/** Validate and coerce to a non-empty unsigned decimal integer string */
+type FormattedAmount =
+  | { valid: true; text: string }
+  | { valid: false; text: "\u2014"; reason: string };
+
+/** Validate a canonical on-chain amount: decimal unsigned integer string only */
 function validateAmount(raw: unknown): string {
-  if (raw === null || raw === undefined) throw new Error("amount is null/undefined");
-  if (typeof raw === "number" || typeof raw === "bigint") raw = String(raw);
-  if (typeof raw !== "string" || !/^[1-9]\d*$/.test(raw)) {
+  if (raw === null || raw === undefined) {
+    throw new Error("amount is null/undefined");
+  }
+  if (typeof raw !== "string" || !/^(0|[1-9]\d*)$/.test(raw)) {
     throw new Error(`Invalid on-chain amount: ${JSON.stringify(raw)}`);
   }
   return raw;
 }
 
 /** Format a native wei amount to BNB (18 decimals, max 6 fractional digits) */
-function formatBnb(raw: unknown): string {
+function formatBnb(raw: unknown): FormattedAmount {
   try {
     const s = validateAmount(raw);
-    if (s === "0") return "0 BNB";
+    if (s === "0") return { valid: true, text: "0 BNB" };
     const len = s.length;
     if (len <= NATIVE_DECIMALS) {
-      // below 1 BNB — show "0.XXXX" with full available precision
       const frac = s.padStart(NATIVE_DECIMALS, "0");
       const trimmed = frac.slice(0, 6).replace(/0+$/, "");
-      return trimmed.length > 0 ? `0.${trimmed} BNB` : "<0.000001 BNB";
+      return { valid: true, text: trimmed.length > 0 ? `0.${trimmed} BNB` : "<0.000001 BNB" };
     }
     const intPart = s.slice(0, len - NATIVE_DECIMALS);
     const fracPart = s.slice(len - NATIVE_DECIMALS, len - NATIVE_DECIMALS + 6).replace(/0+$/, "");
-    return fracPart.length > 0 ? `${intPart}.${fracPart} BNB` : `${intPart} BNB`;
-  } catch { return "\u2014"; }
+    return { valid: true, text: fracPart.length > 0 ? `${intPart}.${fracPart} BNB` : `${intPart} BNB` };
+  } catch (e: unknown) {
+    return { valid: false, text: "\u2014", reason: e instanceof Error ? e.message : "format error" };
+  }
 }
 
 /** Format a raw token amount to PANGU2 (18 decimals, max 4 fractional digits) */
-function formatToken(raw: unknown): string {
+function formatToken(raw: unknown): FormattedAmount {
   try {
     const s = validateAmount(raw);
-    if (s === "0") return `0 ${TOKEN_SYMBOL}`;
+    if (s === "0") return { valid: true, text: `0 ${TOKEN_SYMBOL}` };
     const len = s.length;
     if (len <= TOKEN_DECIMALS) {
       const frac = s.padStart(TOKEN_DECIMALS, "0");
       const trimmed = frac.slice(0, 4).replace(/0+$/, "");
-      return trimmed.length > 0 ? `0.${trimmed} ${TOKEN_SYMBOL}` : `<0.0001 ${TOKEN_SYMBOL}`;
+      return { valid: true, text: trimmed.length > 0 ? `0.${trimmed} ${TOKEN_SYMBOL}` : `<0.0001 ${TOKEN_SYMBOL}` };
     }
     const intPart = s.slice(0, len - TOKEN_DECIMALS);
     const fracPart = s.slice(len - TOKEN_DECIMALS, len - TOKEN_DECIMALS + 4).replace(/0+$/, "");
-    return fracPart.length > 0 ? `${intPart}.${fracPart} ${TOKEN_SYMBOL}` : `${intPart} ${TOKEN_SYMBOL}`;
-  } catch { return "\u2014"; }
+    return { valid: true, text: fracPart.length > 0 ? `${intPart}.${fracPart} ${TOKEN_SYMBOL}` : `${intPart} ${TOKEN_SYMBOL}` };
+  } catch (e: unknown) {
+    return { valid: false, text: "\u2014", reason: e instanceof Error ? e.message : "format error" };
+  }
+}
+
+function fmt(raw: unknown): string {
+  return (raw as FormattedAmount).text;
 }
 
 async function fetchBuybacks() {
@@ -132,8 +145,8 @@ const noData = "\u2014";
           <div class="tr head"><span>Batch</span><span>BNB</span><span>Tokens</span><span>Time</span></div>
           <div v-for="b in buybacks" :key="b.batch_id" class="tr">
             <span>#{{ b.batch_id }}</span>
-            <span>{{ formatBnb(b.amount_bnb_wei) }}</span>
-            <span>{{ formatToken(b.tokens_raw) }}</span>
+            <span>{{ fmt(formatBnb(b.amount_bnb_wei)) }}</span>
+            <span>{{ fmt(formatToken(b.tokens_raw)) }}</span>
             <span>{{ b.timestamp }}</span>
           </div>
         </div>
@@ -156,7 +169,7 @@ const noData = "\u2014";
           <div class="tr head"><span>Batch</span><span>Tokens</span><span>Locked Until</span><span>Status</span></div>
           <div v-for="b in batches" :key="b.batch_id" class="tr">
             <span>#{{ b.batch_id }}</span>
-            <span>{{ formatToken(b.tokens_raw) }}</span>
+            <span>{{ fmt(formatToken(b.tokens_raw)) }}</span>
             <span>{{ b.locked_until ?? noData }}</span>
             <span>{{ b.status }}</span>
           </div>
