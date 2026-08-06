@@ -24,6 +24,17 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
     uint256 public constant MIN_SELL_AMOUNT = 100;
     uint256 public constant INITIAL_SUPPLY = 1_000_000_000 ether;
 
+    // ── Launch Protection (immutable — never modifiable by governance) ──
+    uint32 public constant LAUNCH_PROTECTION_DURATION = 15 minutes;
+    uint16 public constant LAUNCH_BUY_TAX_BPS = 3000;
+    uint16 public constant LAUNCH_SELL_TAX_BPS = 3000;
+    uint16 public constant LAUNCH_SUPPORT_BPS = 2900;
+    uint16 public constant LAUNCH_BURN_BPS = 100;
+
+    /// @notice Timestamp when trading was opened by governance.
+    ///         Zero means trading has never been opened.
+    uint40 public tradingOpenAt;
+
     ICostBasisManager public costBasisManager;
     IFeeVault public feeVault;
     bool public coreConfigured;
@@ -43,6 +54,8 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
     error DirectPairInteractionForbidden(address from, address to, address operator);
     error DirectSystemInteractionForbidden(address from, address to, address operator);
     error UnsupportedTaxRate(uint16 taxBps);
+    error TradingNotOpen();
+    error TradingAlreadyOpen();
     error InvalidAmount();
     error CoreSystemAddressImmutable(address account);
     error InvalidTransferContext(TransferContext.Kind kind);
@@ -68,6 +81,7 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
         uint256 amountOut
     );
     event ProtocolBurn(address indexed operator, uint256 amount);
+    event TradingOpened(uint40 openedAt);
 
     constructor(address initialHolder, address governance, address emergencyAccount) ERC20("PANGU2", "PANGU2") {
         if (initialHolder == address(0) || governance == address(0) || emergencyAccount == address(0)) {
@@ -99,6 +113,21 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
     }
 
     // ── Governance setters ──
+
+    /// @notice Open trading — irreversibly sets the timestamp from which
+    ///         the 15-minute launch protection window is measured.
+    ///         Can only be called once while trading is not yet open.
+    function setTradingOpenAt() external onlyRole(GOVERNANCE_ROLE) {
+        if (tradingOpenAt != 0) revert TradingAlreadyOpen();
+        tradingOpenAt = uint40(block.timestamp);
+        emit TradingOpened(tradingOpenAt);
+    }
+
+    /// @notice True during the 15-minute high-tax launch protection window.
+    function isInLaunchProtection() public view returns (bool) {
+        uint40 opened = tradingOpenAt;
+        return opened != 0 && block.timestamp < uint256(opened) + LAUNCH_PROTECTION_DURATION;
+    }
 
     function setPair(address pair, bool enabled) external onlyRole(GOVERNANCE_ROLE) {
         _requireContract(pair);
@@ -189,19 +218,32 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
 
     // ── Tax preview ──
 
-    function previewBuyTax(uint256 grossAmount) public pure returns (uint256 taxAmount, uint256 netAmount) {
+    function previewBuyTax(uint256 grossAmount) public view returns (uint256 taxAmount, uint256 netAmount) {
         if (grossAmount == 0) revert InvalidAmount();
-        taxAmount = _mulBpsRoundingUp(grossAmount, BUY_TAX_BPS);
+        uint16 rate = isInLaunchProtection() ? LAUNCH_BUY_TAX_BPS : BUY_TAX_BPS;
+        taxAmount = _mulBpsRoundingUp(grossAmount, rate);
         if (taxAmount >= grossAmount) revert InvalidAmount();
         netAmount = grossAmount - taxAmount;
     }
 
     function previewSellTax(uint256 sellAmount, uint16 taxBps)
         public
-        pure
+        view
         returns (uint256 supportAmount, uint256 burnAmount, uint256 swapAmount)
     {
         if (sellAmount < MIN_SELL_AMOUNT) revert InvalidAmount();
+
+        // During launch protection: 29% support + 1% burn, caller's taxBps is ignored
+        if (isInLaunchProtection()) {
+            uint256 totalTax = _mulBpsRoundingUp(sellAmount, LAUNCH_SELL_TAX_BPS); // 30%
+            burnAmount = (totalTax * LAUNCH_BURN_BPS) / LAUNCH_SELL_TAX_BPS; // 1/30 of tax = 1% of sell
+            if (burnAmount == 0) burnAmount = 1;
+            supportAmount = totalTax - burnAmount; // 29% of sell
+            swapAmount = sellAmount - totalTax; // 70% of sell
+            return (supportAmount, burnAmount, swapAmount);
+        }
+
+        // Normal period
         if (taxBps != NORMAL_SELL_TAX_BPS && taxBps != PROFIT_SELL_TAX_BPS) revert UnsupportedTaxRate(taxBps);
         if (taxBps == NORMAL_SELL_TAX_BPS) {
             supportAmount = _mulBpsRoundingUp(sellAmount, NORMAL_SELL_TAX_BPS);
@@ -246,7 +288,9 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
         }
         if (seller == address(0)) revert ZeroAddress();
         if (sellAmount == 0) revert InvalidAmount();
-        if (taxBps != NORMAL_SELL_TAX_BPS && taxBps != PROFIT_SELL_TAX_BPS) revert UnsupportedTaxRate(taxBps);
+        if (!isInLaunchProtection() && taxBps != NORMAL_SELL_TAX_BPS && taxBps != PROFIT_SELL_TAX_BPS) {
+            revert UnsupportedTaxRate(taxBps);
+        }
         (supportAmount, burnAmount, swapAmount) = previewSellTax(sellAmount, taxBps);
         _update(msg.sender, address(feeVault), supportAmount);
         if (burnAmount != 0) {
@@ -262,7 +306,9 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
     {
         if (seller == address(0)) revert ZeroAddress();
         if (tokenIn == 0) revert InvalidAmount();
-        if (taxBps != NORMAL_SELL_TAX_BPS && taxBps != PROFIT_SELL_TAX_BPS) revert UnsupportedTaxRate(taxBps);
+        if (!isInLaunchProtection() && taxBps != NORMAL_SELL_TAX_BPS && taxBps != PROFIT_SELL_TAX_BPS) {
+            revert UnsupportedTaxRate(taxBps);
+        }
         (uint256 supportAmount, uint256 burnAmount, uint256 swapAmount) = previewSellTax(tokenIn, taxBps);
         emit TokensSold(seller, tokenIn, taxBps, supportAmount, burnAmount, swapAmount, amountOut);
     }
