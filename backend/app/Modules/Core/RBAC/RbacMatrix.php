@@ -80,6 +80,10 @@ final class RbacMatrix
             self::ROLE_SUPER_ADMIN,
             self::ROLE_OPERATOR,
         ],
+        // Contract registry — manage (SUPER_ADMIN only)
+        'contracts.manage' => [
+            self::ROLE_SUPER_ADMIN,
+        ],
     ];
 
     /**

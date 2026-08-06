@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Modules\Core\ContractRegistry\Controllers\ContractRegistryController;
 use App\Modules\Pangu2\Admin\Controllers\AdminDashboardController;
 use App\Modules\Pangu2\Admin\Controllers\AdminJobsController;
 use App\Modules\Pangu2\Admin\Controllers\AdminAuditController;
@@ -60,5 +61,13 @@ Route::prefix('admin-api/v1/projects/pangu2')->group(function () {
     });
     Route::middleware('rbac:staking.read')->group(function () {
         Route::get('/staking/coverage', [\App\Modules\Pangu2\Staking\Controllers\StakingController::class, 'coverage']);
+    });
+
+    // ── Contract Registry CRUD (SUPER_ADMIN only) ──
+    Route::middleware(['auth:web', 'rbac:contracts.manage'])->group(function () {
+        Route::get('/contract-registry', [ContractRegistryController::class, 'index']);
+        Route::post('/contract-registry', [ContractRegistryController::class, 'store']);
+        Route::delete('/contract-registry/{id}', [ContractRegistryController::class, 'destroy'])->whereNumber('id');
+        Route::post('/contract-registry/resync', [ContractRegistryController::class, 'resync']);
     });
 });

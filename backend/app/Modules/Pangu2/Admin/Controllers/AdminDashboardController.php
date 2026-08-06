@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Pangu2\Admin\Controllers;
 
 use App\Http\ApiEnvelope;
+use App\Modules\Core\ContractRegistry\Services\ContractRegistryService;
 use App\Modules\Core\RBAC\RbacMatrix;
 use App\Modules\Core\Transaction\Models\TransactionProjection;
 use App\Modules\Pangu2\Buyback\Models\BuybackEvent;
@@ -51,35 +52,10 @@ class AdminDashboardController extends Controller
      */
     public function contracts(): JsonResponse
     {
-        $chainId = (int) config('pangu2.chain_id', 31337);
+        $items = app(ContractRegistryService::class)->getAll();
+        $hasAny = count($items) > 0;
 
-        $contracts = [
-            ['name' => 'Pangu2Token',             'env' => 'token_address'],
-            ['name' => 'Pangu2TradeRouter',       'env' => 'trade_router_address'],
-            ['name' => 'DividendDistributor',     'env' => 'dividend_distributor_address'],
-            ['name' => 'SupportPool',             'env' => 'support_pool_address'],
-            ['name' => 'BuybackLocker',           'env' => 'buyback_locker_address'],
-            ['name' => 'FeeVault',                'env' => 'fee_vault_address'],
-            ['name' => 'CostBasisManager',        'env' => 'cost_basis_manager_address'],
-            ['name' => 'Pangu2Staking',           'env' => 'staking_address'],
-        ];
-
-        $hasAny = false;
-        $items = [];
-        foreach ($contracts as $c) {
-            $addr = config("pangu2.{$c['env']}", '');
-            if ($addr === '') continue;
-            $hasAny = true;
-            $items[] = [
-                'name'    => $c['name'],
-                'address' => $addr,
-                'chain_id'=> $chainId,
-                'status'  => 'ACTIVE',
-            ];
-        }
-
-        $status = $hasAny ? 'LIVE' : 'UNAVAILABLE';
-        return ApiEnvelope::success($items, $status);
+        return ApiEnvelope::success($items, $hasAny ? 'LIVE' : 'UNAVAILABLE');
     }
 
     private function chainId(): int
