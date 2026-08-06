@@ -1,7 +1,13 @@
 # PANGU2 V2 BSC Testnet Deployment Manifest
 
+> **STATUS: SUPERSEDED** — replaced by [`docs/current/DEPLOYMENT_MANIFEST.md`](../current/DEPLOYMENT_MANIFEST.md)
+> This file is retained for historical reference only. The new manifest includes
+> bytecode hashes, constructor args, ABI hashes, and a full verification matrix.
+> All deployment status claims in this document were unverifiable at time of archiving.
+
 - **Network:** BSC Testnet (Chain ID: 97)
-- **Date:** 2026-08-05
+- **Date:** 2026-08-05 (superseded 2026-08-06)
+- **Reason for supersession:** Missing bytecode hashes, constructor args, ABI hashes, deploy tx evidence, and independent verification.
 - **Deployer Address:** `0x6E257B171338BDe98fa1eA3aa62C41AfB0864C53`
 - **Governance Address:** `0x6E257B171338BDe98fa1eA3aa62C41AfB0864C53`
 - **Compiler:** Solidity 0.8.24 + Foundry v1.7.1

@@ -141,9 +141,51 @@ Oracle 需要完整 `twapWindow`。**中途不要修改储备。**
 
 ## 9. 验证部署
 
+### 9.1 快速验证
+
 ```powershell
 .\deploy-and-test.ps1 -VerifyOnly
 ```
+
+### 9.2 完整部署证据验证
+
+Bash 脚本，需要 `curl` + `jq`（或 `python3`）+ BSC Testnet RPC：
+
+```bash
+export BSC_TESTNET_RPC_URL="https://data-seed-prebsc-1-s1.binance.org:8545"
+bash scripts/validate-deployment.sh
+```
+
+验证项目：
+- `eth_getCode` — 11 个合约的链上字节码
+- `eth_getTransactionReceipt` — 部署交易确认
+- Runtime bytecode hash vs 编译产物
+- ABI hash vs 编译产物
+- Pair token0/token1 验证
+- Factory.getPair 确认
+- oracle.pair == pair, oracle.token == token
+- Governance 权限矩阵 (hasRole)
+- Transfer Context 注册验证
+- Deployer 已撤销所有 admin role
+- 5 个 config 文件地址一致性验证
+
+验证通过后将 `docs/current/DEPLOYMENT_MANIFEST.md` 中的所有 `UNVERIFIED` 字段填入实际值。
+
+### 9.3 手动验证 (cast)
+
+```bash
+# 字节码检查
+cast code <contract_address> --rpc-url <rpc_url>
+
+# Storage 读取 (示例: token.isPair)
+cast storage <token_address> <storage_slot> --rpc-url <rpc_url>
+
+# 事件日志检查
+cast logs --address <token_address> \
+  --from-block <deploy_block> --rpc-url <rpc_url>
+```
+
+
 
 ---
 
