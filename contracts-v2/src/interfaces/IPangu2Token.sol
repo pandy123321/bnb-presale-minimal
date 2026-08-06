@@ -24,6 +24,12 @@ interface IPangu2Token is IERC20 {
         view
         returns (uint256 supportAmount, uint256 burnAmount, uint256 swapAmount);
 
+    /// @notice Authoritative buy tax rate — single source of truth.
+    function resolveBuyTaxBps(address buyer) external view returns (uint16);
+
+    /// @notice Authoritative sell tax rate — single source of truth.
+    function resolveSellTaxBps(address seller, uint16 baseTaxBps) external view returns (uint16);
+
     function settleBuy(address buyer, uint256 grossAmount, uint256 costWbnbWei)
         external
         returns (uint256 taxAmount, uint256 netAmount);

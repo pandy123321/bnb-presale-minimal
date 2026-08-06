@@ -264,6 +264,25 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
         return previewBuyTax(grossAmount);
     }
 
+    /// @notice Authoritative buy tax rate for a buyer — single source of truth.
+    ///         Reverts if trading has not yet been opened.
+    function resolveBuyTaxBps(address buyer) public view returns (uint16) {
+        if (tradingOpenAt == 0) revert TradingNotOpen();
+        if (feeWhitelist[buyer]) return 0;
+        if (isInLaunchProtection()) return LAUNCH_BUY_TAX_BPS;
+        return BUY_TAX_BPS;
+    }
+
+    /// @notice Authoritative sell tax rate for a seller — single source of truth.
+    ///         baseTaxBps is the cost-basis-derived rate (400 or 1000).
+    ///         Reverts if trading has not yet been opened.
+    function resolveSellTaxBps(address seller, uint16 baseTaxBps) public view returns (uint16) {
+        if (tradingOpenAt == 0) revert TradingNotOpen();
+        if (feeWhitelist[seller]) return 0;
+        if (isInLaunchProtection()) return LAUNCH_SELL_TAX_BPS;
+        return baseTaxBps;
+    }
+
     function previewSellTax(uint256 sellAmount, uint16 taxBps)
         public
         view
@@ -315,6 +334,7 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
         if (!coreConfigured) revert CoreNotConfigured();
         if (buyer == address(0)) revert ZeroAddress();
         if (grossAmount == 0 || costWbnbWei == 0) revert InvalidAmount();
+        if (tradingOpenAt == 0) revert TradingNotOpen();
         (taxAmount, netAmount) = previewBuyTaxFor(buyer, grossAmount);
         _update(msg.sender, address(feeVault), taxAmount);
         _beginContext(msg.sender, TransferContext.Kind.BUY_SETTLEMENT);
@@ -336,9 +356,7 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
         }
         if (seller == address(0)) revert ZeroAddress();
         if (sellAmount == 0) revert InvalidAmount();
-        if (!isInLaunchProtection() && taxBps != NORMAL_SELL_TAX_BPS && taxBps != PROFIT_SELL_TAX_BPS) {
-            revert UnsupportedTaxRate(taxBps);
-        }
+        if (tradingOpenAt == 0) revert TradingNotOpen();
         (supportAmount, burnAmount, swapAmount) = previewSellTaxFor(seller, sellAmount, taxBps);
         _update(msg.sender, address(feeVault), supportAmount);
         if (burnAmount != 0) {
@@ -354,9 +372,7 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
     {
         if (seller == address(0)) revert ZeroAddress();
         if (tokenIn == 0) revert InvalidAmount();
-        if (!isInLaunchProtection() && taxBps != NORMAL_SELL_TAX_BPS && taxBps != PROFIT_SELL_TAX_BPS) {
-            revert UnsupportedTaxRate(taxBps);
-        }
+        // taxBps validation happens inside previewSellTaxFor → previewSellTax
         (uint256 supportAmount, uint256 burnAmount, uint256 swapAmount) = previewSellTaxFor(seller, tokenIn, taxBps);
         emit TokensSold(seller, tokenIn, taxBps, supportAmount, burnAmount, swapAmount, amountOut);
     }

@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IWBNB} from "./interfaces/IPancakeV2.sol";
-import {IPangu2Token} from "./interfaces/IPangu2Token.sol";
-import {ICostBasisManager} from "./interfaces/ICostBasisManager.sol";
-import {IPancakeV2Adapter} from "./interfaces/IPancakeV2Adapter.sol";
-import {IPangu2TwapOracle} from "./interfaces/IPangu2TwapOracle.sol";
-import {FullMath} from "./libraries/FullMath.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IWBNB } from "./interfaces/IPancakeV2.sol";
+import { IPangu2Token } from "./interfaces/IPangu2Token.sol";
+import { ICostBasisManager } from "./interfaces/ICostBasisManager.sol";
+import { IPancakeV2Adapter } from "./interfaces/IPancakeV2Adapter.sol";
+import { IPangu2TwapOracle } from "./interfaces/IPangu2TwapOracle.sol";
+import { FullMath } from "./libraries/FullMath.sol";
 
 contract Pangu2TradeRouter is AccessControl, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -62,6 +62,8 @@ contract Pangu2TradeRouter is AccessControl, Pausable, ReentrancyGuard {
     error NativeTransferFailed();
     error UnauthorizedNativeSender(address sender);
     error AmountExceedsUint128();
+    error TradingNotOpen();
+    error InvalidTaxRate(uint16 taxBps);
 
     event BuyExecuted(
         address indexed buyer,
@@ -117,7 +119,13 @@ contract Pangu2TradeRouter is AccessControl, Pausable, ReentrancyGuard {
     }
 
     function previewBuy(uint256 bnbAmount) external view returns (BuyPreview memory preview) {
-        return _previewBuy(address(0), bnbAmount);
+        // Generic preview — does NOT account for whitelist. Use previewBuyFor for user quotes.
+        return _previewBuyValue(bnbAmount);
+    }
+
+    function previewBuyFor(address buyer, uint256 bnbAmount) external view returns (BuyPreview memory preview) {
+        if (buyer == address(0)) revert ZeroAddress();
+        return _previewBuy(buyer, bnbAmount);
     }
 
     function previewSell(address seller, uint256 tokenAmount) external view returns (SellPreview memory) {
@@ -134,12 +142,14 @@ contract Pangu2TradeRouter is AccessControl, Pausable, ReentrancyGuard {
         if (msg.value == 0 || minimumNetTokens == 0) revert InvalidAmount();
         _validateDeadline(deadline);
 
-        BuyPreview memory p = _previewBuy(msg.sender, msg.value);
-        uint256 minimumGrossTokens = FullMath.mulDivRoundingUp(
-            minimumNetTokens, BPS_DENOMINATOR, BPS_DENOMINATOR - token.BUY_TAX_BPS()
-        );
+        uint16 actualTaxBps = token.resolveBuyTaxBps(msg.sender);
+        if (actualTaxBps >= BPS_DENOMINATOR) revert InvalidTaxRate(actualTaxBps);
 
-        wbnb.deposit{value: msg.value}();
+        BuyPreview memory p = _previewBuy(msg.sender, msg.value);
+        uint256 minimumGrossTokens =
+            FullMath.mulDivRoundingUp(minimumNetTokens, BPS_DENOMINATOR, BPS_DENOMINATOR - actualTaxBps);
+
+        wbnb.deposit{ value: msg.value }();
         IERC20(address(wbnb)).forceApprove(address(adapter), msg.value);
         uint256 grossTokens = adapter.swapExactInput(
             address(wbnb), address(token), msg.value, minimumGrossTokens, address(this), deadline
@@ -169,25 +179,17 @@ contract Pangu2TradeRouter is AccessControl, Pausable, ReentrancyGuard {
 
         if (swapTokens > type(uint128).max) revert AmountExceedsUint128();
         IERC20(address(token)).forceApprove(address(adapter), swapTokens);
-        uint256 wbnbOut = adapter.swapExactInput(
-            address(token), address(wbnb), swapTokens, minimumBnbOut, address(this), deadline
-        );
+        uint256 wbnbOut =
+            adapter.swapExactInput(address(token), address(wbnb), swapTokens, minimumBnbOut, address(this), deadline);
         IERC20(address(token)).forceApprove(address(adapter), 0);
 
         wbnb.withdraw(wbnbOut);
-        (bool ok,) = payable(msg.sender).call{value: wbnbOut}("");
+        (bool ok,) = payable(msg.sender).call{ value: wbnbOut }("");
         if (!ok) revert NativeTransferFailed();
         bnbOut = wbnbOut;
         token.emitSellSettlementAmountOut(msg.sender, tokenAmount, p.taxBps, bnbOut);
         emit SellExecuted(
-            msg.sender,
-            tokenAmount,
-            p.taxBps,
-            supportTokens,
-            burnTokens,
-            swapTokens,
-            bnbOut,
-            p.quoteBlock
+            msg.sender, tokenAmount, p.taxBps, supportTokens, burnTokens, swapTokens, bnbOut, p.quoteBlock
         );
     }
 
@@ -199,16 +201,28 @@ contract Pangu2TradeRouter is AccessControl, Pausable, ReentrancyGuard {
         _unpause();
     }
 
+    function _previewBuyValue(uint256 bnbAmount) private view returns (BuyPreview memory preview) {
+        if (bnbAmount == 0) revert InvalidAmount();
+        if (bnbAmount > type(uint128).max) revert AmountExceedsUint128();
+        IPangu2TwapOracle.Quote memory q = oracle.validatedQuote(address(wbnb), address(token), uint128(bnbAmount));
+        uint256 grossTokens = q.amountOut;
+        (uint256 taxTokens, uint256 netTokens) = token.previewBuyTax(grossTokens);
+        preview = BuyPreview({
+            amountIn: bnbAmount,
+            grossTokens: grossTokens,
+            taxTokens: taxTokens,
+            netTokens: netTokens,
+            quoteBlock: q.observedAtBlock,
+            expiresAt: block.timestamp + MAXIMUM_DEADLINE_WINDOW
+        });
+    }
 
     function _previewBuy(address buyer, uint256 bnbAmount) private view returns (BuyPreview memory preview) {
         if (bnbAmount == 0) revert InvalidAmount();
         if (bnbAmount > type(uint128).max) revert AmountExceedsUint128();
-        IPangu2TwapOracle.Quote memory q =
-            oracle.validatedQuote(address(wbnb), address(token), uint128(bnbAmount));
+        IPangu2TwapOracle.Quote memory q = oracle.validatedQuote(address(wbnb), address(token), uint128(bnbAmount));
         uint256 grossTokens = q.amountOut;
-        (uint256 taxTokens, uint256 netTokens) = buyer != address(0)
-            ? token.previewBuyTaxFor(buyer, grossTokens)
-            : token.previewBuyTax(grossTokens);
+        (uint256 taxTokens, uint256 netTokens) = token.previewBuyTaxFor(buyer, grossTokens);
         preview = BuyPreview({
             amountIn: bnbAmount,
             grossTokens: grossTokens,
@@ -226,14 +240,14 @@ contract Pangu2TradeRouter is AccessControl, Pausable, ReentrancyGuard {
 
         (uint256 proportionalCost, ICostBasisManager.PositionStatus status) =
             costBasisManager.proportionalCost(seller, tokenAmount);
-        IPangu2TwapOracle.Quote memory twap =
-            oracle.validatedQuote(address(token), address(wbnb), uint128(tokenAmount));
+        IPangu2TwapOracle.Quote memory twap = oracle.validatedQuote(address(token), address(wbnb), uint128(tokenAmount));
 
-        uint16 taxBps = status == ICostBasisManager.PositionStatus.KNOWN && twap.amountOut <= proportionalCost
+        uint16 baseTaxBps = status == ICostBasisManager.PositionStatus.KNOWN && twap.amountOut <= proportionalCost
             ? token.NORMAL_SELL_TAX_BPS()
             : token.PROFIT_SELL_TAX_BPS();
+        uint16 actualTaxBps = token.resolveSellTaxBps(seller, baseTaxBps);
         (uint256 supportTokens, uint256 burnTokens, uint256 swapTokens) =
-            token.previewSellTaxFor(seller, tokenAmount, taxBps);
+            token.previewSellTaxFor(seller, tokenAmount, actualTaxBps);
         if (swapTokens > type(uint128).max) revert AmountExceedsUint128();
         IPangu2TwapOracle.Quote memory postTaxQuote =
             oracle.validatedQuote(address(token), address(wbnb), uint128(swapTokens));
@@ -242,7 +256,7 @@ contract Pangu2TradeRouter is AccessControl, Pausable, ReentrancyGuard {
             tokenIn: tokenAmount,
             proportionalCostWbnbWei: proportionalCost,
             preTaxTwapValueWbnbWei: twap.amountOut,
-            taxBps: taxBps,
+            taxBps: actualTaxBps,
             supportTokens: supportTokens,
             burnTokens: burnTokens,
             swapTokens: swapTokens,
