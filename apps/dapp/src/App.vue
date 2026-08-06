@@ -2,7 +2,7 @@
 import { ref } from "vue";
 import { useWalletStore } from "@/stores/useWallet";
 import { useDataStatusStore } from "@/stores/data/useDataStatus";
-import BottomNav from "@ui/components/BottomNav.vue";
+import BottomNav from "@pangu2/ui/components/BottomNav.vue";
 import ConnectSheet from "@/components/ConnectSheet.vue";
 import NetworkBanner from "@/components/NetworkBanner.vue";
 import DataStatusBanner from "@/components/common/DataStatusBanner.vue";

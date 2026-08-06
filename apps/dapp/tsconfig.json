@@ -10,8 +10,15 @@
     "esModuleInterop": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
-    "paths": { "@/*": ["./src/*"], "@ui/*": ["../packages/ui/*"] },
+    "paths": { "@/*": ["./src/*"] },
     "baseUrl": "."
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue", "tests/**/*.ts", "../packages/ui/**/*.ts", "../packages/ui/**/*.vue"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.d.ts",
+    "src/**/*.vue",
+    "tests/**/*.ts",
+    "../packages/ui/**/*.ts",
+    "../packages/ui/**/*.vue"
+  ]
 }
