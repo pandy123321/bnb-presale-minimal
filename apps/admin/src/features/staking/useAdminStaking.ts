@@ -75,7 +75,7 @@ export function useAdminStaking() {
   // State
   const loading = ref(false);
   const error = ref<string | null>(null);
-  const dataStatus = ref("MOCK_DATA");
+  const dataStatus = ref("SYNCING");
 
   // Coverage
   const coverage = ref<StakingCoverage | null>(null);

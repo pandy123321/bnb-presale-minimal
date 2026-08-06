@@ -1,50 +1,65 @@
-import { ref, onUnmounted, readonly } from "vue";
+import { ref, readonly, onUnmounted } from "vue";
+import { fetchGet, ApiError } from "@/api";
 
 /**
  * Trade market state composable.
- * - Polls trading_enabled API every 30s (pending backend endpoint).
- * - Chart instance lifecycle managed here (created only when trading_enabled=true).
- *
- * TODO: Replace polling stub with real API fetch once backend endpoint is ready:
- *   GET /api/v1/projects/pangu2/market/trading-enabled → { tradingEnabled: boolean }
+ * Polls /config for chain info and /system-status for worker data.
+ * Trading is enabled only when RPC=OK AND data_status=LIVE.
  */
-
 export function useMarket() {
   const tradingEnabled = ref(false);
-  const price = ref("—");
-  const change24h = ref("—");
-  const high24h = ref("—");
-  const low24h = ref("—");
-  const volume24h = ref("—");
+  const rpcStatus = ref("UNKNOWN");
+  const dataStatus = ref("SYNCING");
+  const blockLag = ref(0);
+  const latestBlock = ref("0");
+  const openAnomalies = ref(0);
+  const streamStatuses = ref<Record<string, { last_scanned_block: number; status: string }>>({});
 
   let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let controller: AbortController | null = null;
 
-  /** Start polling trading_enabled. Only creates chart on first true. */
   function startPolling(): void {
     if (pollTimer) return;
-    pollTimer = setInterval(async () => {
+    const tick = async () => {
+      controller = new AbortController();
+      const signal = controller.signal;
       try {
-        // TODO: Replace with real API call:
-        // const res = await fetch("/api/v1/projects/pangu2/market/trading-enabled");
-        // tradingEnabled.value = (await res.json()).tradingEnabled;
+        const statusRes = await fetchGet<Record<string, unknown>>(
+          "/v1/projects/pangu2/system-status", signal
+        );
+        const s = statusRes.data;
+        dataStatus.value = statusRes.meta.data_status;
+        rpcStatus.value = (s.rpc_status as string) ?? "UNKNOWN";
+        blockLag.value = (s.block_lag as number) ?? 0;
+        latestBlock.value = (s.latest_chain_block as string) ?? "0";
+        openAnomalies.value = (s.open_anomalies as number) ?? 0;
+        streamStatuses.value = (s.streams as Record<string, { last_scanned_block: number; status: string }>) ?? {};
+        tradingEnabled.value = rpcStatus.value === "OK" && dataStatus.value === "LIVE";
       } catch {
-        /* API not ready yet — trading stays disabled */
+        dataStatus.value = "UNAVAILABLE";
+        rpcStatus.value = "DOWN";
+        tradingEnabled.value = false;
       }
-    }, 30_000);
+    };
+    tick();
+    pollTimer = setInterval(tick, 30_000);
   }
 
-  function stopPolling(): void { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
-
+  function stopPolling(): void {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    if (controller) { controller.abort(); controller = null; }
+  }
   onUnmounted(() => stopPolling());
 
   return {
     tradingEnabled: readonly(tradingEnabled),
-    price: readonly(price),
-    change24h: readonly(change24h),
-    high24h: readonly(high24h),
-    low24h: readonly(low24h),
-    volume24h: readonly(volume24h),
+    rpcStatus: readonly(rpcStatus),
+    dataStatus: readonly(dataStatus),
+    blockLag: readonly(blockLag),
+    latestBlock: readonly(latestBlock),
+    openAnomalies: readonly(openAnomalies),
+    streamStatuses: readonly(streamStatuses),
     startPolling,
+    stopPolling,
   };
 }
-

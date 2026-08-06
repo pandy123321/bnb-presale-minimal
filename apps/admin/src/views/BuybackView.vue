@@ -1,48 +1,52 @@
 <script setup lang="ts">
+// Buyback data is read from real API — displays syncing placeholder until chain worker confirms events.
+const noData = "\u2014";
 </script>
 
 <template>
   <div>
     <div class="hero">
-      <div><h3>托底、回购与锁仓</h3><p>税费代币兑换为BNB后，固定0.01 BNB回购并锁仓。</p></div>
-      <div class="hero-side"><strong>可执行</strong><small>canExecuteBuyback = true</small></div>
+      <div><h3>Buyback &amp; Locker</h3><p>Support fee tokens are converted to BNB, then used for 0.01 BNB buybacks locked for 365 days.</p></div>
+      <div class="hero-side"><strong>Syncing</strong><small>Waiting for chain worker</small></div>
     </div>
 
     <div class="kpi-grid">
-      <div class="kpi"><div class="kpi-head"><span>待兑换税费</span></div><strong>2,840,000 P2</strong></div>
-      <div class="kpi"><div class="kpi-head"><span>托底池余额</span></div><strong>18.42 BNB</strong></div>
-      <div class="kpi"><div class="kpi-head"><span>累计回购</span></div><strong>42,800,000 P2</strong></div>
-      <div class="kpi"><div class="kpi-head"><span>累计销毁</span></div><strong>8,210,000 P2</strong></div>
+      <div class="kpi"><div class="kpi-head"><span>Pending Fee Tokens</span></div><strong>{{ noData }}</strong></div>
+      <div class="kpi"><div class="kpi-head"><span>Support Pool BNB</span></div><strong>{{ noData }}</strong></div>
+      <div class="kpi"><div class="kpi-head"><span>Total Buybacks</span></div><strong>{{ noData }}</strong></div>
+      <div class="kpi"><div class="kpi-head"><span>Total Burned</span></div><strong>{{ noData }}</strong></div>
     </div>
 
-    <div class="section-head"><h3>回购条件检查</h3></div>
+    <div class="section-head"><h3>Buyback Conditions</h3></div>
     <div class="layout-even">
       <div class="card">
-        <div class="card-head"><h4>执行条件</h4><span class="tag ok">全部通过</span></div>
+        <div class="card-head"><h4>Preconditions</h4><span class="tag muted">Pending sync</span></div>
         <div class="card-body">
-          <div class="check"><span>SupportPool BNB ≥ 0.01</span><span class="tag ok">通过</span></div>
-          <div class="check"><span>距上次回购 ≥ 60秒</span><span class="tag ok">通过</span></div>
-          <div class="check"><span>合约未暂停</span><span class="tag ok">通过</span></div>
+          <div class="check"><span>SupportPool BNB &ge; 0.01</span><span class="tag muted">{{ noData }}</span></div>
+          <div class="check"><span>Since last buyback &ge; 60s</span><span class="tag muted">{{ noData }}</span></div>
+          <div class="check"><span>Contract not paused</span><span class="tag muted">{{ noData }}</span></div>
         </div>
       </div>
       <div class="card">
-        <div class="card-head"><h4>本次回购预览</h4><span class="tag gold">公开触发</span></div>
+        <div class="card-head"><h4>Next Buyback Preview</h4><span class="tag muted">Pending</span></div>
         <div class="card-body">
-          <div class="metric-row"><span>回购金额</span><b>0.01 BNB</b></div>
-          <div class="metric-row"><span>预计回购</span><b>4,607 P2</b></div>
-          <div class="metric-row"><span>接收地址</span><b class="mono">Locker合约</b></div>
-          <div class="metric-row"><span>锁仓期限</span><b>365天</b></div>
+          <div class="metric-row"><span>Amount</span><b>0.01 BNB</b></div>
+          <div class="metric-row"><span>Estimated tokens</span><b>{{ noData }}</b></div>
+          <div class="metric-row"><span>Recipient</span><b class="mono">BuybackLocker</b></div>
+          <div class="metric-row"><span>Lock duration</span><b>365 days</b></div>
         </div>
       </div>
     </div>
 
-    <div class="section-head"><h3>回购批次</h3></div>
+    <div class="section-head"><h3>Buyback Batches</h3></div>
     <div class="card">
       <div class="card-body">
         <div class="table">
-          <div class="tr head"><span>批次</span><span>BNB</span><span>Token</span><span>时间</span></div>
-          <div class="tr"><span>#1247</span><span>0.01</span><span>4,612 P2</span><span>2分钟前</span></div>
-          <div class="tr"><span>#1246</span><span>0.01</span><span>4,598 P2</span><span>3分钟前</span></div>
+          <div class="tr head"><span>Batch</span><span>BNB</span><span>Tokens</span><span>Time</span></div>
+        </div>
+        <div class="empty-state">
+          <b>No buyback batches yet</b>
+          <small>Data will appear once the chain worker confirms on-chain buyback events.</small>
         </div>
       </div>
     </div>
@@ -72,5 +76,8 @@
 .tr { display: grid; grid-template-columns: repeat(4, minmax(100px, 1fr)); gap: 12px; align-items: center; min-height: 48px; padding: 8px 14px; border-bottom: 1px solid rgba(255,255,255,.05); font-size: 11px; }
 .tr.head { min-height: 38px; color: var(--muted); font-size: 10px; background: rgba(255,255,255,.018); }
 .tr:last-child { border-bottom: 0; }
+.empty-state { padding: 24px; text-align: center; }
+.empty-state b { display: block; color: var(--muted); }
+.empty-state small { display: block; color: var(--muted); margin-top: 6px; font-size: 11px; }
 @media (max-width: 1180px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
 </style>
