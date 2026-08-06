@@ -3,8 +3,8 @@ import { ref, computed } from "vue";
 import { DataStatus, isLive } from "@pangu2/api-types";
 import type { DataStatus as DataStatusType, EnvelopeMeta } from "@pangu2/api-types";
 
-const STALE_THRESHOLD_MS = 120_000;
-const DEGRADED_THRESHOLD_MS = 600_000;
+const STALE_THRESHOLD_MS = 120_000; // 2 minutes
+const DEGRADED_THRESHOLD_MS = 600_000; // 10 minutes
 const FRESHNESS_CHECK_INTERVAL_MS = 15_000;
 
 export const STATUS_LABELS: Record<DataStatusType, string> = {
@@ -34,10 +34,9 @@ export const useDataStatusStore = defineStore("dataStatus", () => {
   const chainId = ref<number>(31337);
   let freshnessTimer: ReturnType<typeof setInterval> | null = null;
 
-  const isFresh = computed(() => {
-    if (!isLive(status.value)) return false;
-    return Date.now() - lastUpdatedAt.value < STALE_THRESHOLD_MS;
-  });
+  // ── Computed ──
+
+  const isFresh = computed(() => isLive(status.value) && Date.now() - lastUpdatedAt.value < STALE_THRESHOLD_MS);
 
   const statusLabel = computed(() => STATUS_LABELS[status.value] ?? status.value);
   const statusColor = computed(() => STATUS_COLORS[status.value] ?? "var(--muted)");
@@ -57,7 +56,10 @@ export const useDataStatusStore = defineStore("dataStatus", () => {
     status.value === DataStatus.DEGRADED || status.value === DataStatus.UNAVAILABLE
   );
 
+  /** Whether data is from mock server — always block trading */
   const isMock = computed(() => status.value === DataStatus.MOCK_DATA);
+
+  // ── Actions ──
 
   function recordSuccess(meta: EnvelopeMeta): void {
     status.value = meta.data_status;
@@ -71,11 +73,22 @@ export const useDataStatusStore = defineStore("dataStatus", () => {
     status.value = DataStatus.UNAVAILABLE;
   }
 
+  /**
+   * Evaluate freshness by elapsed time since last successful response.
+   * Transitions LIVE→STALE→DEGRADED regardless of intermediate states.
+   * A fresh recordSuccess() resets to LIVE (or whatever the meta says).
+   */
   function evaluateFreshness(): void {
-    if (status.value !== DataStatus.LIVE) return;
+    if (lastUpdatedAt.value === 0) return;
     const age = Date.now() - lastUpdatedAt.value;
-    if (age >= DEGRADED_THRESHOLD_MS) status.value = DataStatus.DEGRADED;
-    else if (age >= STALE_THRESHOLD_MS) status.value = DataStatus.STALE;
+
+    if (age >= DEGRADED_THRESHOLD_MS) {
+      status.value = DataStatus.DEGRADED;
+    } else if (age >= STALE_THRESHOLD_MS && status.value === DataStatus.LIVE) {
+      status.value = DataStatus.STALE;
+    }
+    // STALE stays STALE — only recordSuccess can restore LIVE.
+    // DEGRADED stays DEGRADED — only recordSuccess can restore.
   }
 
   function startFreshnessTimer(): void {
@@ -91,7 +104,7 @@ export const useDataStatusStore = defineStore("dataStatus", () => {
 
   return {
     status, blockNumber, schemaVersion, lastUpdatedAt, environment, chainId,
-    isFresh, isDegraded, statusLabel, statusColor, ageMs, ageFormatted,
+    isFresh, isMock, isDegraded, statusLabel, statusColor, ageMs, ageFormatted,
     recordSuccess, recordError, evaluateFreshness,
     startFreshnessTimer, stopFreshnessTimer,
   };

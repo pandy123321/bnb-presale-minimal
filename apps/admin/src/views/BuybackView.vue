@@ -1,52 +1,121 @@
 <script setup lang="ts">
-// Buyback data is read from real API — displays syncing placeholder until chain worker confirms events.
+import { ref, onMounted } from "vue";
+
+const PUBLIC_API = "/api/v1/projects/pangu2";
+
+const loadingBuybacks = ref(true);
+const loadingBatches = ref(true);
+const buybackError = ref<string | null>(null);
+const batchError = ref<string | null>(null);
+
+const buybacks = ref<Array<Record<string, unknown>>>([]);
+const batches = ref<Array<Record<string, unknown>>>([]);
+const buybacksTotal = ref(0);
+const batchesTotal = ref(0);
+
+async function fetchBuybacks() {
+  loadingBuybacks.value = true;
+  buybackError.value = null;
+  try {
+    const res = await fetch(`${PUBLIC_API}/buybacks?page=1&per_page=20`);
+    const body = await res.json();
+    if (body.error) throw new Error(body.error.message);
+    buybacks.value = Array.isArray(body.data) ? body.data : [];
+    buybacksTotal.value = body.meta?.total ?? 0;
+  } catch (e: unknown) {
+    buybackError.value = e instanceof Error ? e.message : "Failed to load buybacks";
+  } finally {
+    loadingBuybacks.value = false;
+  }
+}
+
+async function fetchBatches() {
+  loadingBatches.value = true;
+  batchError.value = null;
+  try {
+    const res = await fetch(`${PUBLIC_API}/locker/batches?page=1&per_page=20`);
+    const body = await res.json();
+    if (body.error) throw new Error(body.error.message);
+    batches.value = Array.isArray(body.data) ? body.data : [];
+    batchesTotal.value = body.meta?.total ?? 0;
+  } catch (e: unknown) {
+    batchError.value = e instanceof Error ? e.message : "Failed to load batches";
+  } finally {
+    loadingBatches.value = false;
+  }
+}
+
+onMounted(() => {
+  fetchBuybacks();
+  fetchBatches();
+});
+
 const noData = "\u2014";
 </script>
 
 <template>
   <div>
     <div class="hero">
-      <div><h3>Buyback &amp; Locker</h3><p>Support fee tokens are converted to BNB, then used for 0.01 BNB buybacks locked for 365 days.</p></div>
-      <div class="hero-side"><strong>Syncing</strong><small>Waiting for chain worker</small></div>
-    </div>
-
-    <div class="kpi-grid">
-      <div class="kpi"><div class="kpi-head"><span>Pending Fee Tokens</span></div><strong>{{ noData }}</strong></div>
-      <div class="kpi"><div class="kpi-head"><span>Support Pool BNB</span></div><strong>{{ noData }}</strong></div>
-      <div class="kpi"><div class="kpi-head"><span>Total Buybacks</span></div><strong>{{ noData }}</strong></div>
-      <div class="kpi"><div class="kpi-head"><span>Total Burned</span></div><strong>{{ noData }}</strong></div>
-    </div>
-
-    <div class="section-head"><h3>Buyback Conditions</h3></div>
-    <div class="layout-even">
-      <div class="card">
-        <div class="card-head"><h4>Preconditions</h4><span class="tag muted">Pending sync</span></div>
-        <div class="card-body">
-          <div class="check"><span>SupportPool BNB &ge; 0.01</span><span class="tag muted">{{ noData }}</span></div>
-          <div class="check"><span>Since last buyback &ge; 60s</span><span class="tag muted">{{ noData }}</span></div>
-          <div class="check"><span>Contract not paused</span><span class="tag muted">{{ noData }}</span></div>
-        </div>
+      <div>
+        <h3>Buyback &amp; Locker</h3>
+        <p>Support fee tokens are converted to BNB, then used for 0.01 BNB buybacks locked for 365 days.</p>
       </div>
-      <div class="card">
-        <div class="card-head"><h4>Next Buyback Preview</h4><span class="tag muted">Pending</span></div>
-        <div class="card-body">
-          <div class="metric-row"><span>Amount</span><b>0.01 BNB</b></div>
-          <div class="metric-row"><span>Estimated tokens</span><b>{{ noData }}</b></div>
-          <div class="metric-row"><span>Recipient</span><b class="mono">BuybackLocker</b></div>
-          <div class="metric-row"><span>Lock duration</span><b>365 days</b></div>
-        </div>
+      <div class="hero-side">
+        <strong>{{ buybacksTotal }}</strong>
+        <small>buyback events</small>
       </div>
     </div>
 
+    <!-- Buyback Batches -->
     <div class="section-head"><h3>Buyback Batches</h3></div>
     <div class="card">
       <div class="card-body">
-        <div class="table">
-          <div class="tr head"><span>Batch</span><span>BNB</span><span>Tokens</span><span>Time</span></div>
+        <div v-if="loadingBuybacks" class="empty-state"><b>Loading...</b></div>
+        <div v-else-if="buybackError" class="empty-state error">
+          <b>Error</b><small>{{ buybackError }}</small>
+          <button class="btn-text" @click="fetchBuybacks">Retry</button>
         </div>
-        <div class="empty-state">
+        <div v-else-if="buybacks.length === 0" class="empty-state">
           <b>No buyback batches yet</b>
           <small>Data will appear once the chain worker confirms on-chain buyback events.</small>
+        </div>
+        <div v-else class="table">
+          <div class="tr head">
+            <span>Batch</span><span>BNB</span><span>Tokens</span><span>Time</span>
+          </div>
+          <div v-for="b in buybacks" :key="b.batch_id" class="tr">
+            <span>#{{ b.batch_id }}</span>
+            <span>{{ b.amount_bnb_wei }} BNB</span>
+            <span>{{ b.tokens_raw }} P2</span>
+            <span>{{ b.timestamp }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Locker Batches -->
+    <div class="section-head"><h3>Locker Batches</h3></div>
+    <div class="card">
+      <div class="card-body">
+        <div v-if="loadingBatches" class="empty-state"><b>Loading...</b></div>
+        <div v-else-if="batchError" class="empty-state error">
+          <b>Error</b><small>{{ batchError }}</small>
+          <button class="btn-text" @click="fetchBatches">Retry</button>
+        </div>
+        <div v-else-if="batches.length === 0" class="empty-state">
+          <b>No locker batches yet</b>
+          <small>Locked tokens will appear once buybacks are executed and confirmed.</small>
+        </div>
+        <div v-else class="table">
+          <div class="tr head">
+            <span>Batch</span><span>Tokens</span><span>Locked Until</span><span>Status</span>
+          </div>
+          <div v-for="b in batches" :key="b.batch_id" class="tr">
+            <span>#{{ b.batch_id }}</span>
+            <span>{{ b.tokens_raw }} P2</span>
+            <span>{{ b.locked_until ?? noData }}</span>
+            <span>{{ b.status }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -60,18 +129,8 @@ const noData = "\u2014";
 .hero-side { text-align: right; }
 .hero-side strong { display: block; color: var(--gold2); font-size: 20px; }
 .hero-side small { color: var(--muted); font-size: 10px; }
-.kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
-.kpi { border: 1px solid var(--line); background: var(--panel); padding: 16px; }
-.kpi-head { color: var(--muted); font-size: 11px; }
-.kpi strong { display: block; font-size: 23px; margin-top: 9px; font-weight: 720; }
 .section-head { margin: 24px 0 10px; }
 .section-head h3 { font-size: 15px; }
-.check { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,.05); padding: 9px 0; font-size: 11px; }
-.check:last-child { border-bottom: 0; }
-.check span { color: var(--muted); }
-.metric-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.05); font-size: 11px; }
-.metric-row:last-child { border-bottom: 0; }
-.metric-row span { color: var(--muted); }
 .table { min-width: 600px; overflow: auto; }
 .tr { display: grid; grid-template-columns: repeat(4, minmax(100px, 1fr)); gap: 12px; align-items: center; min-height: 48px; padding: 8px 14px; border-bottom: 1px solid rgba(255,255,255,.05); font-size: 11px; }
 .tr.head { min-height: 38px; color: var(--muted); font-size: 10px; background: rgba(255,255,255,.018); }
@@ -79,5 +138,7 @@ const noData = "\u2014";
 .empty-state { padding: 24px; text-align: center; }
 .empty-state b { display: block; color: var(--muted); }
 .empty-state small { display: block; color: var(--muted); margin-top: 6px; font-size: 11px; }
-@media (max-width: 1180px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+.empty-state.error b { color: var(--red); }
+.empty-state.error small { color: var(--red); margin-bottom: 8px; }
+.btn-text { border: 0; background: none; color: var(--cyan); font-size: 11px; cursor: pointer; margin-top: 8px; }
 </style>

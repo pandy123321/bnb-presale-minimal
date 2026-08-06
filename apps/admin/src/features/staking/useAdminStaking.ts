@@ -112,6 +112,7 @@ export function useAdminStaking() {
       dataStatus.value = body.meta.data_status;
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : "Failed to load coverage";
+      dataStatus.value = "UNAVAILABLE";
     } finally {
       coverageLoading.value = false;
     }
@@ -125,8 +126,10 @@ export function useAdminStaking() {
       const body: Envelope<StakingStatus> = await res.json();
       if (body.error) throw new Error(body.error.message);
       status.value = body.data;
+      dataStatus.value = body.meta.data_status;
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : "Failed to load status";
+      dataStatus.value = "UNAVAILABLE";
     } finally {
       statusLoading.value = false;
     }
@@ -146,9 +149,11 @@ export function useAdminStaking() {
       const body: Envelope<StakingPosition[]> = await res.json();
       if (body.error) throw new Error(body.error.message);
       positions.value = Array.isArray(body.data) ? body.data : [];
+      if (body.meta?.data_status) dataStatus.value = body.meta.data_status;
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : "Failed to load positions";
       positions.value = [];
+      dataStatus.value = "UNAVAILABLE";
     } finally {
       positionsLoading.value = false;
     }
