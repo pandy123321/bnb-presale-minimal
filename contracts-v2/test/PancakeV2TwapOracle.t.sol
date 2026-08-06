@@ -5,8 +5,7 @@ import { Test } from "forge-std/Test.sol";
 import { PancakeV2TwapOracle } from "pangu2/oracle/PancakeV2TwapOracle.sol";
 import { IPancakePair, IPancakeFactory } from "pangu2/interfaces/IPancakeV2.sol";
 
-// ── Mock PancakeV2 Pair ──
-contract MockPancakePair {
+contract MockPair {
     address public immutable token0;
     address public immutable token1;
     address public immutable factory;
@@ -40,10 +39,10 @@ contract MockPancakePair {
     {
         uint256 timeElapsed = uint256(newTs) - uint256(blockTimestampLast);
         if (timeElapsed > 0 && reserve0 > 0 && reserve1 > 0) {
-            // real Pancake V2 uses Q112 fixed point
             unchecked {
-                price0CumulativeLast += (uint256(reserve1) * (2 ** 112) / uint256(reserve0)) * timeElapsed;
-                price1CumulativeLast += (uint256(reserve0) * (2 ** 112) / uint256(reserve1)) * timeElapsed;
+                uint256 Q = 2 ** 112;
+                price0CumulativeLast += (uint256(reserve1) * Q / uint256(reserve0)) * timeElapsed;
+                price1CumulativeLast += (uint256(reserve0) * Q / uint256(reserve1)) * timeElapsed;
             }
         }
         reserve0 = uint112(uint256(reserve0) + amount0In - amount0Out);
@@ -51,17 +50,17 @@ contract MockPancakePair {
         blockTimestampLast = newTs;
     }
 
-    function getReserves() external view returns (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) {
+    function getReserves() external view returns (uint112, uint112, uint32) {
         return (reserve0, reserve1, blockTimestampLast);
     }
 }
 
-/// Simple factory mock that just stores the pair address.
-contract MockPancakeFactory {
+contract MockFactory {
     mapping(address => mapping(address => address)) public pairs;
 
     function setPair(address t0, address t1, address p) external {
         pairs[t0][t1] = p;
+        pairs[t1][t0] = p;
     }
 
     function getPair(address t0, address t1) external view returns (address) {
@@ -73,25 +72,23 @@ contract PancakeV2TwapOracleTest is Test {
     address internal immutable TOKEN = address(0x1000);
     address internal immutable WBNB = address(0x2000);
 
-    MockPancakeFactory internal factory;
-    MockPancakePair internal pair;
+    MockFactory internal factory;
+    MockPair internal pair;
     PancakeV2TwapOracle internal oracle;
 
     uint32 internal immutable TWAP_WINDOW = 30 minutes;
-    uint16 internal immutable DEV_BPS = 300; // 3% deviation
+    uint16 internal immutable DEV_BPS = 300;
     uint112 internal constant INIT_TOKEN_RES = 100_000 ether;
     uint112 internal constant INIT_WBNB_RES = 10_000 ether;
     uint112 internal constant MIN_RES = 1;
 
     function _deployOracle(bool tokenIsToken0) internal {
-        factory = new MockPancakeFactory();
-
+        factory = new MockFactory();
         address t0 = tokenIsToken0 ? TOKEN : WBNB;
         address t1 = tokenIsToken0 ? WBNB : TOKEN;
-
-        pair = new MockPancakePair(t0, t1, address(factory));
+        pair = new MockPair(t0, t1, address(factory));
         factory.setPair(t0, t1, address(pair));
-        factory.setPair(t1, t0, address(pair)); // bidirectional like real factory
+        factory.setPair(t1, t0, address(pair));
 
         uint112 r0 = tokenIsToken0 ? INIT_TOKEN_RES : INIT_WBNB_RES;
         uint112 r1 = tokenIsToken0 ? INIT_WBNB_RES : INIT_TOKEN_RES;
@@ -109,154 +106,190 @@ contract PancakeV2TwapOracleTest is Test {
         oracle.update();
     }
 
-    /// Convenience: anchor + warp a full window in one call.
     function _anchorAndMature() internal {
-        oracle.update(); // UNINITIALIZED → ACCUMULATING
-        _warpAndUpdate(TWAP_WINDOW); // ACCUMULATING → READY
+        oracle.update();
+        _warpAndUpdate(TWAP_WINDOW);
     }
 
     function setUp() public {
         vm.etch(TOKEN, hex"fe");
         vm.etch(WBNB, hex"fe");
-        _deployOracle(true); // PANGU2 = token0
+        _deployOracle(true);
     }
 
-    // ───────────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════
     // T1: No-swap window matures via counterfactual
-    // ───────────────────────────────────────────────────────
     function testNoSwapWindowMatures() public {
         oracle.update();
         assertEq(uint256(oracle.status()), uint256(PancakeV2TwapOracle.WindowStatus.ACCUMULATING));
-
         _warpAndUpdate(TWAP_WINDOW);
-
         assertEq(uint256(oracle.status()), uint256(PancakeV2TwapOracle.WindowStatus.READY));
     }
 
-    // ───────────────────────────────────────────────────────
-    // T2: PANGU2=token0 — bidirectional quotes
-    // ───────────────────────────────────────────────────────
+    // T2: Bidirectional quotes (token0)
     function testQuotesTokenAsToken0() public {
         _anchorAndMature();
-
-        // Token → WBNB (base=TOKEN, quote=WBNB)
         PancakeV2TwapOracle.Quote memory q1 = oracle.validatedQuote(TOKEN, WBNB, 1 ether);
-        assertGt(q1.amountOut, 0);
-
-        // WBNB → Token (base=WBNB, quote=TOKEN)
         PancakeV2TwapOracle.Quote memory q2 = oracle.validatedQuote(WBNB, TOKEN, 1 ether);
+        assertGt(q1.amountOut, 0);
         assertGt(q2.amountOut, 0);
-
-        // Spot: 1 PANGU ≈ 0.1 WBNB (ratio: 10K/100K)
         assertApproxEqRel(q1.amountOut, 0.1 ether, 0.05e18);
-        // Spot: 1 WBNB ≈ 10 PANGU
         assertApproxEqRel(q2.amountOut, 10 ether, 0.05e18);
     }
 
-    // ───────────────────────────────────────────────────────
-    // T3: TWAP not available before window expiry
-    // ───────────────────────────────────────────────────────
+    // T3: TWAP not available before expiry
     function testTwapNotAvailableBeforeExpiry() public {
         oracle.update();
         _warpAndUpdate(TWAP_WINDOW / 2);
-
         assertEq(uint256(oracle.status()), uint256(PancakeV2TwapOracle.WindowStatus.ACCUMULATING));
-
         vm.expectRevert(PancakeV2TwapOracle.OracleNotReady.selector);
         oracle.validatedQuote(TOKEN, WBNB, 1 ether);
     }
 
-    // ───────────────────────────────────────────────────────
-    // T4: TWAP rejected after expiry (maxAge = 5 × twapWindow)
-    // ───────────────────────────────────────────────────────
+    // T4: TWAP rejected after expiry
     function testTwapRejectedAfterExpiry() public {
-        _anchorAndMature(); // ready
-
+        _anchorAndMature();
         uint256 maxAge = TWAP_WINDOW * 5;
         vm.warp(block.timestamp + maxAge + 1);
-
-        vm.expectRevert();
+        vm.expectRevert(
+            abi.encodeWithSelector(PancakeV2TwapOracle.TwapTooOld.selector, block.timestamp - maxAge - 1, maxAge)
+        );
         oracle.validatedQuote(TOKEN, WBNB, 1 ether);
     }
 
-    // ───────────────────────────────────────────────────────
-    // T5: Low liquidity recovery — re-anchors, waits full window
-    // ───────────────────────────────────────────────────────
+    // T5: Low liquidity recovery
     function testLowLiquidityRecovery() public {
-        _anchorAndMature(); // READY
-
-        // Drop below minimum
+        _anchorAndMature();
         pair.setReserves(0, 0, uint32(block.timestamp));
         oracle.update();
         assertEq(uint256(oracle.status()), uint256(PancakeV2TwapOracle.WindowStatus.LIQUIDITY_LOW));
 
-        // Restore liquidity
         pair.setReserves(INIT_TOKEN_RES, INIT_WBNB_RES, uint32(block.timestamp));
         pair.setCumulatives(0, 0);
         oracle.update();
-
         assertEq(uint256(oracle.status()), uint256(PancakeV2TwapOracle.WindowStatus.ACCUMULATING));
 
-        // Half window — still not ready
         _warpAndUpdate(TWAP_WINDOW / 2);
         vm.expectRevert(PancakeV2TwapOracle.OracleNotReady.selector);
         oracle.validatedQuote(TOKEN, WBNB, 1 ether);
 
-        // Full window — ready
         _warpAndUpdate(TWAP_WINDOW / 2);
         assertEq(uint256(oracle.status()), uint256(PancakeV2TwapOracle.WindowStatus.READY));
-        PancakeV2TwapOracle.Quote memory q = oracle.validatedQuote(TOKEN, WBNB, 1 ether);
-        assertGt(q.amountOut, 0);
+        assertGt(oracle.validatedQuote(TOKEN, WBNB, 1 ether).amountOut, 0);
     }
 
-    // ───────────────────────────────────────────────────────
     // T6: Spot/TWAP deviation exceeded
-    // ───────────────────────────────────────────────────────
     function testExcessiveSpotTwapDeviation() public {
-        // First establish a stable TWAP: 0.1 WBNB/PANGU
         _anchorAndMature();
-
-        // Sell 50K PANGU → pair receives token0, sends ~3333 WBNB (CFMM)
-        //  r0'=150K, r1'=6667 → spot = 0.0444, TWAP=0.1 → deviation ≈125%
         pair.simulateSwap(50_000 ether, 0, 0, 3333 ether, uint32(block.timestamp));
-
         vm.expectRevert();
         oracle.validatedQuote(TOKEN, WBNB, 1 ether);
     }
 
-    // ───────────────────────────────────────────────────────
-    // T7: observedAtBlock matches real TWAP completion block
-    // ───────────────────────────────────────────────────────
+    // T7: observedAtBlock matches completion block
     function testObservedAtBlockIsCompletionBlock() public {
         _anchorAndMature();
-
-        PancakeV2TwapOracle.Quote memory q = oracle.validatedQuote(TOKEN, WBNB, 1 ether);
-        assertEq(q.observedAtBlock, block.number, "observedAtBlock should equal completion block number");
+        assertEq(oracle.validatedQuote(TOKEN, WBNB, 1 ether).observedAtBlock, block.number);
     }
 
-    // ───────────────────────────────────────────────────────
-    // T8: TWAP survives multiple windows without swaps
-    // ───────────────────────────────────────────────────────
+    // T8: Multi-window no-swaps
     function testMultiWindowNoSwaps() public {
         _anchorAndMature();
-        PancakeV2TwapOracle.Quote memory q1 = oracle.validatedQuote(TOKEN, WBNB, 1 ether);
-
+        uint256 q1 = oracle.validatedQuote(TOKEN, WBNB, 1 ether).amountOut;
         _warpAndUpdate(TWAP_WINDOW);
-        PancakeV2TwapOracle.Quote memory q2 = oracle.validatedQuote(TOKEN, WBNB, 1 ether);
+        assertEq(oracle.validatedQuote(TOKEN, WBNB, 1 ether).amountOut, q1);
+    }
 
-        assertEq(q1.amountOut, q2.amountOut, "TWAP should be stable with constant reserves");
+    // ═══════════════════════════════════════════════
+    // T9: Mid-window swap — TWAP is time-weighted correctly
+    function testMidWindowSwap_TimeWeighted() public {
+        // Anchor starts at t=1 with reserves 100K/10K, spot = 0.1 WBNB/PANGU
+        oracle.update();
+
+        vm.warp(1 + 600);
+        // Use a smaller swap to keep deviation within 3% limit
+        // 30% of 10K = 3K WBNB left
+        pair.simulateSwap(2300 ether, 0, 0, 200 ether, uint32(block.timestamp));
+        // New reserves: ≈102300 token, ≈9800 WBNB, spot ≈ 0.0958
+
+        vm.warp(1 + TWAP_WINDOW + 60);
+        oracle.update();
+
+        assertEq(uint256(oracle.status()), uint256(PancakeV2TwapOracle.WindowStatus.READY));
+
+        // TWAP should be between pre-swap (0.1) and post-swap (~0.0958)
+        PancakeV2TwapOracle.Quote memory q = oracle.validatedQuote(TOKEN, WBNB, 1 ether);
+        assertGt(q.amountOut, 0.09 ether);
+        assertLt(q.amountOut, 0.1 ether);
+    }
+
+    // T10: Below-minimum reserves triggers exact custom error
+    function testBelowMinimumReservesExactError() public {
+        _anchorAndMature();
+        Oracle oracleLow = new Oracle(
+            TOKEN, WBNB, address(factory), address(pair), TWAP_WINDOW, DEV_BPS, 100_000 ether, 100_000 ether
+        );
+        // minWbnbReserve = 100K ether → current 10K is below
+        oracleLow.update();
+        vm.warp(1 + TWAP_WINDOW);
+        oracleLow.update();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PancakeV2TwapOracle.BelowMinimumReserves.selector,
+                uint112(INIT_TOKEN_RES),
+                uint112(INIT_WBNB_RES),
+                uint112(100_000 ether),
+                uint112(100_000 ether)
+            )
+        );
+        oracleLow.validatedQuote(TOKEN, WBNB, 1 ether);
+    }
+
+    // T11: Exact Spot/TWAP deviation error values
+    function testExcessiveSpotTwapDeviationExactValues() public {
+        _anchorAndMature();
+        pair.simulateSwap(50_000 ether, 0, 0, 3333 ether, uint32(block.timestamp));
+
+        try oracle.validatedQuote(TOKEN, WBNB, 1 ether) {
+            fail("should have reverted");
+        } catch (bytes memory reason) {
+            // Verify the error selector matches
+            bytes4 selector = bytes4(reason);
+            bytes4 expected = PancakeV2TwapOracle.ExcessiveSpotTwapDeviation.selector;
+            assertEq(selector, expected, "should be ExcessiveSpotTwapDeviation");
+        }
+    }
+
+    // T12: Fuzz — counterfactual TWAP matches constant-reserve expectation
+    function testFuzz_ConstantReserves_TWAP(uint256 windowOffset) public {
+        windowOffset = bound(windowOffset, uint256(TWAP_WINDOW), 2 * uint256(TWAP_WINDOW));
+        oracle.update();
+        vm.warp(1 + windowOffset);
+        oracle.update();
+        assertEq(uint256(oracle.status()), uint256(PancakeV2TwapOracle.WindowStatus.READY));
+
+        PancakeV2TwapOracle.Quote memory q = oracle.validatedQuote(TOKEN, WBNB, 1 ether);
+        assertGt(q.amountOut, 0);
+        // With constant reserves 100K/10K, price = 0.1 WBNB/PANGU regardless of window length
+        assertApproxEqRel(q.amountOut, 0.1 ether, 0.02e18);
     }
 }
 
-// ───────────────────────────────────────────────────────────
-// Token-as-token1 test contract
-// ───────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────
+// Helper contract to test with high min reserves
+contract Oracle is PancakeV2TwapOracle {
+    constructor(address t, address w, address f, address p, uint32 ww, uint16 d, uint112 minT, uint112 minW)
+        PancakeV2TwapOracle(t, w, f, p, ww, d, minT, minW)
+    { }
+}
+
 contract PancakeV2TwapOracleToken1Test is Test {
     address internal immutable TOKEN = address(0x1000);
     address internal immutable WBNB = address(0x2000);
 
-    MockPancakeFactory internal factory;
-    MockPancakePair internal pair;
+    MockFactory internal factory;
+    MockPair internal pair;
     PancakeV2TwapOracle internal oracle;
 
     uint32 internal immutable TWAP_WINDOW = 30 minutes;
@@ -269,12 +302,10 @@ contract PancakeV2TwapOracleToken1Test is Test {
         vm.etch(TOKEN, hex"fe");
         vm.etch(WBNB, hex"fe");
 
-        factory = new MockPancakeFactory();
-        address t0 = WBNB;
-        address t1 = TOKEN;
-        pair = new MockPancakePair(t0, t1, address(factory));
-        factory.setPair(t0, t1, address(pair));
-        factory.setPair(t1, t0, address(pair)); // bidirectional like real factory
+        factory = new MockFactory();
+        pair = new MockPair(WBNB, TOKEN, address(factory));
+        factory.setPair(WBNB, TOKEN, address(pair));
+        factory.setPair(TOKEN, WBNB, address(pair));
 
         pair.setReserves(INIT_WBNB_RES, INIT_TOKEN_RES, uint32(block.timestamp));
         pair.setCumulatives(0, 0);
@@ -285,44 +316,44 @@ contract PancakeV2TwapOracleToken1Test is Test {
         assertFalse(oracle.tokenIsToken0());
     }
 
-    // ───────────────────────────────────────────────────────
-    // T9: PANGU2=token1 — no-swap window matures
-    // ───────────────────────────────────────────────────────
     function testNoSwapWindowMaturesToken1() public {
         oracle.update();
         assertEq(uint256(oracle.status()), uint256(PancakeV2TwapOracle.WindowStatus.ACCUMULATING));
-
         vm.warp(block.timestamp + TWAP_WINDOW);
         oracle.update();
         assertEq(uint256(oracle.status()), uint256(PancakeV2TwapOracle.WindowStatus.READY));
     }
 
-    // ───────────────────────────────────────────────────────
-    // T10: PANGU2=token1 — bidirectional quotes
-    // ───────────────────────────────────────────────────────
     function testQuotesTokenAsToken1() public {
-        oracle.update(); // anchor
+        oracle.update();
         vm.warp(block.timestamp + TWAP_WINDOW);
-        oracle.update(); // mature
+        oracle.update();
 
-        // Token → WBNB
         PancakeV2TwapOracle.Quote memory q1 = oracle.validatedQuote(TOKEN, WBNB, 1 ether);
-        assertGt(q1.amountOut, 0);
-
-        // WBNB → Token
         PancakeV2TwapOracle.Quote memory q2 = oracle.validatedQuote(WBNB, TOKEN, 1 ether);
+        assertGt(q1.amountOut, 0);
         assertGt(q2.amountOut, 0);
-
         assertApproxEqRel(q1.amountOut, 0.1 ether, 0.05e18);
         assertApproxEqRel(q2.amountOut, 10 ether, 0.05e18);
     }
 
-    // T11: token1 — observedAtBlock correct
     function testObservedAtBlockToken1() public {
-        oracle.update(); // anchor
+        oracle.update();
         vm.warp(block.timestamp + TWAP_WINDOW);
-        oracle.update(); // mature
+        oracle.update();
+        assertEq(oracle.validatedQuote(TOKEN, WBNB, 1 ether).observedAtBlock, block.number);
+    }
+
+    // token1 mid-swap TWAP: oracle stays READY with a time-weighted price
+    function testMidWindowSwapToken1() public {
+        oracle.update();
+        vm.warp(1 + 600);
+        // Small swap: 100 WBNB → ~990 token1. Deviation stays within 3%.
+        pair.simulateSwap(100 ether, 0, 0, 990 ether, uint32(block.timestamp));
+        vm.warp(1 + TWAP_WINDOW + 60);
+        oracle.update();
+        assertEq(uint256(oracle.status()), uint256(PancakeV2TwapOracle.WindowStatus.READY));
         PancakeV2TwapOracle.Quote memory q = oracle.validatedQuote(TOKEN, WBNB, 1 ether);
-        assertEq(q.observedAtBlock, block.number);
+        assertGt(q.amountOut, 0);
     }
 }

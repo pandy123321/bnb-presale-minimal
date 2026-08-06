@@ -10,7 +10,7 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
         UNINITIALIZED, // 0: no anchor yet
         ACCUMULATING, // 1: anchor set, waiting for full twapWindow
         READY, // 2: at least one completed window, TWAP available
-        LIQUIDITY_LOW // 3: reserves below minimum — fail-closed
+        LIQUIDITY_LOW // 3: reserves below minimum → fail-closed
     }
 
     bool public immutable tokenIsToken0;
@@ -29,7 +29,7 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
     uint256 private constant Q112 = 2 ** 112;
 
     struct Observation {
-        uint32 timestamp;
+        uint40 timestamp;
         uint256 price0CumulativeLast;
         uint256 price1CumulativeLast;
     }
@@ -38,9 +38,8 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
     uint256 public lastTwapPrice1Accumulator;
     uint256 public lastTwapElapsed;
 
-    /// Last TWAP age tracking
     uint40 public lastTwapObservedAtBlock;
-    uint256 public lastTwapCompletedAt; // block.timestamp of last window completion
+    uint256 public lastTwapCompletedAt;
 
     Observation public anchor;
     WindowStatus public status;
@@ -56,8 +55,9 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
     error ExcessiveSpotTwapDeviation(uint256 spot, uint256 twap, uint256 deviationBps);
     error BelowMinimumReserves(uint112 tokenReserve, uint112 wbnbReserve, uint112 minToken, uint112 minWbnb);
     error TwapTooOld(uint256 lastCompletedAt, uint256 maxAge);
+    error PairTimestampAhead(uint32 pairTs);
 
-    event OracleAnchored(uint32 pairTs, uint256 price0CumulativeLast, uint256 price1CumulativeLast);
+    event OracleAnchored(uint40 anchorTs, uint256 price0CumulativeLast, uint256 price1CumulativeLast);
     event TwapWindowCompleted(uint256 elapsed, uint256 price0Accumulator, uint256 price1Accumulator);
     event OracleReset();
     event OracleLowLiquidity();
@@ -110,7 +110,6 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
         return tokenRes >= minTokenReserve && wbnbRes >= minWbnbReserve;
     }
 
-    /// MAXIMUM_TWAP_AGE = 5 × twapWindow; after this TWAP is considered stale and rejected.
     function _maxTwapAge() private view returns (uint256) {
         return uint256(twapWindow) * 5;
     }
@@ -127,43 +126,41 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
             return;
         }
 
+        // Guard: if pair claims a timestamp ahead of our clock, treat it as a
+        // misconfigured pair and reject (fail-closed).  The counterfactual
+        // projection `block.timestamp - ts` would underflow in Solidity 0.8.
+        if (ts > uint32(block.timestamp)) revert PairTimestampAhead(ts);
+
         uint256 p0 = pair.price0CumulativeLast();
         uint256 p1 = pair.price1CumulativeLast();
 
-        // ── Counterfactual cumulatives at block.timestamp ──
-        // Even without swap/mint/burn/sync the cumulative price advances at
-        //   dC/dt = reserve1/reserve0 × Q112  (price0)
-        //   dC/dt = reserve0/reserve1 × Q112  (price1)
-        // We project the pair's last-observed cumulative forward to block.timestamp.
-        (uint256 cfP0, uint256 cfP1) = _counterfactualCumulatives(r0, r1, p0, p1, ts);
+        (uint256 cfP0, uint256 cfP1) = _counterfactualCumulatives(r0, r1, p0, p1, ts, uint32(block.timestamp));
 
         if (status == WindowStatus.LIQUIDITY_LOW) {
             anchor = Observation({
-                timestamp: uint32(block.timestamp), price0CumulativeLast: cfP0, price1CumulativeLast: cfP1
+                timestamp: uint40(block.timestamp), price0CumulativeLast: cfP0, price1CumulativeLast: cfP1
             });
             status = WindowStatus.ACCUMULATING;
             emit OracleRecovered();
-            emit OracleAnchored(uint32(block.timestamp), cfP0, cfP1);
+            emit OracleAnchored(uint40(block.timestamp), cfP0, cfP1);
             return;
         }
 
         if (status == WindowStatus.UNINITIALIZED) {
             anchor = Observation({
-                timestamp: uint32(block.timestamp), price0CumulativeLast: cfP0, price1CumulativeLast: cfP1
+                timestamp: uint40(block.timestamp), price0CumulativeLast: cfP0, price1CumulativeLast: cfP1
             });
             status = WindowStatus.ACCUMULATING;
-            emit OracleAnchored(uint32(block.timestamp), cfP0, cfP1);
+            emit OracleAnchored(uint40(block.timestamp), cfP0, cfP1);
             return;
         }
 
-        // ── TWAP window completion check (counterfactual: uses block.timestamp) ──
-        uint256 windowElapsed = block.timestamp - anchor.timestamp;
+        // ── TWAP window completion ──
+        uint256 windowElapsed = block.timestamp - uint256(anchor.timestamp);
         if (windowElapsed < twapWindow) return;
 
         lastTwapElapsed = windowElapsed;
 
-        // p0Delta / p1Delta are always in Pancake V2's native direction:
-        //   price0 = reserve1/reserve0   price1 = reserve0/reserve1
         uint256 p0Delta;
         uint256 p1Delta;
         unchecked {
@@ -174,9 +171,8 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
         lastTwapPrice0Accumulator = p0Delta / windowElapsed;
         lastTwapPrice1Accumulator = p1Delta / windowElapsed;
 
-        // Shift anchor forward to block.timestamp with counterfactual cumulatives
         anchor =
-            Observation({ timestamp: uint32(block.timestamp), price0CumulativeLast: cfP0, price1CumulativeLast: cfP1 });
+            Observation({ timestamp: uint40(block.timestamp), price0CumulativeLast: cfP0, price1CumulativeLast: cfP1 });
 
         lastTwapObservedAtBlock = uint40(block.number);
         lastTwapCompletedAt = block.timestamp;
@@ -206,7 +202,7 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
         if (status == WindowStatus.UNINITIALIZED) revert NoAnchor();
         if (status != WindowStatus.READY) revert OracleNotReady();
 
-        // TWAP freshness check: reject quotes if TWAP is too old
+        // TWAP freshness
         uint256 maxAge = _maxTwapAge();
         if (lastTwapCompletedAt > 0 && block.timestamp > lastTwapCompletedAt + maxAge) {
             revert TwapTooOld(lastTwapCompletedAt, maxAge);
@@ -247,21 +243,19 @@ contract PancakeV2TwapOracle is IPangu2TwapOracle {
         });
     }
 
-    /// @notice Project pair cumulative prices forward to block.timestamp using current reserves.
-    /// @dev   r0/r1 are raw pair reserves (uint112 from getReserves).  Price is always
-    ///        computed in Pancake V2 direction:  price0 = r1/r0,  price1 = r0/r1.
-    ///        Uses unchecked arithmetic following Pancake V2 overflow convention.
-    function _counterfactualCumulatives(uint112 r0, uint112 r1, uint256 pairP0, uint256 pairP1, uint32 ts)
-        private
-        view
-        returns (uint256 cfP0, uint256 cfP1)
-    {
-        uint256 cfTime = block.timestamp - ts;
+    function _counterfactualCumulatives(
+        uint112 r0,
+        uint112 r1,
+        uint256 pairP0,
+        uint256 pairP1,
+        uint32 pairTs,
+        uint32 nowTs
+    ) private view returns (uint256 cfP0, uint256 cfP1) {
+        uint256 cfTime = nowTs - pairTs;
         if (cfTime == 0) return (pairP0, pairP1);
         uint256 r0u = uint256(r0);
         uint256 r1u = uint256(r1);
         unchecked {
-            // r1 * Q112 ≤ 2^112 × 2^112 = 2^224 < 2^256 — safe
             cfP0 = pairP0 + (r1u * Q112 / r0u) * cfTime;
             cfP1 = pairP1 + (r0u * Q112 / r1u) * cfTime;
         }
