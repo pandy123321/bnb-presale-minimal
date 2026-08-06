@@ -42,6 +42,11 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
     mapping(address => bool) public isPair;
     mapping(address => bool) public isSystemAddress;
     mapping(address => bool) public isLiquidityManager;
+
+    /// @notice Fee whitelist — addresses that pay 0% buy and sell tax.
+    ///         Only real user addresses. NEVER add Router, Adapter, Pair,
+    ///         or any system contract to this mapping.
+    mapping(address => bool) public feeWhitelist;
     mapping(address => mapping(TransferContext.Kind => bool)) public systemTransferContextAllowed;
 
     TransferContext.Kind private _activeContext;
@@ -56,6 +61,7 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
     error UnsupportedTaxRate(uint16 taxBps);
     error TradingNotOpen();
     error TradingAlreadyOpen();
+    error BatchTooLarge(uint256 count, uint256 max);
     error InvalidAmount();
     error CoreSystemAddressImmutable(address account);
     error InvalidTransferContext(TransferContext.Kind kind);
@@ -82,6 +88,7 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
     );
     event ProtocolBurn(address indexed operator, uint256 amount);
     event TradingOpened(uint40 openedAt);
+    event FeeWhitelistUpdated(address indexed account, bool enabled);
 
     constructor(address initialHolder, address governance, address emergencyAccount) ERC20("PANGU2", "PANGU2") {
         if (initialHolder == address(0) || governance == address(0) || emergencyAccount == address(0)) {
@@ -127,6 +134,27 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
     function isInLaunchProtection() public view returns (bool) {
         uint40 opened = tradingOpenAt;
         return opened != 0 && block.timestamp < uint256(opened) + LAUNCH_PROTECTION_DURATION;
+    }
+
+    // ── Fee Whitelist ──
+
+    uint256 public constant MAX_BATCH_WHITELIST = 50;
+
+    function setFeeWhitelist(address account, bool enabled) external onlyRole(GOVERNANCE_ROLE) {
+        if (account == address(0)) revert ZeroAddress();
+        feeWhitelist[account] = enabled;
+        emit FeeWhitelistUpdated(account, enabled);
+    }
+
+    function setFeeWhitelistBatch(address[] calldata accounts, bool enabled) external onlyRole(GOVERNANCE_ROLE) {
+        uint256 len = accounts.length;
+        if (len > MAX_BATCH_WHITELIST) revert BatchTooLarge(len, MAX_BATCH_WHITELIST);
+        for (uint256 i = 0; i < len; ++i) {
+            address account = accounts[i];
+            if (account == address(0)) revert ZeroAddress();
+            feeWhitelist[account] = enabled;
+            emit FeeWhitelistUpdated(account, enabled);
+        }
     }
 
     function setPair(address pair, bool enabled) external onlyRole(GOVERNANCE_ROLE) {
@@ -226,6 +254,16 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
         netAmount = grossAmount - taxAmount;
     }
 
+    /// @notice Preview buy tax for a specific buyer — 0% if whitelisted.
+    function previewBuyTaxFor(address buyer, uint256 grossAmount)
+        public
+        view
+        returns (uint256 taxAmount, uint256 netAmount)
+    {
+        if (feeWhitelist[buyer]) return (0, grossAmount);
+        return previewBuyTax(grossAmount);
+    }
+
     function previewSellTax(uint256 sellAmount, uint16 taxBps)
         public
         view
@@ -256,6 +294,16 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
         swapAmount = sellAmount - supportAmount - burnAmount;
     }
 
+    /// @notice Preview sell tax for a specific seller — 0% if whitelisted.
+    function previewSellTaxFor(address seller, uint256 sellAmount, uint16 taxBps)
+        public
+        view
+        returns (uint256 supportAmount, uint256 burnAmount, uint256 swapAmount)
+    {
+        if (feeWhitelist[seller]) return (0, 0, sellAmount);
+        return previewSellTax(sellAmount, taxBps);
+    }
+
     // ── Settlement ──
 
     function settleBuy(address buyer, uint256 grossAmount, uint256 costWbnbWei)
@@ -267,7 +315,7 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
         if (!coreConfigured) revert CoreNotConfigured();
         if (buyer == address(0)) revert ZeroAddress();
         if (grossAmount == 0 || costWbnbWei == 0) revert InvalidAmount();
-        (taxAmount, netAmount) = previewBuyTax(grossAmount);
+        (taxAmount, netAmount) = previewBuyTaxFor(buyer, grossAmount);
         _update(msg.sender, address(feeVault), taxAmount);
         _beginContext(msg.sender, TransferContext.Kind.BUY_SETTLEMENT);
         _update(msg.sender, buyer, netAmount);
@@ -291,7 +339,7 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
         if (!isInLaunchProtection() && taxBps != NORMAL_SELL_TAX_BPS && taxBps != PROFIT_SELL_TAX_BPS) {
             revert UnsupportedTaxRate(taxBps);
         }
-        (supportAmount, burnAmount, swapAmount) = previewSellTax(sellAmount, taxBps);
+        (supportAmount, burnAmount, swapAmount) = previewSellTaxFor(seller, sellAmount, taxBps);
         _update(msg.sender, address(feeVault), supportAmount);
         if (burnAmount != 0) {
             _burn(msg.sender, burnAmount);
@@ -309,7 +357,7 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
         if (!isInLaunchProtection() && taxBps != NORMAL_SELL_TAX_BPS && taxBps != PROFIT_SELL_TAX_BPS) {
             revert UnsupportedTaxRate(taxBps);
         }
-        (uint256 supportAmount, uint256 burnAmount, uint256 swapAmount) = previewSellTax(tokenIn, taxBps);
+        (uint256 supportAmount, uint256 burnAmount, uint256 swapAmount) = previewSellTaxFor(seller, tokenIn, taxBps);
         emit TokensSold(seller, tokenIn, taxBps, supportAmount, burnAmount, swapAmount, amountOut);
     }
 
