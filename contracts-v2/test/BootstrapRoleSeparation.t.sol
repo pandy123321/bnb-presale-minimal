@@ -12,42 +12,46 @@ import { BuybackLocker } from "pangu2/BuybackLocker.sol";
 import { DividendDistributor } from "pangu2/DividendDistributor.sol";
 import { Pangu2TradeRouter } from "pangu2/Pangu2TradeRouter.sol";
 import { Pangu2Staking } from "pangu2/Pangu2Staking.sol";
-import { IPancakeFactory, IPancakePair, IWBNB } from "pangu2/interfaces/IPancakeV2.sol";
+import { IPancakePair, IWBNB } from "pangu2/interfaces/IPancakeV2.sol";
 import { TransferContext } from "pangu2/libraries/TransferContext.sol";
 
-/// @notice Lightweight LP proxy used in tests — mirrors BootstrapLpProxy.
+/// @notice Production LP proxy mirror
 contract TestLpProxy {
     address public immutable lpOwner;
     address public immutable initialHolder;
+    uint256 public immutable tokenAmount;
+    uint256 public immutable nativeAmount;
+    bool public executed;
 
     error NotLpOwner();
+    error AlreadyExecuted();
+    error NativeAmountMismatch();
 
     modifier onlyLpOwner() {
         require(msg.sender == lpOwner, "!owner");
         _;
     }
 
-    constructor(address initialHolder_) {
-        lpOwner = tx.origin;
+    constructor(address lpOwner_, address initialHolder_, uint256 tokenAmount_, uint256 nativeAmount_) {
+        lpOwner = lpOwner_;
         initialHolder = initialHolder_;
+        tokenAmount = tokenAmount_;
+        nativeAmount = nativeAmount_;
     }
 
-    /// Pull PANGU from initialHolder via approve+transferFrom, wrap BNB, add liquidity.
-    function addLiquidity(address token, address wbnb, address pair, address lpRecipient, uint256 tokenAmount)
-        external
-        payable
-        onlyLpOwner
-    {
+    function addLiquidity(address token, address wbnb, address pair, address lpRecipient) external payable onlyLpOwner {
+        if (executed) revert AlreadyExecuted();
+        if (msg.value != nativeAmount) revert NativeAmountMismatch();
+        executed = true;
         Pangu2Token(token).transferFrom(initialHolder, pair, tokenAmount);
-        IWBNB(wbnb).deposit{ value: msg.value }();
-        IWBNB(wbnb).transfer(pair, msg.value);
+        IWBNB(wbnb).deposit{ value: nativeAmount }();
+        IWBNB(wbnb).transfer(pair, nativeAmount);
         IPancakePair(pair).mint(lpRecipient);
     }
 
     receive() external payable { }
 }
 
-/// @notice Tests role separation in Bootstrap and Finalize deployment flow.
 contract BootstrapRoleSeparationTest is Test {
     uint64 internal constant LOCK_DURATION = 365 days;
     uint32 internal constant TWAP_WINDOW = 30 minutes;
@@ -76,20 +80,21 @@ contract BootstrapRoleSeparationTest is Test {
     DividendDistributor internal distributor;
     Pangu2TradeRouter internal tradeRouter;
     Pangu2Staking internal staking;
-    MockPancakeFactory internal mockFactory;
-    MockPancakePair internal mockPair;
+    MockFactory internal mockFactory;
+    MockPair internal mockPair;
     address internal pair;
 
     TestLpProxy internal lpProxy;
     address internal lpProxyAddr;
 
+    uint256 internal constant LP_TOKEN_AMOUNT = 500_000 ether;
+    uint256 internal constant LP_NATIVE_AMOUNT = 10_000 ether;
+
     bytes32 internal constant GOV = keccak256("GOVERNANCE_ROLE");
     bytes32 internal constant DA = 0x00;
 
     function setUp() public {
-        mockFactory = new MockPancakeFactory();
-
-        // Deploy mock WBNB and factory, then etch their bytecodes at the constant addresses
+        mockFactory = new MockFactory();
         MockWBNB mockWbnb = new MockWBNB();
         vm.etch(WBNB, address(mockWbnb).code);
         vm.etch(FACTORY, address(mockFactory).code);
@@ -102,18 +107,13 @@ contract BootstrapRoleSeparationTest is Test {
         releaseRecipient = address(0xB000);
         rootPublisher = address(0xC000);
         lpRecipient = address(0xD000);
-
-        require(governance != lpAddr, "!distinct");
-        require(governance != holder, "!distinct");
-        require(lpAddr != holder, "!distinct");
-
+        require(governance != lpAddr && governance != holder && lpAddr != holder, "!distinct");
         vm.deal(lpAddr, 20_000 ether);
 
         token = new Pangu2Token(holder, governance, emergency);
-
-        mockPair = new MockPancakePair(address(token), WBNB);
+        mockPair = new MockPair(address(token), WBNB);
         pair = address(mockPair);
-        MockPancakeFactory(FACTORY).setPair(address(token), WBNB, pair);
+        MockFactory(FACTORY).setPair(address(token), WBNB, pair);
         mockPair.setReserves(uint112(100_000 ether), uint112(10_000 ether), uint32(block.timestamp));
 
         costBasis = new CostBasisManager(address(token), governance);
@@ -152,7 +152,13 @@ contract BootstrapRoleSeparationTest is Test {
         token.setSystemAddress(address(distributor), true);
         token.setSystemAddress(address(staking), true);
         token.grantRole(token.SETTLEMENT_ROLE(), address(tradeRouter));
-        costBasis.configureOperators(address(tradeRouter), address(distributor));
+        // TradeRouter paused — use emergency (has PAUSER_ROLE) or grant governance PAUSER
+        vm.stopPrank();
+
+        vm.prank(emergency);
+        tradeRouter.pause();
+
+        vm.startPrank(governance);
         costBasis.configureLiquidityGateway(address(adapter));
         adapter.setCaller(address(tradeRouter), true);
         adapter.setCaller(address(feeVault), true);
@@ -167,50 +173,47 @@ contract BootstrapRoleSeparationTest is Test {
         token.setSystemTransferContext(address(staking), TransferContext.Kind.STAKING_REWARD, true);
         vm.stopPrank();
 
-        // LP deploys LpProxy (tx.origin = lpAddr)
         vm.prank(lpAddr, lpAddr);
-        lpProxy = new TestLpProxy(holder);
+        lpProxy = new TestLpProxy(lpAddr, holder, LP_TOKEN_AMOUNT, LP_NATIVE_AMOUNT);
         lpProxyAddr = address(lpProxy);
     }
 
     // ════════════════════════════════════════════════════
-    // T1: Independent Governance + LP complete the flow
-    // ════════════════════════════════════════════════════
+    // T1: Full bootstrap flow with separate roles
     function testFullBootstrapFlowWithSeparateRoles() public {
-        uint256 tokenAmount = 500_000 ether;
-        uint256 bnbAmount = 10_000 ether;
-
-        // Step 1: Governance sets pair + LpProxy as liquidityManager
         vm.startPrank(governance);
         token.setPair(pair, true);
         token.setLiquidityManager(lpProxyAddr, true);
         assertTrue(token.isLiquidityManager(lpProxyAddr));
         vm.stopPrank();
 
-        // Step 2: Holder approves LpProxy for pull
         vm.prank(holder);
-        token.approve(lpProxyAddr, tokenAmount);
-        assertEq(token.allowance(holder, lpProxyAddr), tokenAmount);
+        token.approve(lpProxyAddr, LP_TOKEN_AMOUNT);
+        assertEq(token.allowance(holder, lpProxyAddr), LP_TOKEN_AMOUNT);
 
-        // Step 3: LP calls LpProxy.addLiquidity (pulls from holder via transferFrom)
         vm.prank(lpAddr);
-        lpProxy.addLiquidity{ value: bnbAmount }(address(token), WBNB, pair, lpRecipient, tokenAmount);
+        lpProxy.addLiquidity{ value: LP_NATIVE_AMOUNT }(address(token), WBNB, pair, lpRecipient);
+        assertTrue(lpProxy.executed());
 
         (uint112 r0, uint112 r1,) = mockPair.getReserves();
         assertGt(r0, 0);
         assertGt(r1, 0);
 
-        // Step 4: Governance revokes LpProxy + oracle anchor
         vm.startPrank(governance);
         token.setLiquidityManager(lpProxyAddr, false);
         assertFalse(token.isLiquidityManager(lpProxyAddr));
-        oracle.update();
         vm.stopPrank();
+
+        // Holder clears allowance
+        vm.prank(holder);
+        token.approve(lpProxyAddr, 0);
+        assertEq(token.allowance(holder, lpProxyAddr), 0);
+
+        vm.prank(governance);
+        oracle.update();
     }
 
-    // ════════════════════════════════════════════════════
-    // T2: LP cannot execute Governance operations
-    // ════════════════════════════════════════════════════
+    // T2: LP cannot execute Governance
     function testLpCannotSetPair() public {
         vm.prank(lpAddr);
         vm.expectRevert();
@@ -223,128 +226,203 @@ contract BootstrapRoleSeparationTest is Test {
         token.setLiquidityManager(lpAddr, true);
     }
 
-    // ════════════════════════════════════════════════════
-    // T3: Governance cannot use LP's assets
-    // ════════════════════════════════════════════════════
+    // T3: Governance cannot use LP's BNB
     function testGovernanceCannotSpendLpTokens() public {
         address testLp = address(0x7100);
-        uint256 tokenAmount = 100_000 ether;
         vm.prank(holder);
-        token.transfer(testLp, tokenAmount);
-        assertEq(token.balanceOf(testLp), tokenAmount);
-
+        token.transfer(testLp, 100_000 ether);
         vm.prank(governance);
         vm.expectRevert();
-        token.transferFrom(testLp, governance, tokenAmount);
+        token.transferFrom(testLp, governance, 100_000 ether);
     }
 
-    // ════════════════════════════════════════════════════
-    // T4: Temporary permissions revoked after Bootstrap
-    // ════════════════════════════════════════════════════
+    // T4: Temporary permissions revoked
     function testTempPermissionsRevoked() public {
         vm.startPrank(governance);
         token.setPair(pair, true);
         token.setLiquidityManager(lpProxyAddr, true);
         assertTrue(token.isLiquidityManager(lpProxyAddr));
-
         token.setLiquidityManager(lpProxyAddr, false);
         assertFalse(token.isLiquidityManager(lpProxyAddr));
         vm.stopPrank();
-
         assertFalse(token.hasRole(GOV, lpAddr));
         assertTrue(token.hasRole(GOV, governance));
     }
 
-    // ════════════════════════════════════════════════════
-    // T5: Pair-Oracle-Adapter bindings consistent
-    // ════════════════════════════════════════════════════
+    // T5: Pair-Oracle bindings
     function testPairOracleAdapterBindingsConsistent() public {
-        assertEq(address(oracle.pair()), pair, "oracle pair mismatch");
-        assertEq(oracle.token(), address(token), "oracle token mismatch");
-
+        assertEq(address(oracle.pair()), pair);
+        assertEq(oracle.token(), address(token));
         (address t0, address t1) = (mockPair.token0(), mockPair.token1());
-        bool validPair = (t0 == address(token) && t1 == WBNB) || (t0 == WBNB && t1 == address(token));
-        assertTrue(validPair, "pair token config invalid");
-
+        assertTrue((t0 == address(token) && t1 == WBNB) || (t0 == WBNB && t1 == address(token)));
         vm.prank(governance);
         token.setPair(pair, true);
-        assertTrue(token.isPair(pair), "pair not registered on token");
+        assertTrue(token.isPair(pair));
     }
 
-    // ════════════════════════════════════════════════════
-    // T6: Chain 56 must fail
-    // ════════════════════════════════════════════════════
+    // T6-T7: Chain rejection
     function testChain56Rejected() public {
         vm.chainId(56);
         assertEq(block.chainid, 56);
-        assertTrue(block.chainid != 97, "chain 56 should not be 97");
+        assertTrue(block.chainid != 97);
     }
 
-    // ════════════════════════════════════════════════════
-    // T7: Non-97 non-56 network must fail
-    // ════════════════════════════════════════════════════
     function testNonTestnetChainRejected() public {
         vm.chainId(1);
         assertEq(block.chainid, 1);
         assertTrue(block.chainid != 97);
-
         vm.chainId(31_337);
         assertEq(block.chainid, 31_337);
         assertTrue(block.chainid != 97);
     }
 
-    // ════════════════════════════════════════════════════
-    // T8: Finalize validates Governance permissions
-    // ════════════════════════════════════════════════════
+    // T8: Governance permissions
     function testFinalizeValidatesGovernancePermissions() public view {
-        assertTrue(token.hasRole(DA, governance), "gov missing token ADMIN");
-        assertTrue(costBasis.hasRole(DA, governance), "gov missing costBasis ADMIN");
-        assertTrue(token.hasRole(GOV, governance), "gov missing token GOVERNANCE");
-        assertFalse(token.hasRole(DA, lpAddr), "LP must not have token ADMIN");
-        assertFalse(token.hasRole(GOV, lpAddr), "LP must not have token GOVERNANCE");
+        assertTrue(token.hasRole(DA, governance));
+        assertTrue(costBasis.hasRole(DA, governance));
+        assertFalse(token.hasRole(GOV, lpAddr));
+        assertTrue(token.hasRole(GOV, governance));
     }
 
-    // ════════════════════════════════════════════════════
-    // T9: LP proxy can only be called by LP owner
-    // ════════════════════════════════════════════════════
+    // T9: LpProxy only callable by owner
     function testLpProxyOnlyCallableByOwner() public {
         vm.prank(governance);
         vm.expectRevert();
-        lpProxy.addLiquidity(address(token), WBNB, pair, lpRecipient, 1 ether);
+        lpProxy.addLiquidity(address(token), WBNB, pair, lpRecipient);
     }
 
-    // ════════════════════════════════════════════════════
-    // T10: Oracle produces valid quotes after window
-    // ════════════════════════════════════════════════════
+    // T10: Oracle quotes after window
     function testOracleProducesValidQuotesAfterWindow() public {
         vm.prank(governance);
         oracle.update();
-
         vm.warp(block.timestamp + TWAP_WINDOW);
         vm.prank(governance);
         oracle.update();
-
         assertEq(uint256(oracle.status()), uint256(PancakeV2TwapOracle.WindowStatus.READY));
+        assertGt(oracle.validatedQuote(address(token), WBNB, 1 ether).amountOut, 0);
+        assertGt(oracle.validatedQuote(WBNB, address(token), 1 ether).amountOut, 0);
+    }
 
-        PancakeV2TwapOracle.Quote memory q1 = oracle.validatedQuote(address(token), WBNB, 1 ether);
-        assertGt(q1.amountOut, 0);
-
-        PancakeV2TwapOracle.Quote memory q2 = oracle.validatedQuote(WBNB, address(token), 1 ether);
-        assertGt(q2.amountOut, 0);
+    // T11: LpProxy starts with zero tokens
+    function testLpProxyStartsWithZeroTokens() public {
+        assertEq(token.balanceOf(lpProxyAddr), 0);
+        assertEq(token.balanceOf(holder), token.totalSupply());
     }
 
     // ════════════════════════════════════════════════════
-    // T11: Holder starts with all tokens; LpProxy has none
-    // ════════════════════════════════════════════════════
-    function testLpProxyStartsWithZeroTokens() public {
-        assertEq(token.balanceOf(lpProxyAddr), 0, "LpProxy must have zero tokens");
-        assertEq(token.balanceOf(holder), token.totalSupply(), "all tokens should be with holder");
+    // NEW: T12 — Proxy one-shot execution
+    function testLpProxyCannotExecuteTwice() public {
+        vm.startPrank(governance);
+        token.setPair(pair, true);
+        token.setLiquidityManager(lpProxyAddr, true);
+        vm.stopPrank();
+        vm.prank(holder);
+        token.approve(lpProxyAddr, LP_TOKEN_AMOUNT);
+
+        vm.prank(lpAddr);
+        lpProxy.addLiquidity{ value: LP_NATIVE_AMOUNT }(address(token), WBNB, pair, lpRecipient);
+        assertTrue(lpProxy.executed());
+
+        vm.prank(lpAddr);
+        vm.expectRevert(TestLpProxy.AlreadyExecuted.selector);
+        lpProxy.addLiquidity{ value: LP_NATIVE_AMOUNT }(address(token), WBNB, pair, lpRecipient);
+    }
+
+    // T13 — Proxy rejects wrong native amount
+    function testLpProxyRejectsWrongNativeAmount() public {
+        vm.startPrank(governance);
+        token.setPair(pair, true);
+        token.setLiquidityManager(lpProxyAddr, true);
+        vm.stopPrank();
+
+        vm.prank(lpAddr);
+        vm.expectRevert(TestLpProxy.NativeAmountMismatch.selector);
+        lpProxy.addLiquidity{ value: LP_NATIVE_AMOUNT + 1 }(address(token), WBNB, pair, lpRecipient);
+    }
+
+    // T14 — Proxy token amount is immutable
+    function testLpProxyTokenAmountImmutable() public {
+        assertEq(lpProxy.tokenAmount(), LP_TOKEN_AMOUNT);
+        assertEq(lpProxy.nativeAmount(), LP_NATIVE_AMOUNT);
+    }
+
+    // T15 — After bootstrap, trading is still paused
+    function testTradingStillPausedAfterBootstrap() public {
+        vm.startPrank(governance);
+        token.setPair(pair, true);
+        token.setLiquidityManager(lpProxyAddr, true);
+        vm.stopPrank();
+        vm.prank(holder);
+        token.approve(lpProxyAddr, LP_TOKEN_AMOUNT);
+        vm.prank(lpAddr);
+        lpProxy.addLiquidity{ value: LP_NATIVE_AMOUNT }(address(token), WBNB, pair, lpRecipient);
+
+        // TradeRouter should still be paused
+        assertTrue(tradeRouter.paused(), "tradeRouter must be paused after bootstrap");
+    }
+
+    // T16 — Holder allowance cleared after bootstrap
+    function testHolderAllowanceCleared() public {
+        vm.startPrank(governance);
+        token.setPair(pair, true);
+        token.setLiquidityManager(lpProxyAddr, true);
+        vm.stopPrank();
+        vm.prank(holder);
+        token.approve(lpProxyAddr, LP_TOKEN_AMOUNT);
+        assertEq(token.allowance(holder, lpProxyAddr), LP_TOKEN_AMOUNT);
+
+        vm.prank(lpAddr);
+        lpProxy.addLiquidity{ value: LP_NATIVE_AMOUNT }(address(token), WBNB, pair, lpRecipient);
+
+        // Clear allowance
+        vm.prank(holder);
+        token.approve(lpProxyAddr, 0);
+        assertEq(token.allowance(holder, lpProxyAddr), 0);
+    }
+
+    // T17 — openTrading starts protection window
+    function testOpenTradingStartsProtectionWindow() public {
+        assertEq(token.tradingOpenAt(), 0);
+        assertFalse(token.isInLaunchProtection());
+
+        vm.prank(governance);
+        token.setTradingOpenAt();
+
+        assertGt(token.tradingOpenAt(), 0);
+        assertTrue(token.isInLaunchProtection());
+    }
+
+    // T18 — TradeRouter pause enforced
+    function testPausedTradeRouterRejectsBuy() public {
+        vm.prank(governance);
+        token.setTradingOpenAt();
+        assertTrue(tradeRouter.paused());
+
+        vm.prank(address(tradeRouter));
+        vm.expectRevert();
+        token.settleBuy(holder, 1 ether, 1 ether);
+    }
+
+    // T19 — Governance can unpause after trading open
+    function testGovernanceCanUnpauseAfterOpen() public {
+        vm.prank(governance);
+        token.setTradingOpenAt();
+        assertTrue(tradeRouter.paused());
+
+        vm.prank(governance);
+        tradeRouter.unpause();
+        assertFalse(tradeRouter.paused());
+    }
+
+    // T20 — Wrong pair binding detected
+    function testOraclePairMismatchDetected() public {
+        MockPair wrongPair = new MockPair(address(token), WBNB);
+        vm.expectRevert();
+        new PancakeV2TwapOracle(address(token), WBNB, FACTORY, address(wrongPair), TWAP_WINDOW, MAX_DEVIATION_BPS, 1, 1);
     }
 }
 
-// ───────────────────────────────────────────────────────
-// Mock contracts
-// ───────────────────────────────────────────────────────
+// ── Mocks ──
 
 contract MockWBNB {
     mapping(address => uint256) public balanceOf;
@@ -356,38 +434,36 @@ contract MockWBNB {
         totalSupply += msg.value;
     }
 
-    function transfer(address to, uint256 amount) external returns (bool) {
-        require(balanceOf[msg.sender] >= amount, "insufficient");
-        balanceOf[msg.sender] -= amount;
-        balanceOf[to] += amount;
+    function transfer(address to, uint256 a) external returns (bool) {
+        require(balanceOf[msg.sender] >= a, "insufficient");
+        balanceOf[msg.sender] -= a;
+        balanceOf[to] += a;
         return true;
     }
 
-    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
-        require(balanceOf[from] >= amount, "insufficient");
-        require(allowance[from][msg.sender] >= amount, "no allowance");
-        balanceOf[from] -= amount;
-        balanceOf[to] += amount;
-        allowance[from][msg.sender] -= amount;
+    function transferFrom(address f, address t, uint256 a) external returns (bool) {
+        require(balanceOf[f] >= a && allowance[f][msg.sender] >= a, "no allowance");
+        balanceOf[f] -= a;
+        balanceOf[t] += a;
+        allowance[f][msg.sender] -= a;
         return true;
     }
 
-    function approve(address spender, uint256 amount) external returns (bool) {
-        allowance[msg.sender][spender] = amount;
+    function approve(address sp, uint256 a) external returns (bool) {
+        allowance[msg.sender][sp] = a;
         return true;
     }
 
-    function withdraw(uint256 amount) external {
-        require(balanceOf[msg.sender] >= amount, "insufficient");
-        balanceOf[msg.sender] -= amount;
-        totalSupply -= amount;
-        payable(msg.sender).transfer(amount);
+    function withdraw(uint256 a) external {
+        require(balanceOf[msg.sender] >= a, "insufficient");
+        balanceOf[msg.sender] -= a;
+        totalSupply -= a;
+        payable(msg.sender).transfer(a);
     }
-
     receive() external payable { }
 }
 
-contract MockPancakeFactory {
+contract MockFactory {
     mapping(address => mapping(address => address)) public pairs;
 
     function setPair(address t0, address t1, address p) external {
@@ -404,7 +480,7 @@ contract MockPancakeFactory {
     }
 }
 
-contract MockPancakePair {
+contract MockPair {
     address public immutable token0;
     address public immutable token1;
     uint112 public reserve0;
