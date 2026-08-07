@@ -2,9 +2,12 @@
 
 | Field | Value |
 |---|---|
-| Document ID | `S0_BCM_V1` |
+| Document ID | `S0_BCM_V2` |
 | Stage | S0 |
 | Status | `CANDIDATE` |
+| Base Commit (deployed) | `3ef50b6d77a31c092e9353e255e672836f36ece8` |
+| Planning Review Head | `4d33669b41568fa573e9c0e5865be8b1cea803c3` |
+| S0 Review Commit | `046e40291a66904a4141b1c083561f381daec265` |
 
 ---
 
@@ -30,7 +33,7 @@
 | 18 | **Direct Pair Protection** | Users cannot transfer direct to Pair; only Router can | UNCHANGED | NO | `DirectPairInteractionForbidden` in `_update()` |
 | 19 | **TransferContext** | System contracts use typed context for transfers | CLARIFIED (add Staking context kinds) | NO | `TransferContext.Kind` enum + systemTransferContextAllowed |
 | 20 | **CostBasis** | NONE/KNOWN/UNKNOWN triple-state | IMPLEMENTATION_CHANGE_REQUIRED (dual ledger replaces single struct) | YES (internal representation change, view compatibility maintained) | `CostBasisManager.sol` at commit `3ef50b6` |
-| 21 | **Contract Accounts** | Not supported in deployed baseline | USER_DECISION_REQUIRED | PENDING | N/A (not yet implemented) |
+| 21 | **Contract Accounts** | Not supported in deployed baseline | BLOCKED_DECISION (pending user choice — EOA-only or smart contract support) | PENDING | N/A (pending user decision D-11; ALL contract account ABI items (ContractStatus enum, setContractStatus, contractStatus, ContractStatusUpdated event, InvalidContractState error) have been REMOVED from S0 freeze pending resolution) |
 | 22 | **Mainnet** | NO-GO | UNCHANGED | NO | `MAINNET = NO-GO` in all documentation |
 | 23 | **Deployment Script** | DeployPangu2 + Bootstrap + Finalize + OpenTrading | UNCHANGED | NO | 4-script deployment pipeline at commit `3ef50b6` |
 | 24 | **Token Name/Symbol** | PANGU2 / PANGU2 | UNCHANGED | NO | ERC20 constructor params |
@@ -52,4 +55,5 @@
 | IMPLEMENTATION_CHANGE_REQUIRED | 2 (dual ledger, staking mutation) |
 | USER_DECISION_REQUIRED | 1 (contract accounts) |
 | NEW (phase separation) | 1 |
-| ECONOMIC_BASELINE_CHANGE | 0 (no rate/parameter changes) |
+| ECONOMIC_BASELINE_CHANGE | NO (no rate/parameter changes; internal representation changes are NOT economic baseline changes) |
+| INTERNAL_REPRESENTATION_CHANGE | YES (dual ledger replaces single Position struct — tax rates, supply, and all economic semantics unchanged) |

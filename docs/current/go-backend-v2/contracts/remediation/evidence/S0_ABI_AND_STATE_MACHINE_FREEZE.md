@@ -1,10 +1,15 @@
-# S0 ABI and State Machine Freeze
+# S0 ABI and State Machine Freeze (31 Mandatory Items)
 
 | Field | Value |
 |---|---|
-| Document ID | `S0_ABI_V1` |
+| Document ID | `S0_ABI_V2` |
 | Stage | S0 |
-| Status | `CANDIDATE` |
+| Status | `CANDIDATE (REVISED)` |
+| Base Commit (deployed) | `3ef50b6d77a31c092e9353e255e672836f36ece8` |
+| Planning Review Head | `4d33669b41568fa573e9c0e5865be8b1cea803c3` |
+| S0 Review Commit | `046e40291a66904a4141b1c083561f381daec265` |
+
+**NOTE**: 5 contract-account-related items (ABI-06, ABI-15, ABI-16, ABI-27, ABI-33) have been REMOVED pending user decision D-11. This freeze contains 31 mandatory items.
 
 ---
 
@@ -24,7 +29,6 @@
 | ID | Enum | Values | Contract |
 |---|---|---|---|
 | ABI-05 | `StakingOperationKind` | { NONE, STAKE_DEPOSIT, REWARD_CLAIM, PRINCIPAL_RETURN } | TransferContext |
-| ABI-06 | `ContractStatus` | { NONE, APPROVED, EXIT_ONLY, REVOKED } | Pangu2Token (if contracts supported) |
 
 ---
 
@@ -40,8 +44,6 @@
 | ABI-12 | `sell(uint256, maxSupport, maxBurn, minSwapTokens, slippageBps, deadline)` | Pangu2TradeRouter | Extended with user constraints |
 | ABI-13 | `setFeeWhitelist(address, bool)` | Pangu2Token | Governance whitelist management |
 | ABI-14 | `dualPositionOf(address)` | CostBasisManager | Returns DualPosition struct |
-| ABI-15 | `setContractStatus(address, ContractStatus)` | Pangu2Token | Governance contract lifecycle (if contracts supported) |
-| ABI-16 | `contractStatus(address)` | Pangu2Token | View contract status (if contracts supported) |
 
 ---
 
@@ -73,7 +75,6 @@
 | ABI-24 | `StakingContextActivated(address indexed stakingContract, address indexed account, uint256 positionId, StakingOperationKind kind)` | Pangu2Token |
 | ABI-25 | `StakingContextCleared()` | Pangu2Token |
 | ABI-26 | `DualPositionChanged(address indexed account, uint256 oldKnown, uint256 newKnown, uint256 oldUnknown, uint256 newUnknown)` | CostBasisManager |
-| ABI-27 | `ContractStatusUpdated(address indexed account, ContractStatus oldStatus, ContractStatus newStatus)` | Pangu2Token (if contracts supported) |
 
 ---
 
@@ -86,7 +87,6 @@
 | ABI-30 | `UnauthorizedStakingCaller(address caller)` | Pangu2Token |
 | ABI-31 | `InvalidPositionId(uint256 positionId)` | Pangu2Staking |
 | ABI-32 | `RewardNotMatured(uint256 unlockAt)` | Pangu2Staking |
-| ABI-33 | `InvalidContractState(ContractStatus current)` | Pangu2Token (if contracts supported) |
 
 ---
 

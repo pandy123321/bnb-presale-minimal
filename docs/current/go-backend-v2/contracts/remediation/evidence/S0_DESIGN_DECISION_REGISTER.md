@@ -2,11 +2,12 @@
 
 | Field | Value |
 |---|---|
-| Document ID | `S0_DDR_V1` |
+| Document ID | `S0_DDR_V2` |
 | Stage | S0 |
-| Status | `CANDIDATE` |
-| Base Commit (deployed) | `3ef50b6` |
-| Planning Review Head | `4d33669` |
+| Status | `CANDIDATE (REVISED)` |
+| Base Commit (deployed) | `3ef50b6d77a31c092e9353e255e672836f36ece8` |
+| Planning Review Head | `4d33669b41568fa573e9c0e5865be8b1cea803c3` |
+| S0 Review Commit | `046e40291a66904a4141b1c083561f381daec265` |
 | Created | 2026-08-07 |
 
 ---
@@ -29,7 +30,8 @@ knownBalance == 0 ==> knownCostWbnbWei == 0
 ```
 
 **Eligibility rules**:
-- Eligible liquid users: all non-zero, non-protocol EOA and approved contract accounts
+- Eligible liquid users: all non-zero, non-protocol EOA addresses only
+- Contract account support: `BLOCKED_DECISION` — pending user decision D-11; DO NOT include contract accounts in S0 frozen design until resolved
 - Protocol addresses excluded: Pair, System Address, TradeRouter, FeeVault, Staking custody, Locker, DividendDistributor, GovernanceAdapter, SupportPool, PancakeV2Adapter
 - System addresses never use the dual ledger; their balances are always `NONE`
 - UNKNOWN received tokens cannot erase existing KNOWN cost
@@ -60,7 +62,8 @@ knownBalance == 0 ==> knownCostWbnbWei == 0
 **Fail-closed**: When actual balance != knownBalance + unknownBalance, revert with `InvalidPositionState`
 
 | **Impact** | S1+ Solidity implementation |
-| **Economic baseline change** | YES (dual ledger replaces single Position struct) |
+| **Economic baseline change** | NO (dual ledger is an internal accounting representation change; all tax rates, supply, and economic semantics are unchanged. See INTERNAL_REPRESENTATION_CHANGE_ONLY below.) |
+| **Internal representation change** | YES (dual ledger replaces single Position struct for CostBasis internal storage; legacy `positionOf()` view preserved for backward compatibility) |
 | **Status** | `FROZEN` |
 
 ---
@@ -110,6 +113,21 @@ Preview functions return a constant maximum-tax bound that the executor promises
 
 **User-constraining parameters on execute**:
 
+**Buy**:
+```text
+amount (uint256) — BNB amount sent with the transaction
+maxTax (uint256) — revert if actual tax tokens > maxTax; unit: PANGU2 token wei
+minNet (uint256) — revert if net tokens received < minNet; unit: PANGU2 token wei
+deadline (uint256) — revert if block.timestamp > deadline
+```
+
+- `actualTax <= maxTax` always enforced
+- `netAmount >= minNet` always enforced
+- maxTax and minNet are user-supplied limits; user may supply more generous bounds than preview (e.g., maxTax higher than preview, minNet lower than preview) — but actual economic result is bounded by protocol rules, not by user limits
+- execute MUST re-read current tax/state/oracle at execution time (not cached from preview)
+- deadline uses strict `>`: revert if `block.timestamp > deadline`
+
+**Sell**:
 ```text
 maximumSupport (uint256) — revert if actual support > this
 maximumBurn (uint256) — revert if actual burn > this
@@ -292,7 +310,7 @@ maxDeviation = 300 bps (immutable)
 **Long-gap rule (ONLY V2 TWAP logic, frozen)**:
 
 ```text
-if elapsed > MAX_TWAP_AGE:
+if elapsed >= MAX_TWAP_AGE:
     discard old completion candidate
     re-anchor to current counterfactual cumulative
     status = ACCUMULATING
@@ -300,7 +318,11 @@ if elapsed > MAX_TWAP_AGE:
 ```
 
 **Boundary rules**:
-- `elapsed == MAX_TWAP_AGE`: treat as `>` (not `>=`), discard old anchor
+- Comparator: `>=` (elapsed >= MAX_TWAP_AGE triggers re-anchor). This is the sole canonical comparator.
+- `elapsed = MAX_TWAP_AGE - 1` (= 8999): window is complete but not yet expired; READY may be produced if reserves OK
+- `elapsed = MAX_TWAP_AGE` (= 9000): re-anchor, DO NOT produce READY
+- `elapsed = MAX_TWAP_AGE + 1` (= 9001): re-anchor, DO NOT produce READY
+- Implementation MUST use `>=` as the comparison operator; `>` is INCORRECT per this frozen specification
 - `uint32` timestamp wraparound: use modular arithmetic (solidity 0.8.24 with unchecked)
 - Cumulative `uint256` overflow: allowed (wrapping, standard PancakeV2 pattern)
 - High-frequency permissionless update: `update()` is callable by anyone, but cannot continuously reset an uncompleted window

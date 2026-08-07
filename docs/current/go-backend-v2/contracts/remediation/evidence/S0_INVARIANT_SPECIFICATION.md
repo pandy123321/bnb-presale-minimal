@@ -2,9 +2,12 @@
 
 | Field | Value |
 |---|---|
-| Document ID | `S0_INV_V1` |
+| Document ID | `S0_INV_V2` |
 | Stage | S0 |
-| Status | `CANDIDATE` |
+| Status | `CANDIDATE (REVISED)` |
+| Base Commit (deployed) | `3ef50b6d77a31c092e9353e255e672836f36ece8` |
+| Planning Review Head | `4d33669b41568fa573e9c0e5865be8b1cea803c3` |
+| S0 Review Commit | `046e40291a66904a4141b1c083561f381daec265` |
 
 ---
 
@@ -144,8 +147,8 @@
 | Item | Detail |
 |---|---|
 | **Contract** | PancakeV2TwapOracle |
-| **Precondition** | elapsed > MAX_TWAP_AGE |
-| **Invariant** | status NEVER transitions to READY in this update |
+| **Precondition** | elapsed >= MAX_TWAP_AGE |
+| **Invariant** | status NEVER transitions to READY in this update; re-anchor triggered |
 | **Revert atomicity** | status set to ACCUMULATING; READY not produced |
 | **Verification** | Unit: warp > 9000 seconds, call update() |
 
