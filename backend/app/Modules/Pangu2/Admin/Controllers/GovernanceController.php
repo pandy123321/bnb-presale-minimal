@@ -24,10 +24,13 @@ class GovernanceController extends Controller
     ];
 
     private const BUYBACK_REASON_LABELS = [
-        0 => 'Can execute',
-        1 => 'Insufficient pool balance',
-        2 => 'Below minimum interval',
-        3 => 'Pool not active',
+        0 => 'No blocking reason',
+        1 => 'Contract paused',
+        2 => 'Locker not configured',
+        3 => 'Insufficient pool balance',
+        4 => 'Cooldown period',
+        5 => 'Oracle unavailable',
+        6 => 'Invalid oracle quote',
     ];
 
     // ── RPC helper ──
