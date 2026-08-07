@@ -84,6 +84,11 @@ final class RbacMatrix
         'contracts.manage' => [
             self::ROLE_SUPER_ADMIN,
         ],
+        // Governance — read (SUPER_ADMIN + OPERATOR)
+        'governance.read' => [
+            self::ROLE_SUPER_ADMIN,
+            self::ROLE_OPERATOR,
+        ],
     ];
 
     /**

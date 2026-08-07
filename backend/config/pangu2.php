@@ -19,6 +19,9 @@ return [
     'fee_vault_address' => env('PANGU2_FEE_VAULT_ADDRESS', ''),
     'cost_basis_manager_address' => env('PANGU2_COST_BASIS_MANAGER_ADDRESS', ''),
     'staking_address' => env('PANGU2_STAKING_ADDRESS', ''),
+    'pair_address' => env('PANGU2_PAIR_ADDRESS', ''),
+    'oracle_address' => env('PANGU2_ORACLE_ADDRESS', ''),
+    'adapter_address' => env('PANGU2_ADAPTER_ADDRESS', ''),
     'staking_mock_enabled' => (bool) env('PANGU2_STAKING_MOCK_ENABLED', false),
     'wbnb_address' => env('PANGU2_WBNB_ADDRESS', '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'),
 

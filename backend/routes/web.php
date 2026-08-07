@@ -5,6 +5,7 @@ use App\Modules\Core\ContractRegistry\Controllers\ContractRegistryController;
 use App\Modules\Pangu2\Admin\Controllers\AdminDashboardController;
 use App\Modules\Pangu2\Admin\Controllers\AdminJobsController;
 use App\Modules\Pangu2\Admin\Controllers\AdminAuditController;
+use App\Modules\Pangu2\Admin\Controllers\GovernanceController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
@@ -69,5 +70,15 @@ Route::prefix('admin-api/v1/projects/pangu2')->group(function () {
         Route::post('/contract-registry', [ContractRegistryController::class, 'store']);
         Route::delete('/contract-registry/{id}', [ContractRegistryController::class, 'destroy'])->whereNumber('id');
         Route::post('/contract-registry/resync', [ContractRegistryController::class, 'resync']);
+    });
+
+    // ── Governance Monitoring (SUPER_ADMIN + OPERATOR) ──
+    Route::middleware(['auth:web', 'rbac:governance.read'])->group(function () {
+        Route::get('/governance/trading-status', [GovernanceController::class, 'tradingStatus']);
+        Route::get('/governance/buyback-check', [GovernanceController::class, 'buybackCheck']);
+        Route::get('/governance/oracle-status', [GovernanceController::class, 'oracleStatus']);
+        Route::get('/governance/pause-status', [GovernanceController::class, 'pauseStatus']);
+        Route::get('/governance/system-addresses', [GovernanceController::class, 'systemAddresses']);
+        Route::get('/governance/deployer-balance', [GovernanceController::class, 'deployerBalance']);
     });
 });
