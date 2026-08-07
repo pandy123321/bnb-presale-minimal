@@ -122,26 +122,62 @@ contract BootstrapPangu2 is Script {
             (ot0 == tokenAddr && ot1 == expectedWbnb) || (ot0 == expectedWbnb && ot1 == tokenAddr),
             "pair tokens mismatch"
         );
-        // Bootstrap state detection (A/B/C)
-        //   A: pair not registered + reserves=0     → first-time bootstrap
-        //   B: pair registered     + reserves=0     → setPair succeeded, liquidity not yet added → continue
-        //   C: pair registered     + reserves>0     → liquidity already added → skip injection, only resume cleanup
+        // Bootstrap state detection (three-phase A/B/C)
+        //   A: pair not registered + reserves=0     -> first-time bootstrap
+        //   B: pair registered     + reserves=0     -> setPair succeeded, liquidity not yet added -> safe to continue
+        //   C: pair registered     + reserves>0     -> liquidity already added -> skip injection, verify + cleanup only
+
         bool pairAlreadyRegistered = token.isPair(pairAddr);
         (uint112 r0Check, uint112 r1Check,) = pair.getReserves();
-        bool liquidityAlreadyAdded = r0Check > 0 || r1Check > 0;
+        bool reservesEmpty = r0Check == 0 && r1Check == 0;
+        bool reservesTwoSided = r0Check > 0 && r1Check > 0;
 
-        if (liquidityAlreadyAdded) {
-            // ── State C: liquidity already present — skip all injection steps ──
+        // Reject inconsistent one-sided reserves
+        if (!reservesEmpty && !reservesTwoSided) {
+            revert("inconsistent one-sided pair reserves -- manual inspection required");
+        }
+
+        // -- State C: liquidity already present, skip all injection, only resume cleanup --
+        if (reservesTwoSided) {
             require(pairAlreadyRegistered, "reserves exist but pair not registered -- inconsistent state");
             console.log("Bootstrap: liquidity already present (resume mode) -- skipping token/BNB injection");
 
-            // Only do Oracle update (step 7) — injection steps 1-6 are already done
+            // Cleanup: compute and revoke the LpProxy from the failed prior run
+            // The proxy was deployed at the LP's nonce immediately before the retry.
+            uint64 priorNonce = vm.getNonce(lpAddr) - 1;
+            address priorProxyAddr = _computeCreateAddress(lpAddr, priorNonce);
+            if (priorProxyAddr.code.length > 0) {
+                console.log("Prior LpProxy found at:");
+                console.logAddress(priorProxyAddr);
+                if (token.isLiquidityManager(priorProxyAddr)) {
+                    vm.startBroadcast(govKey);
+                    token.setLiquidityManager(priorProxyAddr, false);
+                    vm.stopBroadcast();
+                    console.log("Revoked stale liquidityManager on prior LpProxy");
+                }
+            } else {
+                console.log("Prior LpProxy not found -- manual cleanup may be needed");
+            }
+
+            // Step 7: Oracle update
+            uint256 minTokenReserveOpt = vm.envUint("MIN_TOKEN_RESERVE");
+            uint256 minWbnbReserveOpt = vm.envUint("MIN_WBNB_RESERVE");
             vm.startBroadcast(govKey);
             oracle.update();
             vm.stopBroadcast();
 
             // Verify final state
+            (r0Check, r1Check,) = pair.getReserves();
+            require(r0Check > 0 && r1Check > 0, "reserves must be two-sided after resume");
             require(token.isPair(pairAddr), "pair protection not active");
+
+            // Map reserves to token/WBNB side using token0/token1 ordering
+            (uint112 tokenRes, uint112 wbnbRes) = (ot0 == tokenAddr)
+                ? (r0Check, r1Check)
+                : (r1Check, r0Check);
+            require(tokenRes >= minTokenReserveOpt, "token reserve below Oracle minimum");
+            require(wbnbRes >= minWbnbReserveOpt, "WBNB reserve below Oracle minimum");
+
             console.log("=== Bootstrap Complete (resume) ===");
             console.log("Governance:");
             console.logAddress(govAddr);
@@ -149,6 +185,7 @@ contract BootstrapPangu2 is Script {
             return;
         }
 
+        // -- State A / State B: fresh or partial Bootstrap (reserves are empty) --
         if (pairAlreadyRegistered) {
             console.log("Pair already registered (retry mode -- liquidity not yet added)");
         }
@@ -223,5 +260,39 @@ contract BootstrapPangu2 is Script {
         console.log("LpProxy:");
         console.logAddress(lpProxyAddr);
         console.log("Oracle anchor set. Trading paused. Wait TWAP window -> run OpenTradingPangu2.");
+    }
+
+    // -- Helper: compute address of a contract deployed at a given sender nonce --
+    // Uses the Ethereum CREATE address formula: keccak256(rlp([sender, nonce]))[12:]
+    function _computeCreateAddress(address sender, uint64 nonce) private pure returns (address) {
+        if (nonce == 0) {
+            return address(
+                uint160(uint256(keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), sender, bytes1(0x80)))))
+            );
+        }
+        if (nonce < 0x80) {
+            return address(uint160(
+                uint256(keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), sender, bytes1(uint8(nonce)))))
+            ));
+        }
+        // nonce >= 0x80: need RLP length byte
+        bytes memory nonceBytes = new bytes(0);
+        uint64 n = nonce;
+        while (n > 0) {
+            nonceBytes = abi.encodePacked(bytes1(uint8(n & 0xff)), nonceBytes);
+            n >>= 8;
+        }
+        uint256 len = nonceBytes.length;
+        if (len == 1 && uint8(nonceBytes[0]) < 0x80) {
+            bytes memory listContent = abi.encodePacked(bytes1(0x94), sender, nonceBytes);
+            bytes1 listHead = bytes1(uint8(0xc0 + listContent.length));
+            return address(uint160(uint256(keccak256(abi.encodePacked(listHead, listContent)))));
+        }
+        bytes memory listContent = abi.encodePacked(
+            bytes1(0x94), sender,
+            bytes1(uint8(0x80 + len)), nonceBytes
+        );
+        bytes1 listHead = bytes1(uint8(0xc0 + listContent.length));
+        return address(uint160(uint256(keccak256(abi.encodePacked(listHead, listContent)))));
     }
 }
