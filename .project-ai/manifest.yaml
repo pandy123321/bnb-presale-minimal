@@ -1,0 +1,14 @@
+schemaVersion: 1
+projectName: 文档优化
+contextVersion: 1
+status: PUBLISHED
+enabledDocuments:
+  - context.md
+  - architecture.md
+  - glossary.md
+  - rules/coding.md
+  - rules/review.md
+excludedPaths:
+  - .env
+  - application-prod.yml
+  - '**/secrets/**'

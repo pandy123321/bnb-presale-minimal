@@ -1,0 +1,9 @@
+﻿Deployed Source Commit = 3ef50b6d77a31c092e9353e255e672836f36ece8
+Deployed Tree = d3761ce33f75906717ea9ad227e98333487e368d
+Planning/Review Head = 4d33669b41568fa573e9c0e5865be8b1cea803c3
+Planning Tree = a11ee048650a73f2ec408db06da15ee56c92ef95
+Chain ID = 97
+Scope = contracts-v2/src, contracts-v2/test, contracts-v2/script, contracts-v2/foundry.toml
+Deployment Approval = NOT_GRANTED
+BSC Testnet Runtime Fixed = NO
+Mainnet = NO-GO

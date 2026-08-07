@@ -1,0 +1,70 @@
+# Submission Manifest
+
+| Relative Path | SHA-256 | Size Bytes |
+|---|---|---:|
+| 00_REVIEW_REQUEST.md | `e1ca23a34cd176787277dd553184df50bf43f36ab50b204ffabb682cfa436c01` | 1001 |
+| docs/current/go-backend-v2/00_EXISTING_BASELINE_REVIEW.md | `7df2bdb2d643db9d38ea774eac983d0543424248185c13e4ea56794a653cd758` | 10408 |
+| docs/current/go-backend-v2/01_ARCHITECTURE_AND_MIGRATION.md | `5fce85ea3c019ad29df5339d3c4fa8fdd07fc61459e6bf06a6889d0c3300aaf2` | 9900 |
+| docs/current/go-backend-v2/02_DATABASE_FREEZE.md | `74fd3bdf47a473f253bbfb5a4ea45a4c17ba2d0977a600d8e1a2b1d78476c135` | 14904 |
+| docs/current/go-backend-v2/03_API_FREEZE.md | `311c65bedb86e35bbbfc0e27ef1cb8b38f2a34aadc07174a84f51d7eb49d9a8b` | 14434 |
+| docs/current/go-backend-v2/04_EVENT_AND_STATE_FREEZE.md | `b322a2d19b55b5d100bb7ffe8eb3304b870fdc33202b873ac66eeae8a9294f3d` | 12141 |
+| docs/current/go-backend-v2/05_BUSINESS_AND_CONTRACT_INHERITANCE.md | `0b6f7d4bf1313a6dd989b4c1ce25696585b4049d1dc849dd2d90a7f850a6f541` | 13784 |
+| docs/current/go-backend-v2/06_DEPLOYMENT_ENVIRONMENT.md | `805ec86cfe559199cf901a5e2660da0b95d10fbd5cbe7f81924156a8a5e9fcb9` | 9922 |
+| docs/current/go-backend-v2/07_FRAMEWORK_AND_DEPENDENCIES.md | `5282ef80fa96f3f7f83b048244c9a5ebc3a271b224f33d608d0f218f73c387a9` | 9098 |
+| docs/current/go-backend-v2/08_RULES_COMPLIANCE_AND_DECISIONS.md | `10c0640d6e9cf2813ad9cf915843b05c1d05e6f6c38669e35fd13f409d40fbab` | 9229 |
+| docs/current/go-backend-v2/09_SELF_REVIEW.md | `51e53a1dc89161fc9d8606ce8af987e2b4c3a1e11f307e9e23b9e0c25649f362` | 11424 |
+| docs/current/go-backend-v2/10_INDEPENDENT_REVIEW_REMEDIATION.md | `b8060b77aa89fb6c08dcca575dc5d1c86739e703ce42b66ec64dacb1330447d7` | 11376 |
+| docs/current/go-backend-v2/11_INDEPENDENT_REVIEW_ROUND2_REMEDIATION.md | `fc36b5287ebbf8bf7cefe575db0dc2b371033cf1e0ecd16afb36b4fa56359bea` | 11531 |
+| docs/current/go-backend-v2/12_INDEPENDENT_CLOUD_ROUND3_REMEDIATION.md | `6d1e7d3f7ff02e5d5cbb384e4550b1dc91d4618ec2fdf904edc4ed5224d1fc08` | 3631 |
+| docs/current/go-backend-v2/13_ROUND4_CLOUD_REVIEW_PROMPT.md | `50d50fbddb6d09d7d9c64d7a8119933c25ac3a692959932f04cb57581ff31121` | 7519 |
+| docs/current/go-backend-v2/14_INDEPENDENT_CLOUD_ROUND4_REMEDIATION.md | `a9318010ed55ebee6c1eb2a977d9d8b54abd560807fcaec0baf69b2729076012` | 4655 |
+| docs/current/go-backend-v2/15_ROUND5_CLOUD_REVIEW_PROMPT.md | `6cef6bc72437d734be748e2a519baed95a5e689fdf7badc21f2f35af123bf101` | 7037 |
+| docs/current/go-backend-v2/16_INDEPENDENT_CLOUD_ROUND5_REMEDIATION.md | `54c0a89e05472e5cf29fbecc7ff2a9ff84a829f703a5b0e1bebe7a4a7c7f8b0f` | 5268 |
+| docs/current/go-backend-v2/17_ROUND6_CLOUD_REVIEW_PROMPT.md | `da240500c594b7fb95004b2cd9fecad104b4d2c7580c5ab170658bdcf928a0a5` | 7737 |
+| docs/current/go-backend-v2/contracts/BSC_TESTNET_DEPLOYMENT_BASELINE.md | `ded9ffb342e8751fb4020b1cbc9d23c5de0feb80fee713dd5b2148a8b2947bc4` | 8906 |
+| docs/current/go-backend-v2/contracts/remediation/00_AUDIT_FINDINGS_BASELINE.md | `6f96acee4b9085520f0b805d44256079c515cad5e0c87059f4a08f88301a43d1` | 3341 |
+| docs/current/go-backend-v2/contracts/remediation/01_MASTER_EXECUTION_PROMPT.md | `0afa8e35f719d5b73a0e48f9f6e307a2aca3c82490d98652f459d28f2e124808` | 5621 |
+| docs/current/go-backend-v2/contracts/remediation/02_REVIEW_WORKFLOW_AND_PROMPTS.md | `46d7045eb60ddfeef6843ecbc982752253b637dc85698e7d4b7261e599f1971b` | 8588 |
+| docs/current/go-backend-v2/contracts/remediation/03_STAGE_EVIDENCE_TEMPLATE.md | `c8483b5990af336b0c35bec45ce7eb4b9ed9b6638d3ce0407e602e52df1431ca` | 2928 |
+| docs/current/go-backend-v2/contracts/remediation/04_CLOUD_REVIEW_SUBMISSION_CHECKLIST.md | `dae0c8d0c00794da452b2d66650aa70e157e72a808adb109a12e90215d8eae74` | 3315 |
+| docs/current/go-backend-v2/contracts/remediation/05_EXTERNAL_PLAN_REVIEW_ADJUDICATION.md | `477d733ae27f9091a447394ae672bf9c2569917d6e4d3ad6e09d5bed04f4dc7a` | 7150 |
+| docs/current/go-backend-v2/contracts/remediation/06_S0_EXECUTION_REVIEW_RULES.md | `6aabee78359b908e8ec39a491a3608eb3de87b07cb90e3e263b7aff4fd3042db` | 16984 |
+| docs/current/go-backend-v2/contracts/remediation/evidence/S0_ABI_AND_STATE_MACHINE_FREEZE.md | `dcd477c7a4d70b249346d9b9c64579940984f46ed7f4dd89a7d7f27d261110c8` | 7878 |
+| docs/current/go-backend-v2/contracts/remediation/evidence/S0_BASELINE_COMPLIANCE_MATRIX.md | `0c5873b703cd1960f914a500325ae696f9c02cbfed6ac7aa8a8c5291a47cb977` | 4960 |
+| docs/current/go-backend-v2/contracts/remediation/evidence/S0_DESIGN_DECISION_REGISTER.md | `a3f3125c813060d1b5393f71f55ed29ead6a3dea5efbda5f8e8971a5f50296cd` | 14357 |
+| docs/current/go-backend-v2/contracts/remediation/evidence/S0_INVARIANT_SPECIFICATION.md | `8574a132b4a1de3b2508188bc9a0c4ebcdee4e350a2e4012ca12fe52b08a9239` | 7768 |
+| docs/current/go-backend-v2/contracts/remediation/evidence/S0_STAGE_EVIDENCE.md | `40aadd733e855f8673778e45631b6023aa2af818d2932d9a606ff528704714c5` | 7413 |
+| docs/current/go-backend-v2/contracts/remediation/README.md | `28814a2419c7f9224d9d42f837a50de1d120021b588d8539554f36028e1172ad` | 7501 |
+| docs/current/go-backend-v2/contracts/remediation/stages/S0_DESIGN_AND_INVARIANT_FREEZE.md | `dbb51ed2605cb5b9734a10e4d13d8eabf5972de632bc68270c17e877fd4d1185` | 11431 |
+| docs/current/go-backend-v2/contracts/remediation/stages/S1_COST_BASIS_DUAL_LEDGER.md | `02c72adeeaf8b0d0fc79c35ff5a55f1fec085f365be548f037e8f473296d734b` | 4089 |
+| docs/current/go-backend-v2/contracts/remediation/stages/S2_TOKEN_ROUTER_MIXED_SETTLEMENT_AND_WHITELIST.md | `82d2328aa4719fd31a21cc90db0d7957c056ab7c8126732d8147f3a1d8f1a157` | 4932 |
+| docs/current/go-backend-v2/contracts/remediation/stages/S3_STAKING_COST_BASIS_BRIDGE.md | `b740da6f171cdd6c5cbb54f5a30a3f654a80c2ed9ab57970aa6ea2474c6673e4` | 5526 |
+| docs/current/go-backend-v2/contracts/remediation/stages/S4A_STAKING_REWARD_EXIT.md | `e69b59eb8693cdd3e0cb19242a4c8fca13080a8e49f22f55d2a8b77aec6ad28b` | 4612 |
+| docs/current/go-backend-v2/contracts/remediation/stages/S4B_STAKING_PAUSE_AND_EMERGENCY_CONTROL.md | `1389a165d1ee093b7439651e138ddee1e4b42496df419bf33fef5afbdd5c6e2e` | 3254 |
+| docs/current/go-backend-v2/contracts/remediation/stages/S5_SUPPORT_BUYBACK_PRICE_IMPACT.md | `7ba9cdc477191e3bc783ffc8c5a429f7e4c06aaab55746c6924513347eabe5af` | 3624 |
+| docs/current/go-backend-v2/contracts/remediation/stages/S6_DIVIDEND_EPOCH_FINALITY.md | `daebd8cd72153a8a228837e5a6dab325d277cacdea0a62c122d2ad8c07487765` | 2754 |
+| docs/current/go-backend-v2/contracts/remediation/stages/S7_ORACLE_UINT32_ROLLOVER.md | `bd8be3c6330a4b9164d66ab752f2435e6e6ed328c99bea504c3575e90a14b1e1` | 3083 |
+| docs/current/go-backend-v2/contracts/remediation/stages/S8A_CONTRACT_ACCOUNT_LIFECYCLE.md | `051255c2d76fc370da062750c66fab547965f5bfc4ff57b085496669e1874c6d` | 4246 |
+| docs/current/go-backend-v2/contracts/remediation/stages/S8B_CONTRACT_ACCOUNT_BYPASS_REGRESSION.md | `32906ecb0af59924ff85a12c1ab9df42a2b0889ad094d1b0c14fe074a446f0f2` | 3701 |
+| docs/current/go-backend-v2/contracts/remediation/stages/S9_FINAL_CODE_EXIT_GATE.md | `bf289cbe09d3c498496f87b42c10428d2797403adec8a69c38f059f820a8785d` | 5640 |
+| docs/current/go-backend-v2/events/binggoplus-events-v2.yaml | `f2d730fcbf5f1305f6d07814cf11a461d82d38cbc69abbdcb909468c19967c83` | 7766 |
+| docs/current/go-backend-v2/openapi/binggoplus-api-v2.yaml | `a06150b0319d3976f2e873c2f13aa1fa44fd2e9fd05d135f741f2238e2beb7f5` | 54795 |
+| docs/current/go-backend-v2/README.md | `f84fe4af9156e1795415ea8dc4d4cb6cfbb566c48eba4a7b551db3ac71954795` | 7398 |
+| docs/current/go-backend-v2/sql/0001_binggoplus_v2_schema.sql | `dcb06d4fcfec8914f3c17cb8bb53a1591a912a2fdc0e759568011ba7b79c6e9f` | 38975 |
+| docs/current/go-backend-v2/sql/0002_binggoplus_v2_runtime_privileges.sql | `7f5894244452063221deea3cb600650d56eeb4ea9d45ce2a751c301bee8cc445` | 10361 |
+| docs/current/go-backend-v2/states/binggoplus-state-machines-v2.yaml | `d41c855ce94dbd1401bdadf139b81668faf81c5db1fdc14e19736c098b5aebac` | 4798 |
+| docs/current/PRODUCT_PLANNING.md | `bfb4e4eeaa9d59ea3833438d1b4aa891648a4e702ec87361a7b3d3ca0876dbbb` | 9660 |
+| review-history/03_ROUND5_BLOCKED_INCOMPLETE_PACKAGE_ADJUDICATION.md | `54c0a89e05472e5cf29fbecc7ff2a9ff84a829f703a5b0e1bebe7a4a7c7f8b0f` | 5268 |
+| SOURCE_COMMIT.txt | `8c6b9d3df57412a0a19f217acc18361c659151ca0835bd47ad713fb4a6765d97` | 373 |
+| 开源项目通用引用准入规则V1.0.md | `1248303869a2498cce511da0fb8f0113be7a4b8af315805fc7d6469abb5df5ac` | 11305 |
+| 通用智能合约安全开发风险控制与漏洞治理规范 V1.0.md | `5c3032b4e947e4d3568ddd9a412b2897b5f5db9529e4a1aff17a2d33f3a68bac` | 47124 |
+
+Source workspace commit: `046e40291a66904a4141b1c083561f381daec265`
+Package revision note: Markdown + SQL + OpenAPI + Event + State + rule originals are copied together for Round6 independent retest. Self-review status table aligned with Round5 CLOSED findings.
+
+## Manifest Files
+
+| Relative Path | SHA-256 | Size Bytes |
+|---|---|---:|
+| SUBMISSION_MANIFEST.csv | `0cc9c766966458aa5d9ad2323ca53175e5568735bb3aafd0ffa2edf8fab1d46e` | 7955 |
+| SUBMISSION_MANIFEST.md | `aa7c4b0751ebd9d862e247ebb23ae655ac29f7e78c2cb556e045d04d9f7081aa` | 9017 |

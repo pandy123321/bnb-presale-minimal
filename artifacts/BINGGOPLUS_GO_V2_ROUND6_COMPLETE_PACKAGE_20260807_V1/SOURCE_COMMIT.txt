@@ -1,0 +1,5 @@
+﻿PACKAGE=BINGGOPLUS_GO_V2_ROUND6_COMPLETE_PACKAGE_20260807_V1
+BUILT_AT=2026-08-07
+SOURCE_WORKSPACE_COMMIT=046e40291a66904a4141b1c083561f381daec265
+SOURCE_WORKSPACE_COMMIT_SHORT=046e40291a66
+BASELINE_NOTE=Package contents are copied from docs/current/go-backend-v2 and related baselines in the workspace at the source commit above. Do not substitute older ZIP snapshots.

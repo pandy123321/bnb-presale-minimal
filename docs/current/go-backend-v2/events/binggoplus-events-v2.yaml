@@ -1,0 +1,188 @@
+schema_version: v2-event-1-candidate
+status: FREEZE_CANDIDATE
+product: binggoplus
+chain_id: 97
+deployment_source_commit: 3ef50b6d77a31c092e9353e255e672836f36ece8
+abi_manifest_hash: UNRESOLVED_READBACK
+identity_key: [environment_id, block_hash, tx_hash, log_index]
+canonical_identity_key: [environment_id, tx_hash, log_index]
+ordering: [block_number, tx_index, log_index]
+confirmation_policy:
+  confirmation_depth: 20
+  reorg_lookback: 200
+  approval_status: OPERATIONS_AND_SECURITY_APPROVAL_REQUIRED
+streams:
+  - key: TOKEN
+    contract_key: token
+    evm_contract: Pangu2Token
+    address: '0x49a4a6ecaacc5d9ae60df7717f62e0605f591bc3'
+    start_block: 123502176
+    projectors: [token_ledger, trades, fee_flow, protocol_control, roles]
+    events:
+      - 'Transfer(address,address,uint256)'
+      - 'Approval(address,address,uint256)'
+      - 'CoreConfigured(address,address)'
+      - 'FeeWhitelistUpdated(address,bool)'
+      - 'LiquidityContextsRevoked(address)'
+      - 'LiquidityManagerUpdated(address,bool)'
+      - 'PairUpdated(address,bool)'
+      - 'Paused(address)'
+      - 'ProtocolBurn(address,uint256)'
+      - 'RoleAdminChanged(bytes32,bytes32,bytes32)'
+      - 'RoleGranted(bytes32,address,address)'
+      - 'RoleRevoked(bytes32,address,address)'
+      - 'SystemAddressUpdated(address,bool)'
+      - 'SystemTransferContextUpdated(address,uint8,bool)'
+      - 'TokensPurchased(address,uint256,uint256,uint256,uint256)'
+      - 'TokensSold(address,uint256,uint16,uint256,uint256,uint256,uint256)'
+      - 'TradingOpened(uint40)'
+      - 'Unpaused(address)'
+  - key: TRADE
+    contract_key: trade_router
+    evm_contract: Pangu2TradeRouter
+    address: '0xb0b5b52cb99ee7ea055669ba49afd02cf69c71b5'
+    start_block: 123502248
+    projectors: [trades, protocol_control, roles]
+    events:
+      - 'BuyExecuted(address,uint256,uint256,uint256,uint256,uint256)'
+      - 'SellExecuted(address,uint256,uint16,uint256,uint256,uint256,uint256,uint256)'
+      - 'Paused(address)'
+      - 'Unpaused(address)'
+      - 'RoleAdminChanged(bytes32,bytes32,bytes32)'
+      - 'RoleGranted(bytes32,address,address)'
+      - 'RoleRevoked(bytes32,address,address)'
+  - key: COST_BASIS
+    contract_key: cost_basis_manager
+    evm_contract: CostBasisManager
+    address: '0x695660310afb747589d415d24f20a3eef05693d0'
+    start_block: 123502181
+    projectors: [cost_basis, protocol_control, roles]
+    events:
+      - 'CostBasisTransferred(address,address,uint256,uint256,uint8,uint8)'
+      - 'LiquidityGatewayConfigured(address)'
+      - 'LpCostMigrated(address,address,uint256,uint256,uint256)'
+      - 'LpLossRecorded(address,uint256,uint256,uint256)'
+      - 'LpPositionChanged(address,uint256,uint256,uint256,uint256,uint256,uint8,uint8,bytes32)'
+      - 'OperatorsConfigured(address,address)'
+      - 'PositionChanged(address,uint256,uint256,uint256,uint256,uint8,uint8,bytes32)'
+      - 'SystemAddressUpdated(address,bool)'
+      - 'RoleAdminChanged(bytes32,bytes32,bytes32)'
+      - 'RoleGranted(bytes32,address,address)'
+      - 'RoleRevoked(bytes32,address,address)'
+  - key: FEE_VAULT
+    contract_key: fee_vault
+    evm_contract: FeeVault
+    address: '0xf82313eb70d24250d541c26796fe1615beb15d29'
+    start_block: 123502218
+    projectors: [fee_vault, dividend, protocol_control, roles]
+    events:
+      - 'DividendDistributorConfigured(address)'
+      - 'DividendFunded(address,uint256,uint256)'
+      - 'FeeBucketCredited(uint8,uint256,uint256)'
+      - 'FeesConverted(uint8,address,uint256,uint256,address,uint256)'
+      - 'Paused(address)'
+      - 'Unpaused(address)'
+      - 'RoleAdminChanged(bytes32,bytes32,bytes32)'
+      - 'RoleGranted(bytes32,address,address)'
+      - 'RoleRevoked(bytes32,address,address)'
+  - key: SUPPORT
+    contract_key: support_pool
+    evm_contract: SupportPool
+    address: '0xe6d37841b13d78e9ae759b77ecfaebeddb90589b'
+    start_block: 123502210
+    projectors: [buyback, protocol_control, roles]
+    events:
+      - 'BuybackExecuted(uint256,address,uint256,uint256,address,address,uint256)'
+      - 'FeeVaultConfigured(address)'
+      - 'LockerConfigured(address)'
+      - 'Paused(address)'
+      - 'Unpaused(address)'
+      - 'RoleAdminChanged(bytes32,bytes32,bytes32)'
+      - 'RoleGranted(bytes32,address,address)'
+      - 'RoleRevoked(bytes32,address,address)'
+  - key: LOCKER
+    contract_key: buyback_locker
+    evm_contract: BuybackLocker
+    address: '0x0a2283cd52523889fcb333596c3f0a14741b1cce'
+    start_block: 123502225
+    projectors: [locker, roles]
+    events:
+      - 'LockBatchCreated(uint256,uint256,uint256,uint256,uint256,uint256)'
+      - 'LockBatchReleased(uint256,address,uint256)'
+  - key: DIVIDEND
+    contract_key: dividend_distributor
+    evm_contract: DividendDistributor
+    address: '0x917705d794ec31144f7b2c4d62bfaab4fe327385'
+    start_block: 123502234
+    projectors: [dividend, cost_basis, protocol_control, roles]
+    events:
+      - 'CommitmentRevoked(uint256,bytes32)'
+      - 'DividendClaimed(uint256,address,uint256)'
+      - 'DividendRootPublished(uint256,uint256,uint256,bytes32,bytes32,uint64,uint64,uint16,uint256)'
+      - 'EpochCancelled(uint256,uint256,uint256)'
+      - 'EpochClosed(uint256,uint256,uint256)'
+      - 'EpochCommitmentApproved(uint256,bytes32,bytes32,bytes32,uint256,uint256,uint64,uint64,uint16)'
+      - 'Paused(address)'
+      - 'Unpaused(address)'
+      - 'RoleAdminChanged(bytes32,bytes32,bytes32)'
+      - 'RoleGranted(bytes32,address,address)'
+      - 'RoleRevoked(bytes32,address,address)'
+  - key: STAKING
+    contract_key: staking
+    evm_contract: Pangu2Staking
+    address: '0xf1d27ef1037c38b6752bae449fd3a460b49775a8'
+    start_block: 123502253
+    projectors: [staking, cost_basis, roles]
+    events:
+      - 'EarlyUnstake(address,uint256,uint256,uint256)'
+      - 'RewardClaimed(address,uint256)'
+      - 'RewardFunded(address,uint256)'
+      - 'RewardRateUpdated(uint256,uint256)'
+      - 'Staked(address,uint256,uint64,uint256)'
+      - 'Unstaked(address,uint256,uint256,uint256)'
+      - 'RoleAdminChanged(bytes32,bytes32,bytes32)'
+      - 'RoleGranted(bytes32,address,address)'
+      - 'RoleRevoked(bytes32,address,address)'
+  - key: ORACLE
+    contract_key: twap_oracle
+    evm_contract: PancakeV2TwapOracle
+    address: '0x11c39db60a95b232c6c303c1869aa81886694d9c'
+    start_block: 123502202
+    projectors: [oracle]
+    events:
+      - 'OracleAnchored(uint40,uint256,uint256)'
+      - 'OracleLowLiquidity()'
+      - 'OracleRecovered()'
+      - 'OracleReset()'
+      - 'TwapWindowCompleted(uint256,uint256,uint256)'
+  - key: ADAPTER
+    contract_key: pancake_v2_adapter
+    evm_contract: PancakeV2Adapter
+    address: '0xc3bb2129cb362b82cc15ec63a8355e80d4198e3a'
+    start_block: 123502195
+    projectors: [adapter_swap, protocol_control, roles]
+    events:
+      - 'CallerUpdated(address,bool)'
+      - 'SwapExecuted(address,address,address,uint256,uint256,address)'
+      - 'RoleAdminChanged(bytes32,bytes32,bytes32)'
+      - 'RoleGranted(bytes32,address,address)'
+      - 'RoleRevoked(bytes32,address,address)'
+  - key: PAIR
+    contract_key: pancake_v2_pair
+    evm_contract: PancakeV2Pair
+    address: '0x07d481b52c27941f6daaeb53aaa879c588408f32'
+    start_block: 123502187
+    projectors: [pair_reserve, liquidity, market_crosscheck]
+    abi_source_status: PANCAKE_V2_PAIR_ABI_APPROVAL_REQUIRED
+    events:
+      - 'Mint(address,uint256,uint256)'
+      - 'Burn(address,uint256,uint256,address)'
+      - 'Swap(address,uint256,uint256,uint256,uint256,address)'
+      - 'Sync(uint112,uint112)'
+      - 'Transfer(address,address,uint256)'
+gates:
+  - AUTO_GENERATE_TOPIC0_FROM_APPROVED_ABI
+  - VERIFY_ABI_MANIFEST_HASH
+  - VERIFY_RUNTIME_CODE_HASH_AT_FIXED_BLOCK
+  - APPROVE_CONFIRMATION_AND_REORG_POLICY
+  - REJECT_UNKNOWN_CONTRACT_ADDRESS
