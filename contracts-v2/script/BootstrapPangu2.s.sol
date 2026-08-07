@@ -143,7 +143,13 @@ contract BootstrapPangu2 is Script {
             console.log("Bootstrap: liquidity already present (resume mode) -- skipping token/BNB injection");
 
             // Cleanup: read prior LpProxy address from deployment artifact (saved by a prior Bootstrap)
-            string memory artifactPath = string(abi.encodePacked(vm.projectRoot(), "/broadcast/LATEST_LP_PROXY"));
+            // Artifact is scoped by chainId/token/pair to prevent cross-deployment mismatch
+            string memory artifactPath = string(abi.encodePacked(
+                vm.projectRoot(), "/broadcast/bootstrap-",
+                vm.toString(block.chainid), "-",
+                _toHexString(tokenAddr, 40), "-",
+                _toHexString(pairAddr, 40), ".txt"
+            ));
             string memory artifact = vm.readFile(artifactPath);
             require(bytes(artifact).length > 0, "LpProxy artifact not found -- cannot resume Bootstrap");
 
@@ -204,7 +210,13 @@ contract BootstrapPangu2 is Script {
         console.log("LpProxy deployed at:", lpProxyAddr);
 
         // Record LpProxy address in deployment artifact for retry/resume scenarios
-        string memory artifactPath = string(abi.encodePacked(vm.projectRoot(), "/broadcast/LATEST_LP_PROXY"));
+        // Artifact is scoped by chainId/token/pair to prevent cross-deployment mismatch
+        string memory artifactPath = string(abi.encodePacked(
+            vm.projectRoot(), "/broadcast/bootstrap-",
+            vm.toString(block.chainid), "-",
+            _toHexString(tokenAddr, 40), "-",
+            _toHexString(pairAddr, 40), ".txt"
+        ));
         vm.writeFile(artifactPath, vm.toString(lpProxyAddr));
 
         // ── 2. Governance — register Pair + authorize LpProxy ──
@@ -265,5 +277,18 @@ contract BootstrapPangu2 is Script {
         console.log("LpProxy:");
         console.logAddress(lpProxyAddr);
         console.log("Oracle anchor set. Trading paused. Wait TWAP window -> run OpenTradingPangu2.");
+    }
+
+    function _toHexString(address addr, uint256 length) private pure returns (string memory) {
+        bytes memory alphabet = "0123456789abcdef";
+        bytes memory str = new bytes(2 + length);
+        str[0] = "0";
+        str[1] = "x";
+        uint160 val = uint160(addr);
+        for (uint256 i = 0; i < length; i++) {
+            str[2 + length - 1 - i] = alphabet[uint8(val & 0xf)];
+            val >>= 4;
+        }
+        return string(str);
     }
 }
