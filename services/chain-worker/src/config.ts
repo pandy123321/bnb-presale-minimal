@@ -40,6 +40,10 @@ export const DEPLOYMENT_BLOCK  = parseIntSafe(env("DEPLOYMENT_BLOCK", "DEPLOYMEN
 
 export const TRADE_ROUTER_ADDRESS = requireEnv("CHAIN_WORKER_TRADE_ROUTER_ADDRESS").toLowerCase();
 export const DIVIDEND_DISTRIBUTOR_ADDRESS = requireEnv("CHAIN_WORKER_DIVIDEND_ADDRESS").toLowerCase();
+export const STAKING_ADDRESS = requireEnv("CHAIN_WORKER_STAKING_ADDRESS").toLowerCase();
+export const BUYBACK_LOCKER_ADDRESS = requireEnv("CHAIN_WORKER_BUYBACK_LOCKER_ADDRESS").toLowerCase();
+export const SUPPORT_POOL_ADDRESS = requireEnv("CHAIN_WORKER_SUPPORT_POOL_ADDRESS").toLowerCase();
+export const FEE_VAULT_ADDRESS = requireEnv("CHAIN_WORKER_FEE_VAULT_ADDRESS").toLowerCase();
 
 /** Sanitised RPC URL for logging — only host:port, no credentials/path */
 export function rpcLogLabel(): string {

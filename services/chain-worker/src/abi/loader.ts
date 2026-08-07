@@ -51,6 +51,10 @@ export function getAbiDir(): string {
 export const REQUIRED_ABI_NAMES = [
   "Pangu2TradeRouter",
   "DividendDistributor",
+  "Pangu2Staking",
+  "BuybackLocker",
+  "SupportPool",
+  "FeeVault",
 ] as const;
 
 /**

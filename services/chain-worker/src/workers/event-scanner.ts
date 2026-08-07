@@ -16,14 +16,20 @@ import { toJsonSafe } from "../utils/json-safe";
 import {
   CHAIN_ID, RPC_URL, SCAN_BATCH_SIZE, CONFIRMATION_BLOCKS,
   SCAN_INTERVAL_SECONDS, WORKER_ID, LEASE_TTL_SECONDS, DEPLOYMENT_BLOCK,
-  TRADE_ROUTER_ADDRESS, DIVIDEND_DISTRIBUTOR_ADDRESS, rpcLogLabel,
+  TRADE_ROUTER_ADDRESS, DIVIDEND_DISTRIBUTOR_ADDRESS,
+  STAKING_ADDRESS, BUYBACK_LOCKER_ADDRESS, SUPPORT_POOL_ADDRESS, FEE_VAULT_ADDRESS,
+  rpcLogLabel,
 } from "../config";
 
 // ── ABI load ─────────────────────────────────
 const requiredAbis: Map<string, AbiArtifact> = loadRequiredAbis();
 const tradeAbi = requiredAbis.get("Pangu2TradeRouter");
 const dividendAbi = requiredAbis.get("DividendDistributor");
-if (!tradeAbi || !dividendAbi) {
+const stakingAbi = requiredAbis.get("Pangu2Staking");
+const lockerAbi = requiredAbis.get("BuybackLocker");
+const supportAbi = requiredAbis.get("SupportPool");
+const feeVaultAbi = requiredAbis.get("FeeVault");
+if (!tradeAbi || !dividendAbi || !stakingAbi || !lockerAbi || !supportAbi || !feeVaultAbi) {
   console.error("[Scanner] FATAL: Required ABIs not found");
   process.exit(1);
 }
@@ -35,6 +41,10 @@ interface ScanStream {
 const STREAMS: ScanStream[] = [
   { name: "TRADE_EVENTS", contractAddress: TRADE_ROUTER_ADDRESS as `0x${string}`, abi: tradeAbi.abi as Abi, startBlock: DEPLOYMENT_BLOCK },
   { name: "DIVIDEND_EVENTS", contractAddress: DIVIDEND_DISTRIBUTOR_ADDRESS as `0x${string}`, abi: dividendAbi.abi as Abi, startBlock: DEPLOYMENT_BLOCK },
+  { name: "STAKING_EVENTS", contractAddress: STAKING_ADDRESS as `0x${string}`, abi: stakingAbi.abi as Abi, startBlock: DEPLOYMENT_BLOCK },
+  { name: "LOCKER_EVENTS", contractAddress: BUYBACK_LOCKER_ADDRESS as `0x${string}`, abi: lockerAbi.abi as Abi, startBlock: DEPLOYMENT_BLOCK },
+  { name: "SUPPORT_EVENTS", contractAddress: SUPPORT_POOL_ADDRESS as `0x${string}`, abi: supportAbi.abi as Abi, startBlock: DEPLOYMENT_BLOCK },
+  { name: "FEE_VAULT_EVENTS", contractAddress: FEE_VAULT_ADDRESS as `0x${string}`, abi: feeVaultAbi.abi as Abi, startBlock: DEPLOYMENT_BLOCK },
 ];
 
 let rpc: PublicClient | null = null;
