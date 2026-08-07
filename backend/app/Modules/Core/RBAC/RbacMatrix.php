@@ -89,6 +89,10 @@ final class RbacMatrix
             self::ROLE_SUPER_ADMIN,
             self::ROLE_OPERATOR,
         ],
+        // Governance — write (SUPER_ADMIN only)
+        'governance.manage' => [
+            self::ROLE_SUPER_ADMIN,
+        ],
     ];
 
     /**

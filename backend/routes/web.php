@@ -81,4 +81,14 @@ Route::prefix('admin-api/v1/projects/pangu2')->group(function () {
         Route::get('/governance/system-addresses', [GovernanceController::class, 'systemAddresses']);
         Route::get('/governance/deployer-balance', [GovernanceController::class, 'deployerBalance']);
     });
+
+    // ── Governance Write (SUPER_ADMIN only) ──
+    Route::middleware(['auth:web', 'rbac:governance.manage'])->group(function () {
+        Route::post('/governance/set-pair', [GovernanceController::class, 'setPair']);
+        Route::post('/governance/pause', [GovernanceController::class, 'pause']);
+        Route::post('/governance/unpause', [GovernanceController::class, 'unpause']);
+        Route::post('/governance/trigger-buyback', [GovernanceController::class, 'triggerBuyback']);
+        Route::post('/governance/update-oracle', [GovernanceController::class, 'updateOracle']);
+        Route::post('/governance/release-locker', [GovernanceController::class, 'releaseLocker']);
+    });
 });

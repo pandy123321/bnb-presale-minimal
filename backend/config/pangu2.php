@@ -6,6 +6,7 @@ return [
     'rpc_url' => env('PANGU2_RPC_URL', 'http://127.0.0.1:8545'),
     'backup_rpc_url' => env('PANGU2_BACKUP_RPC_URL', ''),
     'operator_address' => env('CHAIN_OPERATOR_ADDRESS', ''),
+    'operator_private_key' => env('CHAIN_OPERATOR_PRIVATE_KEY', ''),
     'allow_mainnet_writes' => (bool) env('ALLOW_MAINNET_WRITES', false),
     'required_confirmations' => (int) env('PANGU2_CONFIRMATIONS', 12),
     'deployment_block' => env('PANGU2_DEPLOYMENT_BLOCK', '0'),

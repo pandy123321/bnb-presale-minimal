@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Pangu2\Admin\Controllers;
 
 use App\Http\ApiEnvelope;
+use App\Modules\Core\Chain\Services\ChainOperatorService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -276,6 +279,125 @@ class GovernanceController extends Controller
             ], 'LIVE');
         } catch (\Throwable $e) {
             return ApiEnvelope::error('RPC_ERROR', $e->getMessage(), true, [], 502);
+        }
+    }
+
+    // ── 7. Write Operations (SUPER_ADMIN only) ──
+
+    public function setPair(Request $request, ChainOperatorService $chain): JsonResponse
+    {
+        $data = $request->validate([
+            'pairAddress' => ['required', 'string', 'regex:/^0x[a-fA-F0-9]{40}$/'],
+            'enabled'     => ['required', 'boolean'],
+        ]);
+
+        $tokenAddr = config('pangu2.token_address', '');
+        $selector  = '0xcace3a6f'; // setPair(address,bool)
+        $param1    = str_pad(substr($data['pairAddress'], 2), 64, '0', STR_PAD_LEFT);
+        $param2    = str_pad($data['enabled'] ? '1' : '0', 64, '0', STR_PAD_LEFT);
+        $callData  = $selector . $param1 . $param2;
+
+        return $this->executeWrite('SET_PAIR', $tokenAddr, $callData, $chain);
+    }
+
+    public function pause(ChainOperatorService $chain): JsonResponse
+    {
+        $tokenAddr = config('pangu2.token_address', '');
+        return $this->executeWrite('PAUSE', $tokenAddr, '0x8456cb59', $chain); // pause()
+    }
+
+    public function unpause(ChainOperatorService $chain): JsonResponse
+    {
+        $tokenAddr = config('pangu2.token_address', '');
+        return $this->executeWrite('UNPAUSE', $tokenAddr, '0x3f4ba83a', $chain); // unpause()
+    }
+
+    public function triggerBuyback(ChainOperatorService $chain): JsonResponse
+    {
+        $supportPool = config('pangu2.support_pool_address', '');
+        return $this->executeWrite('TRIGGER_BUYBACK', $supportPool, '0x52482e92', $chain); // buyback()
+    }
+
+    public function updateOracle(ChainOperatorService $chain): JsonResponse
+    {
+        $oracleAddr = config('pangu2.oracle_address', '');
+        return $this->executeWrite('UPDATE_ORACLE', $oracleAddr, '0xa2e62045', $chain); // update()
+    }
+
+    public function releaseLocker(Request $request, ChainOperatorService $chain): JsonResponse
+    {
+        $data = $request->validate([
+            'batchId' => ['required', 'integer', 'min:1'],
+        ]);
+
+        $lockerAddr = config('pangu2.buyback_locker_address', '');
+        $selector   = '0xb1ee006c'; // release(uint256)
+        $param      = str_pad(dechex($data['batchId']), 64, '0', STR_PAD_LEFT);
+        $callData   = $selector . $param;
+
+        return $this->executeWrite('RELEASE_LOCKER', $lockerAddr, $callData, $chain);
+    }
+
+    // ── Write helper ──
+
+    private function executeWrite(string $action, string $targetContract, string $callData, ChainOperatorService $chain): JsonResponse
+    {
+        $admin = request()->user();
+
+        try {
+            $result = $chain->sendTransaction($targetContract, $callData);
+
+            $this->auditLog($action, $admin?->id, $targetContract, substr($callData, 0, 10), $result['txHash'], $result['blockNumber'], true);
+
+            return ApiEnvelope::success([
+                'action'      => $action,
+                'txHash'      => $result['txHash'],
+                'blockNumber' => $result['blockNumber'],
+                'status'      => 'CONFIRMED',
+            ], 'LIVE');
+
+        } catch (\Throwable $e) {
+            $this->auditLog($action, $admin?->id, $targetContract, substr($callData, 0, 10), null, null, false, $e->getMessage());
+
+            return ApiEnvelope::error(
+                'CHAIN_WRITE_ERROR',
+                $e->getMessage(),
+                true,
+                ['action' => $action],
+                503,
+            );
+        }
+    }
+
+    private function auditLog(
+        string $action,
+        ?int $adminId,
+        string $targetContract,
+        string $funcSelector,
+        ?string $txHash,
+        ?int $blockNumber,
+        bool $success,
+        ?string $errorMessage = null,
+    ): void {
+        try {
+            DB::table('admin_audit_logs')->insert([
+                'action'           => $action,
+                'target_type'      => 'GovernanceWrite',
+                'target_id'        => null,
+                'ip_address'       => request()?->ip(),
+                'result'           => $success ? 'SUCCESS' : 'FAILED',
+                'before_data'      => null,
+                'after_data'       => json_encode([
+                    'contract'       => $targetContract,
+                    'func_selector'  => $funcSelector,
+                    'tx_hash'        => $txHash,
+                    'block_number'   => $blockNumber,
+                    'error_message'  => $errorMessage,
+                ]),
+                'created_at'       => now(),
+            ]);
+        } catch (\Throwable) {
+            // audit log failure must not block the operation
         }
     }
 }
