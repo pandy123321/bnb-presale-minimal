@@ -1,5 +1,6 @@
 // PANGU2 Admin — Jobs API
 import { ref, onMounted, onUnmounted } from "vue";
+import { adminFetch } from "@/api/adminFetch";
 
 const ADMIN_API = "/admin-api/v1/projects/pangu2";
 
@@ -14,10 +15,10 @@ export function useJobs() {
   const retryMsg = ref<string | null>(null);
   let timer: ReturnType<typeof setInterval> | null = null;
 
-  async function fetch() {
+  async function fetchJobsData() {
     loading.value = true; error.value = null;
     try {
-      const res = await fetch(`${ADMIN_API}/jobs`, { credentials: "include" });
+      const res = await adminFetch("/jobs");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = await res.json();
       jobs.value = (body.data ?? []) as JobInfo[];
@@ -33,22 +34,22 @@ export function useJobs() {
     retryConfirm.value = null; retryingJob.value = name; retryMsg.value = null;
     try {
       const key = `p2-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-      const res = await fetch(`${ADMIN_API}/jobs/${name}/retry`, {
-        method: "POST", credentials: "include",
+      const res = await adminFetch(`/jobs/${name}/retry`, {
+        method: "POST",
         headers: { "Idempotency-Key": key, "Content-Type": "application/json" },
       });
       const body = await res.json();
       if (!res.ok) { retryMsg.value = body?.error?.message ?? "Retry failed"; }
-      else { retryMsg.value = `已排队 (${key.slice(0, 12)}...)`; await fetch(); }
+      else { retryMsg.value = `已排队 (${key.slice(0, 12)}...)`; await fetchJobsData(); }
     } catch (e: unknown) { retryMsg.value = e instanceof Error ? e.message : "Network error"; }
     finally { retryingJob.value = null; }
   }
 
-  onMounted(() => { fetch(); timer = setInterval(fetch, 15_000); });
+  onMounted(() => { fetchJobsData(); timer = setInterval(fetchJobsData, 15_000); });
   onUnmounted(() => { if (timer) clearInterval(timer); });
 
   const statusLabel = (s: string) =>
     ({ HEALTHY: "正常", RUNNING: "运行中", IDLE: "空闲", FAILED: "失败", DEGRADED: "降级" })[s] ?? s;
 
-  return { jobs, loading, error, retryingJob, retryConfirm, retryMsg, requestRetry, cancelRetry, confirmRetry, statusLabel, fetch };
+  return { jobs, loading, error, retryingJob, retryConfirm, retryMsg, requestRetry, cancelRetry, confirmRetry, statusLabel, fetch: fetchJobsData };
 }

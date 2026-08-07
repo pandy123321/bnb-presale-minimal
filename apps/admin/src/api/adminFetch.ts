@@ -17,7 +17,7 @@ export async function getCsrfToken(): Promise<string> {
 export async function adminFetch(input: string, init?: RequestInit): Promise<Response> {
   // Ensure CSRF token is available; retry once on 419
   if (!csrfToken) {
-    try { csrfToken = await getCsrfToken(); } catch { /* will fail on first request */ }
+    try { csrfToken = await getCsrfToken(); } catch (e) { console.warn("[adminFetch] CSRF token fetch failed:", e instanceof Error ? e.message : String(e)); }
   }
 
   const headers = new Headers(init?.headers);

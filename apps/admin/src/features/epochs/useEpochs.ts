@@ -1,18 +1,9 @@
 // PANGU2 Admin — Epoch API
 import { ref, onMounted, onUnmounted } from "vue";
 import type { EpochInfo, DividendTier, Envelope } from "@pangu2/api-types";
-import { useAdminAuthStore } from "@/stores/useAdminAuth";
+import { adminFetch } from "@/api/adminFetch";
 
-const ADMIN_API = "/admin-api/v1/projects/pangu2";
 const API_BASE = "/api/v1/projects/pangu2";
-
-async function adminFetch<T>(path: string): Promise<Envelope<T>> {
-  const res = await fetch(`${ADMIN_API}${path}`, {
-    credentials: "include", headers: { "Content-Type": "application/json" },
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json() as Promise<Envelope<T>>;
-}
 
 async function publicFetch<T>(path: string): Promise<Envelope<T>> {
   const res = await fetch(`${API_BASE}${path}`);
@@ -30,12 +21,12 @@ export function useEpochs() {
   async function fetch() {
     loading.value = true; error.value = null;
     try {
-      const [cur, dash] = await Promise.all([
+      const [cur, dashResp] = await Promise.all([
         publicFetch<EpochInfo>("/dividend/epochs/current"),
-        adminFetch<{ current_epoch_id: number }>("/dashboard"),
+        adminFetch("/dashboard"),
       ]);
       current.value = cur.data;
-      // Build mock epoch list from dashboard
+      const dash = await dashResp.json() as Envelope<{ current_epoch_id: number }>;
       const count = dash.data?.current_epoch_id ?? current.value?.epoch_id ?? 28;
       epochs.value = Array.from({ length: Math.min(count, 10) }, (_, i) => ({
         ...cur.data,

@@ -1,7 +1,6 @@
 // PANGU2 Admin — Audit API
 import { ref, onMounted, onUnmounted } from "vue";
-
-const ADMIN_API = "/admin-api/v1/projects/pangu2";
+import { adminFetch } from "@/api/adminFetch";
 
 export interface AuditEntry { id: number; action: string; target_type: string | null; admin_email: string; admin_role: string; ip_address: string | null; result: string; created_at: string; }
 
@@ -15,13 +14,13 @@ export function useAudit() {
   const total = ref(0);
   let timer: ReturnType<typeof setInterval> | null = null;
 
-  async function fetch() {
+  async function fetchLogs() {
     loading.value = true; error.value = null;
     try {
       const params = new URLSearchParams({ per_page: "25", page: String(page.value) });
       if (filterAction.value) params.set("action", filterAction.value);
       if (filterAdmin.value) params.set("administrator", filterAdmin.value);
-      const res = await fetch(`${ADMIN_API}/audit-logs?${params}`, { credentials: "include" });
+      const res = await adminFetch(`/audit-logs?${params}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = await res.json();
       logs.value = (body.data ?? []) as AuditEntry[];
@@ -30,10 +29,10 @@ export function useAudit() {
     finally { loading.value = false; }
   }
 
-  onMounted(() => { fetch(); timer = setInterval(fetch, 30_000); });
+  onMounted(() => { fetchLogs(); timer = setInterval(fetchLogs, 30_000); });
   onUnmounted(() => { if (timer) clearInterval(timer); });
 
   const resultLabel = (r: string) => (r === "SUCCESS" ? "成功" : r === "FAILED" ? "失败" : r);
 
-  return { logs, loading, error, filterAction, filterAdmin, page, total, resultLabel, fetch };
+  return { logs, loading, error, filterAction, filterAdmin, page, total, resultLabel, fetch: fetchLogs };
 }
