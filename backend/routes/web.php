@@ -39,18 +39,18 @@ Route::prefix('admin-api/v1/projects/pangu2')->group(function () {
     Route::middleware(['auth:web', 'rbac:dashboard.read'])->group(function () {
         Route::get('/dashboard', [AdminDashboardController::class, 'dashboard']);
     });
-    Route::middleware('rbac:contracts.read')->group(function () {
+    Route::middleware(['auth:web', 'rbac:contracts.read'])->group(function () {
         Route::get('/contracts', [AdminDashboardController::class, 'contracts']);
     });
     // Jobs — view all, retry SUPER_ADMIN+OPERATOR only
-    Route::middleware('rbac:jobs.read')->group(function () {
+    Route::middleware(['auth:web', 'rbac:jobs.read'])->group(function () {
         Route::get('/jobs', [AdminJobsController::class, 'index']);
     });
-    Route::middleware('rbac:jobs.retry')->group(function () {
+    Route::middleware(['auth:web', 'rbac:jobs.retry'])->group(function () {
         Route::post('/jobs/{taskName}/retry', [AdminJobsController::class, 'retry'])->where('taskName', '[a-zA-Z0-9_-]+');
     });
     // Audit — SUPER_ADMIN+AUDITOR only
-    Route::middleware('rbac:audit.read')->group(function () {
+    Route::middleware(['auth:web', 'rbac:audit.read'])->group(function () {
         Route::get('/audit-logs', [AdminAuditController::class, 'index']);
         Route::get('/audit-logs/{id}', [AdminAuditController::class, 'show'])->whereNumber('id');
     });
@@ -60,7 +60,7 @@ Route::prefix('admin-api/v1/projects/pangu2')->group(function () {
         Route::post('/staking/fund-rewards', [\App\Modules\Pangu2\Staking\Controllers\StakingController::class, 'fundRewards']);
         Route::post('/staking/set-reward-rate', [\App\Modules\Pangu2\Staking\Controllers\StakingController::class, 'setRewardRate']);
     });
-    Route::middleware('rbac:staking.read')->group(function () {
+    Route::middleware(['auth:web', 'rbac:staking.read'])->group(function () {
         Route::get('/staking/coverage', [\App\Modules\Pangu2\Staking\Controllers\StakingController::class, 'coverage']);
     });
 
