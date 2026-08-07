@@ -198,9 +198,4 @@ class DividendController extends Controller
 
         return $tiers;
     }
-
-    private function chainId(): int
-    {
-        return (int) config('pangu2.chain_id', 31337);
-    }
 }

@@ -27,7 +27,7 @@ Route::prefix('admin-api/v1/projects/pangu2')->group(function () {
     });
 
     // Auth — JSON endpoints (no RBAC, guest for login, web guard for me/logout)
-    Route::post('/auth/login', [AuthController::class, 'apiLogin']);
+    Route::post('/auth/login', [AuthController::class, 'apiLogin'])->middleware('throttle:login');
     Route::middleware('auth:web')->group(function () {
         Route::get('/auth/me', fn (\Illuminate\Http\Request $r) => \App\Http\ApiEnvelope::success([
             'admin' => ['id' => $r->user()->id, 'name' => $r->user()->name, 'email' => $r->user()->email, 'role' => $r->user()->role],
