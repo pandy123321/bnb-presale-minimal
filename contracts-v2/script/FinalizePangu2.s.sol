@@ -84,7 +84,7 @@ contract FinalizePangu2 is Script {
         console.log("Reserve1:");
         console.log(uint256(r1));
 
-        // Oracle update (already READY — safe no-op), then bidirectional quote validation
+        // Update/complete the Oracle window if needed, then validate quotes in both directions.
         vm.startBroadcast(govKey);
         oracle.update();
 

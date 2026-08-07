@@ -122,10 +122,35 @@ contract BootstrapPangu2 is Script {
             (ot0 == tokenAddr && ot1 == expectedWbnb) || (ot0 == expectedWbnb && ot1 == tokenAddr),
             "pair tokens mismatch"
         );
-        // If pair was registered by a failed prior Bootstrap, allow retry
+        // Bootstrap state detection (A/B/C)
+        //   A: pair not registered + reserves=0     → first-time bootstrap
+        //   B: pair registered     + reserves=0     → setPair succeeded, liquidity not yet added → continue
+        //   C: pair registered     + reserves>0     → liquidity already added → skip injection, only resume cleanup
         bool pairAlreadyRegistered = token.isPair(pairAddr);
+        (uint112 r0Check, uint112 r1Check,) = pair.getReserves();
+        bool liquidityAlreadyAdded = r0Check > 0 || r1Check > 0;
+
+        if (liquidityAlreadyAdded) {
+            // ── State C: liquidity already present — skip all injection steps ──
+            require(pairAlreadyRegistered, "reserves exist but pair not registered -- inconsistent state");
+            console.log("Bootstrap: liquidity already present (resume mode) -- skipping token/BNB injection");
+
+            // Only do Oracle update (step 7) — injection steps 1-6 are already done
+            vm.startBroadcast(govKey);
+            oracle.update();
+            vm.stopBroadcast();
+
+            // Verify final state
+            require(token.isPair(pairAddr), "pair protection not active");
+            console.log("=== Bootstrap Complete (resume) ===");
+            console.log("Governance:");
+            console.logAddress(govAddr);
+            console.log("Reserve0:", uint256(r0Check), " Reserve1:", uint256(r1Check));
+            return;
+        }
+
         if (pairAlreadyRegistered) {
-            console.log("Pair already registered (retry mode)");
+            console.log("Pair already registered (retry mode -- liquidity not yet added)");
         }
 
         require(token.balanceOf(holderAddr) >= initialTokenAmount, "holder has insufficient tokens");
