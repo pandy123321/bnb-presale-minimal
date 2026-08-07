@@ -2,15 +2,17 @@
 
 | Field | Value |
 |---|---|
-| Document ID | `S0_SE_V2` |
+| Document ID | `S0_SE_V3` |
 | Stage | S0 — Design and Invariant Freeze |
-| Status | `CANDIDATE (REVISED)` |
+| Status | `CANDIDATE (FINAL REVISION)` |
 | Base Commit (deployed) | `3ef50b6d77a31c092e9353e255e672836f36ece8` |
 | Planning Review Head | `4d33669b41568fa573e9c0e5865be8b1cea803c3` |
-| S0 Review Commit | `046e40291a66904a4141b1c083561f381daec265` |
+| Initial S0 Candidate Commit | `046e40291a66904a4141b1c083561f381daec265` |
+| S0 Review Commit (revised) | `ff8d693179fbea11f80ed3e491a41b8054f2693a` |
 | S0 Design Agent | Cursor Agent (session `7668e4db-0a98-45f6-82a4-19b44b5c54e4`) |
 | Independent Review Agent | ChatGPT (BNB合约 dedicated review session) |
-| Revised After Review | 2026-08-07T19:30+08:00 |
+| Review Adjudication Agent | ChatGPT GPT-5.6 Sol (separate BNB合约 adjudication session) |
+| Revised After Review | 2026-08-07T19:45+08:00 |
 
 ---
 
@@ -20,9 +22,10 @@
 S0 Base Commit               3ef50b6d77a31c092e9353e255e672836f36ece8
 Deployed Source Commit       3ef50b6d77a31c092e9353e255e672836f36ece8
 Planning Review Head         4d33669b41568fa573e9c0e5865be8b1cea803c3
-S0 Review Commit             046e40291a66904a4141b1c083561f381daec265
+Initial S0 Candidate Commit  046e40291a66904a4141b1c083561f381daec265
+S0 Review Commit (revised)   ff8d693179fbea11f80ed3e491a41b8054f2693a
 Files Read                   15 rules/baseline docs + 24 deployed .sol sources
-Files Modified               5 (all evidence documents, revised after review)
+Files Modified               5 (all evidence documents, final revision)
 Solidity Files Modified      NONE
 Tests Executed               NO
 Build Executed               NO
@@ -30,9 +33,11 @@ RPC Used                     NO
 Deployment Executed          NO
 ```
 
+**Note**: The `Initial S0 Candidate Commit` field records the first S0 document submission. The current revised content is in the commit identified by the external submission manifest. This avoids the Git SHA self-reference cycle problem.
+
 ---
 
-## 2. Design Decision Checklist (post-revision)
+## 2. Design Decision Checklist (FINAL — all 12 frozen)
 
 | Decision ID | Design Question | Frozen Result | Impact Stage | Economic Baseline Change | Internal Rep Change | Status |
 |---|---|---|---|---|---|---|
@@ -44,16 +49,18 @@ Deployment Executed          NO
 | D-6 | Staking typed mutation path | Token -> CostBasis single path with positionId | S3, S4A | NO | NO | `FROZEN` |
 | D-7 | Staking reward accounting | Per-position RewardAccounting, funding invariant | S4A, S5 | NO | NO | `FROZEN` |
 | D-8 | Staking pause | Block stake/claim/fund, allow principal exit | S3, S4A | NO | NO | `FROZEN` |
-| D-9 | Oracle rollover and long-gap | `>=` MAX_TWAP_AGE = re-anchor; boundary values specified | S1 | NO | NO | `FROZEN` |
+| D-9 | Oracle rollover and long-gap | `>=` MAX_TWAP_AGE = re-anchor; 8999/9000/9001 boundary specified | S1 | NO | NO | `FROZEN` |
 | D-10 | Approved user vs fee whitelist | Independent governance attributes | S3/S4A or N/A | NO | NO | `FROZEN` |
-| D-11 | Contract account lifecycle | EOA-only until user decision; ALL contract ABI items REMOVED from S0 freeze | N/A until resolved | NO | NO | `BLOCKED_DECISION` |
+| D-11 | Contract account lifecycle | NOT SUPPORTED — EOA-only, permanent V2 boundary | N/A | NO | NO | `FROZEN` |
 | D-12 | Support/Dividend/economic params | All frozen as-is from deployed baseline | S1 | NO | NO | `FROZEN` |
 
-**Frozen: 11 | Blocked: 1 (D-11 — all dependent ABI items removed from freeze)**
+**Frozen: 12 | Blocked: 0**
 
 ---
 
-## 3. Invariant Checklist (18 items — confirmed complete)
+## 3. Invariant Checklist (17 mandatory + 1 deferred)
+
+### Mandatory Invariants (17)
 
 | Invariant ID | Contract | Invariant | Revert Atomicity | Verification Method |
 |---|---|---|---|---|
@@ -70,17 +77,24 @@ Deployment Executed          NO
 | STK-INV-04 | Staking | Forfeited reward -> available reserve | earlyUnstake atomic | Unit |
 | STK-INV-05 | CostBasis + Token | Only Token mutates CostBasis | UnauthorizedHook revert | Unit |
 | STK-INV-06 | Staking | No reward when totalStaked == 0 | setRewardRate revert | Unit |
-| ORC-INV-01 | PancakeV2TwapOracle | elapsed >= MAX_TWAP_AGE produces re-anchor, never READY | Status stays ACCUMULATING | Unit (warp at boundary values) |
+| ORC-INV-01 | PancakeV2TwapOracle | elapsed >= 9000 produces re-anchor, never READY; test at 8999/9000/9001 | Status stays ACCUMULATING | Unit (warp at 8999, 9000, 9001) |
 | REG-INV-01 | Token | Approved user never gets protocol roles | By design | Unit |
-| REG-INV-02 | Token | Revocation never permanently locks balance | transfer() succeeds | Unit (if contracts supported after user decision) |
 | FEE-INV-01 | FeeVault | Balance covers dividend + support buckets | _assertSolvent revert | Invariant |
 | DIV-INV-01 | DividendDistributor | totalAmount = claimed + carry | closeEpoch atomic | Unit |
 
+### Deferred Invariants (D-11 Dependent — NOT APPLICABLE to EOA-only V2)
+
+| Invariant ID | Contract | Reason for Deferral | Status |
+|---|---|---|---|
+| REG-INV-02 | Token | Contract account revocation invariant — not applicable to EOA-only V2 baseline | `NOT_APPLICABLE` |
+
+**Total: 17 mandatory + 1 deferred = 18 described (no conditional invariants in mandatory count)**
+
 ---
 
-## 4. ABI and State Machine Checklist (revised — 31 mandatory items)
+## 4. ABI and State Machine Checklist (31 mandatory items)
 
-Contract-account-related ABI items (ABI-06, ABI-15, ABI-16, ABI-27, ABI-33) have been REMOVED from this freeze pending user decision D-11.
+Contract-account-related ABI items permanently removed per D-11 (EOA-only).
 
 | ID | Type | Proposed Freeze | Impact Contract | Compatibility |
 |---|---|---|---|---|
@@ -95,8 +109,6 @@ Contract-account-related ABI items (ABI-06, ABI-15, ABI-16, ABI-27, ABI-33) have
 
 **Total mandatory ABI items: 31**
 
-**Legacy ABI retained: Position struct, PositionStatus enum, proportionalCost(), liquidityPositionOf(), existing TradeRouter signatures**
-
 ---
 
 ## 5. Baseline Compliance Summary
@@ -106,8 +118,10 @@ Contract-account-related ABI items (ABI-06, ABI-15, ABI-16, ABI-27, ABI-33) have
 | UNCHANGED | 18 |
 | CLARIFIED | 8 |
 | IMPLEMENTATION_CHANGE_REQUIRED | 2 (dual ledger, staking mutation) |
-| BLOCKED_DECISION | 1 (contract accounts — all dependent ABI removed) |
+| FROZEN — NOT SUPPORTED | 1 (contract accounts — permanent V2 EOA-only boundary) |
 | NEW (phase separation) | 1 |
+| BLOCKED_DECISION | 0 |
+| USER_DECISION_REQUIRED | 0 |
 | ECONOMIC_BASELINE_CHANGE | NO |
 | INTERNAL_REPRESENTATION_CHANGE | YES (dual ledger only) |
 
@@ -115,39 +129,40 @@ Contract-account-related ABI items (ABI-06, ABI-15, ABI-16, ABI-27, ABI-33) have
 
 ---
 
-## 6. Revision Log (post-initial-review)
+## 6. Revision Log (cumulative)
 
-| Fix | Finding | Resolution |
-|---|---|---|
-| P2-01 | Contract accounts in frozen design | Removed from D-1 eligibility; all contract ABI items (ABI-06,15,16,27,33) removed; marked BLOCKED_DECISION |
-| P2-02 | Economic baseline conflict | Unified: NO economic baseline change; YES internal representation change |
-| P2-03 | Oracle boundary contradiction | Unified to `>=`; specified boundary values for 8999/9000/9001 |
-| P2-04 | Buy constraints incomplete | Added complete Buy limit params (maxTax, minNet, deadline) with semantics |
-| P2-05 | Short commit SHAs | All SHAs updated to full 40-character |
+| Revision | Findings Addressed |
+|---|---|
+| V2 (ff8d693) | P2-02 unified economic baseline; P2-03 Oracle `>=` boundary; P2-04 Buy constraints complete; P2-05 full SHAs |
+| V3 (current) | P2-06 D-11 closed as EOA-only NOT SUPPORTED; P2-07 commit binding renamed to Initial S0 Candidate Commit; P2-08 REG-INV-02 moved to DEFERRED; P2-09 Oracle verification at 8999/9000/9001; P3-01 compliance summary unified; ORC-INV-01 boundary verification explicit |
 
 ---
 
-## 7. Cross-Document Consistency Verification
+## 7. Cross-Document Consistency Verification (FINAL)
 
 | Check | Result |
 |---|---|
 | 12 Decisions complete and readable | YES |
-| 18 Invariants complete and readable | YES |
-| 31 mandatory ABI items (5 contract items removed) | YES |
+| All 12 Decisions FROZEN (0 blocked) | YES |
+| 17 Mandatory Invariants complete | YES |
+| 1 Deferred Invariant (REG-INV-02, not in mandatory count) | YES |
+| 31 Mandatory ABI items | YES |
 | 30-point Compliance Matrix | YES |
 | All SHAs full 40-char | YES |
+| Commit binding uses Initial Candidate + external manifest (no SHA self-reference) | YES |
 | No "PENDING" in frozen decisions | YES |
 | No "if supported" in mandatory ABI | YES |
-| No "USER_DECISION_REQUIRED" except D-11 | YES |
+| No "USER_DECISION_REQUIRED" in FROZEN decisions | YES |
+| No "BLOCKED_DECISION" remaining | YES |
 | Economic baseline = NO across all 5 docs | YES |
+| Oracle 8999/9000/9001 boundary verifiable | YES |
+| Role separation: Design Agent, Independent Review, Adjudication Agent identified | YES |
 
 ---
 
 ## 8. Unresolved
 
-| ID | Problem | User Decision Required | Affected Stages | S0 Closing Impact |
-|---|---|---|---|---|
-| D-11 | Contract account lifecycle — EOA-only vs smart contract support | YES | S3, S4A | `BLOCKED_DECISION` — S0 cannot close until resolved; all dependent ABI removed |
+**NONE.** All 12 mandatory design decisions are FROZEN. All 17 mandatory invariants are frozen. All 31 mandatory ABI items are frozen. REG-INV-02 is deferred as NOT_APPLICABLE (contract accounts not supported in V2 per D-11).
 
 ---
 
@@ -158,8 +173,8 @@ S0_PRE_REVIEW_READY = YES
 INDEPENDENT_DESIGN_REVIEW_REQUIRED = YES
 REVIEW_ADJUDICATION_REQUIRED = YES
 
-S0_APPROVED_DESIGN_BASELINE = NO (D-11 BLOCKED_DECISION)
-S1_ALLOWED = NO
+S0_APPROVED_DESIGN_BASELINE = PENDING_INDEPENDENT_REVIEW
+S1_ALLOWED = NO (pending approved baseline)
 SOLIDITY_IMPLEMENTATION_ALLOWED = NO
 
 DEPLOYMENT_APPROVAL = NOT_GRANTED
@@ -169,12 +184,12 @@ MAINNET = NO-GO
 
 ## 10. Files Modified
 
-| File | Changes | Purpose |
-|---|---|---|
-| `evidence/S0_DESIGN_DECISION_REGISTER.md` | Full SHAs, D-1 eligibility fixed, D-1 economic baseline NO, D-3 Buy constraints complete, D-9 Oracle `>=` | All 5 P2 findings addressed |
-| `evidence/S0_ABI_AND_STATE_MACHINE_FREEZE.md` | Full SHAs, 5 contract ABI items removed | P2-01 addressed |
-| `evidence/S0_BASELINE_COMPLIANCE_MATRIX.md` | Full SHAs, economic baseline summary fixed, contract accounts row updated | P2-02 addressed |
-| `evidence/S0_INVARIANT_SPECIFICATION.md` | ORC-INV-01 updated to `>=` | P2-03 consistency |
-| `evidence/S0_STAGE_EVIDENCE.md` | Full SHAs, revision log, cross-doc consistency matrix, reduced ABI count | All P2 findings consolidated |
+| File | Revision |
+|---|---|
+| `evidence/S0_DESIGN_DECISION_REGISTER.md` | D-11 closed as EOA-only NOT SUPPORTED; commit binding renamed; Unresolved section removed |
+| `evidence/S0_ABI_AND_STATE_MACHINE_FREEZE.md` | Commit binding renamed; NOTE updated to "permanently REMOVED" |
+| `evidence/S0_BASELINE_COMPLIANCE_MATRIX.md` | D-11 row FROZEN; summary unified to BLOCKED_DECISION: 0, all 30 frozen |
+| `evidence/S0_INVARIANT_SPECIFICATION.md` | ORC-INV-01 verification at 8999/9000/9001; REG-INV-02 moved to DEFERRED; mandatory count = 17 |
+| `evidence/S0_STAGE_EVIDENCE.md` | Full revision (this file) with updated counts, change log, and consistency matrix |
 
 **Solidity files modified: NONE**

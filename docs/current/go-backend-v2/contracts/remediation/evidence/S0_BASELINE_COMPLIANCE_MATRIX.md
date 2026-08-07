@@ -7,7 +7,8 @@
 | Status | `CANDIDATE` |
 | Base Commit (deployed) | `3ef50b6d77a31c092e9353e255e672836f36ece8` |
 | Planning Review Head | `4d33669b41568fa573e9c0e5865be8b1cea803c3` |
-| S0 Review Commit | `046e40291a66904a4141b1c083561f381daec265` |
+| S0 Review Commit (revised) | `ff8d693179fbea11f80ed3e491a41b8054f2693a` |
+| Initial S0 Candidate Commit | `046e40291a66904a4141b1c083561f381daec265` |
 
 ---
 
@@ -33,7 +34,7 @@
 | 18 | **Direct Pair Protection** | Users cannot transfer direct to Pair; only Router can | UNCHANGED | NO | `DirectPairInteractionForbidden` in `_update()` |
 | 19 | **TransferContext** | System contracts use typed context for transfers | CLARIFIED (add Staking context kinds) | NO | `TransferContext.Kind` enum + systemTransferContextAllowed |
 | 20 | **CostBasis** | NONE/KNOWN/UNKNOWN triple-state | IMPLEMENTATION_CHANGE_REQUIRED (dual ledger replaces single struct) | YES (internal representation change, view compatibility maintained) | `CostBasisManager.sol` at commit `3ef50b6` |
-| 21 | **Contract Accounts** | Not supported in deployed baseline | BLOCKED_DECISION (pending user choice — EOA-only or smart contract support) | PENDING | N/A (pending user decision D-11; ALL contract account ABI items (ContractStatus enum, setContractStatus, contractStatus, ContractStatusUpdated event, InvalidContractState error) have been REMOVED from S0 freeze pending resolution) |
+| 21 | **Contract Accounts** | Not supported in deployed baseline | FROZEN — NOT SUPPORTED (permanent V2 boundary, EOA-only) | NO | D-11 FROZEN; all dependent ABI removed; REG-INV-02 deferred |
 | 22 | **Mainnet** | NO-GO | UNCHANGED | NO | `MAINNET = NO-GO` in all documentation |
 | 23 | **Deployment Script** | DeployPangu2 + Bootstrap + Finalize + OpenTrading | UNCHANGED | NO | 4-script deployment pipeline at commit `3ef50b6` |
 | 24 | **Token Name/Symbol** | PANGU2 / PANGU2 | UNCHANGED | NO | ERC20 constructor params |
@@ -53,7 +54,9 @@
 | UNCHANGED | 18 |
 | CLARIFIED | 8 |
 | IMPLEMENTATION_CHANGE_REQUIRED | 2 (dual ledger, staking mutation) |
-| USER_DECISION_REQUIRED | 1 (contract accounts) |
+| FROZEN / NOT SUPPORTED | 1 (contract accounts — EOA-only, permanent V2 boundary) |
 | NEW (phase separation) | 1 |
+| BLOCKED_DECISION | 0 |
+| USER_DECISION_REQUIRED | 0 |
 | ECONOMIC_BASELINE_CHANGE | NO (no rate/parameter changes; internal representation changes are NOT economic baseline changes) |
 | INTERNAL_REPRESENTATION_CHANGE | YES (dual ledger replaces single Position struct — tax rates, supply, and all economic semantics unchanged) |

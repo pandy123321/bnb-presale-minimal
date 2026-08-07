@@ -7,7 +7,8 @@
 | Status | `CANDIDATE (REVISED)` |
 | Base Commit (deployed) | `3ef50b6d77a31c092e9353e255e672836f36ece8` |
 | Planning Review Head | `4d33669b41568fa573e9c0e5865be8b1cea803c3` |
-| S0 Review Commit | `046e40291a66904a4141b1c083561f381daec265` |
+| S0 Review Commit (revised) | `ff8d693179fbea11f80ed3e491a41b8054f2693a` |
+| Initial S0 Candidate Commit | `046e40291a66904a4141b1c083561f381daec265` |
 
 ---
 
@@ -150,7 +151,7 @@
 | **Precondition** | elapsed >= MAX_TWAP_AGE |
 | **Invariant** | status NEVER transitions to READY in this update; re-anchor triggered |
 | **Revert atomicity** | status set to ACCUMULATING; READY not produced |
-| **Verification** | Unit: warp > 9000 seconds, call update() |
+| **Verification** | Unit: warp to 1800+8999 (must NOT re-anchor), warp to 1800+9000 (MUST re-anchor, never READY), warp to 1800+9001 (MUST re-anchor, never READY) |
 
 ---
 
@@ -165,6 +166,10 @@
 | **Revert atomicity** | N/A (invariant enforced by design — no code path grants roles to approved users) |
 | **Verification** | Unit: check approved user role membership |
 
+**Mandatory registry invariants: 1 (REG-INV-01)**
+
+### DEFERRED — D-11 Dependent (Contract Accounts Not Supported in V2)
+
 ### REG-INV-02: Revocation Cannot Permanently Lock Balance
 | Item | Detail |
 |---|---|
@@ -173,6 +178,7 @@
 | **Invariant** | User can still transfer() out (exit) or sell via official Router; funds are not unrecoverable |
 | **Revert atomicity** | transfer() does not revert for REVOKED address |
 | **Verification** | Unit: REVOKED user calls transfer() and sell() |
+| **Status** | `DEFERRED — NOT_APPLICABLE to EOA-only V2 baseline (D-11 FROZEN as NOT SUPPORTED)` |
 
 ---
 

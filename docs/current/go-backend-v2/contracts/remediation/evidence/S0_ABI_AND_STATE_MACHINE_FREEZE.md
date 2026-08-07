@@ -7,9 +7,10 @@
 | Status | `CANDIDATE (REVISED)` |
 | Base Commit (deployed) | `3ef50b6d77a31c092e9353e255e672836f36ece8` |
 | Planning Review Head | `4d33669b41568fa573e9c0e5865be8b1cea803c3` |
-| S0 Review Commit | `046e40291a66904a4141b1c083561f381daec265` |
+| S0 Review Commit (revised) | `ff8d693179fbea11f80ed3e491a41b8054f2693a` |
+| Initial S0 Candidate Commit | `046e40291a66904a4141b1c083561f381daec265` |
 
-**NOTE**: 5 contract-account-related items (ABI-06, ABI-15, ABI-16, ABI-27, ABI-33) have been REMOVED pending user decision D-11. This freeze contains 31 mandatory items.
+**NOTE**: 5 contract-account-related items (ABI-06, ABI-15, ABI-16, ABI-27, ABI-33) have been permanently REMOVED from V2 baseline per decision D-11 (EOA-only). This freeze contains 31 mandatory items.
 
 ---
 

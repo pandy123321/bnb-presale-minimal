@@ -7,7 +7,8 @@
 | Status | `CANDIDATE (REVISED)` |
 | Base Commit (deployed) | `3ef50b6d77a31c092e9353e255e672836f36ece8` |
 | Planning Review Head | `4d33669b41568fa573e9c0e5865be8b1cea803c3` |
-| S0 Review Commit | `046e40291a66904a4141b1c083561f381daec265` |
+| S0 Review Commit (revised) | `ff8d693179fbea11f80ed3e491a41b8054f2693a` |
+| Initial S0 Candidate Commit | `046e40291a66904a4141b1c083561f381daec265` |
 | Created | 2026-08-07 |
 
 ---
@@ -31,7 +32,7 @@ knownBalance == 0 ==> knownCostWbnbWei == 0
 
 **Eligibility rules**:
 - Eligible liquid users: all non-zero, non-protocol EOA addresses only
-- Contract account support: `BLOCKED_DECISION` — pending user decision D-11; DO NOT include contract accounts in S0 frozen design until resolved
+- Contract account support: NOT SUPPORTED — permanent V2 boundary (D-11 FROZEN)
 - Protocol addresses excluded: Pair, System Address, TradeRouter, FeeVault, Staking custody, Locker, DividendDistributor, GovernanceAdapter, SupportPool, PancakeV2Adapter
 - System addresses never use the dual ledger; their balances are always `NONE`
 - UNKNOWN received tokens cannot erase existing KNOWN cost
@@ -372,27 +373,19 @@ TransferContext allowlist member
 
 ## Decision 11: Contract Account Lifecycle
 
-**Frozen result**: `USER_DECISION_REQUIRED` — S0 cannot close this decision.
+**Frozen result**: **NOT SUPPORTED — EOA-only.** Contract accounts (smart wallets, multisigs, counterfactual addresses) are not supported in the PANGU2 V2 baseline. This is a permanent product boundary for V2.
 
-The design candidate is:
+**Rationale**: The deployed baseline at `3ef50b6` does not support contract accounts. Adding contract account support would require a full lifecycle (APPROVED/EXIT_ONLY/REVOKED), identity constraints (initCodeHash, trusted factory), and deep integration across Token, CostBasis, TransferContext, and Router. This scope exceeds V2 remediation objectives.
 
-```text
-NONE -> APPROVED -> EXIT_ONLY/GRACE -> REVOKED
-```
+**Consequences**:
+- All contract-account-related ABI items (ContractStatus enum, setContractStatus, contractStatus, ContractStatusUpdated event, InvalidContractState error) are REMOVED from S0 freeze
+- REG-INV-02 (revocation) is DEFERRED / NOT_APPLICABLE to V2 EOA-only baseline
+- Smart wallets and counterfactual addresses cannot interact with PANGU2 V2; their assets would be permanently locked — this is a documented V2 limitation
+- Contract account support MAY be considered for a future V3 scope, with a full design freeze
 
-But the following must be decided by the user:
-- Whether to support contract accounts at all, or remain EOA-only
-- If supported: trusted factory, initCodeHash, or equivalent identity constraint
-- Counterfactual address pre-registration security model
-- EXIT_ONLY: which operations are allowed (transfer out + official Router sell = yes; receive + buy = no)
-- Balance-zero + grace period conditions
-- REVOKED terminal state
-
-**Risk of EOA-only**: Smart wallets and counterfactual addresses cannot interact; their assets would be permanently locked.
-
-| **Impact** | S3/S4A if contracts supported; NONE if EOA-only |
-| **Economic baseline change** | USER DECISION REQUIRED |
-| **Status** | `BLOCKED_DECISION` |
+| **Impact** | NONE (V2 end-state is EOA-only) |
+| **Economic baseline change** | NO |
+| **Status** | `FROZEN` |
 
 ---
 
@@ -427,8 +420,16 @@ Dividend claim window = 30 days (testnet baseline)
 
 ---
 
-## Unresolved Decisions
+## Economic Baseline Summary
 
-| Decision ID | Problem | User Decision Required | Affected Stages | S0 Closing Impact |
-|---|---|---|---|---|
-| D-11 | Contract account lifecycle — EOA-only vs smart contract support | YES (cannot self-sign ACCEPTED_DEVIATION) | S3, S4A | `BLOCKED_DECISION` — S0 cannot close until resolved |
+| Parameter | Status |
+|---|---|
+| All tax rates (Buy 4%, Sell 4%/10%, Launch 30%) | UNCHANGED |
+| Supply (1B) | UNCHANGED |
+| Buyback (0.01 BNB, 60s) | UNCHANGED |
+| Dividend (30-day testnet window) | UNCHANGED |
+| Launch Protection (15 min) | UNCHANGED |
+| Staking economic params | UNCHANGED |
+| Dual ledger | INTERNAL REPRESENTATION CHANGE ONLY |
+| Contract accounts | NOT SUPPORTED (permanent V2 boundary) |
+| **Economic Baseline Changed** | **NO** |
