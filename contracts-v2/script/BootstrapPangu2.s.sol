@@ -122,7 +122,11 @@ contract BootstrapPangu2 is Script {
             (ot0 == tokenAddr && ot1 == expectedWbnb) || (ot0 == expectedWbnb && ot1 == tokenAddr),
             "pair tokens mismatch"
         );
-        require(!token.isPair(pairAddr), "pair already trading-enabled");
+        // If pair was registered by a failed prior Bootstrap, allow retry
+        bool pairAlreadyRegistered = token.isPair(pairAddr);
+        if (pairAlreadyRegistered) {
+            console.log("Pair already registered (retry mode)");
+        }
 
         require(token.balanceOf(holderAddr) >= initialTokenAmount, "holder has insufficient tokens");
         require(address(lpAddr).balance >= initialBnbAmount, "LP has insufficient BNB");
@@ -139,7 +143,9 @@ contract BootstrapPangu2 is Script {
         // ── 2. Governance — register Pair + authorize LpProxy ──
         vm.startBroadcast(govKey);
         require(token.hasRole(keccak256("GOVERNANCE_ROLE"), govAddr), "gov missing GOVERNANCE_ROLE");
-        token.setPair(pairAddr, true);
+        if (!pairAlreadyRegistered) {
+            token.setPair(pairAddr, true);
+        }
         token.setLiquidityManager(lpProxyAddr, true);
         require(token.isLiquidityManager(lpProxyAddr), "LpProxy not liquidityManager");
         vm.stopBroadcast();

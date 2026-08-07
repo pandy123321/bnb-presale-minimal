@@ -74,7 +74,18 @@ export function useAdminConfig() {
   });
   onUnmounted(() => { if (timer) clearInterval(timer); });
 
-  return { loading, error, project, environment, chainId, chainName, rpcStatus, supportedNetworks, explorerUrl, fetchConfig };
+  return {
+    get loading() { return loading.value; },
+    get error() { return error.value; },
+    get project() { return project.value; },
+    get environment() { return environment.value; },
+    get chainId() { return chainId.value; },
+    get chainName() { return chainName.value; },
+    get rpcStatus() { return rpcStatus.value; },
+    get supportedNetworks() { return supportedNetworks.value; },
+    get explorerUrl() { return explorerUrl.value; },
+    fetchConfig,
+  };
 }
 
 // ── Admin System Status ─────────────────────
@@ -122,7 +133,17 @@ export function useAdminSystemStatus() {
   });
   onUnmounted(() => { if (timer) clearInterval(timer); });
 
-  return { loading, error, latestBlock, lastScanned, blockLag, rpcStatus: rpcSStatus, queueStatus, openAnomalies, fetchStatus };
+  return {
+    get loading() { return loading.value; },
+    get error() { return error.value; },
+    get latestBlock() { return latestBlock.value; },
+    get lastScanned() { return lastScanned.value; },
+    get blockLag() { return blockLag.value; },
+    get rpcStatus() { return rpcSStatus.value; },
+    get queueStatus() { return queueStatus.value; },
+    get openAnomalies() { return openAnomalies.value; },
+    fetchStatus,
+  };
 }
 
 // ── Admin Contracts ─────────────────────────
@@ -161,7 +182,13 @@ export function useAdminContracts() {
   });
   onUnmounted(() => { if (timer) clearInterval(timer); });
 
-  return { loading, error, contracts, total, fetchContracts };
+  return {
+    get loading() { return loading.value; },
+    get error() { return error.value; },
+    get contracts() { return contracts.value; },
+    get total() { return total.value; },
+    fetchContracts,
+  };
 }
 
 // ── Admin Transactions (Mock until B05) ─────
@@ -206,5 +233,11 @@ export function useAdminTransactions() {
 
   onMounted(() => fetchTransactions());
 
-  return { loading, error, transactions, total, fetchTransactions };
+  return {
+    get loading() { return loading.value; },
+    get error() { return error.value; },
+    get transactions() { return transactions.value; },
+    get total() { return total.value; },
+    fetchTransactions,
+  };
 }

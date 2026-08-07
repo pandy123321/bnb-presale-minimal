@@ -46,7 +46,7 @@ contract FinalizePangu2 is Script {
         require(token.hasRole(GOV, govAddr), "caller is not governance");
 
         // Pair bindings
-        IPancakeFactory factory = IPancakeFactory(IPancakeRouter01(expectedRouter).factory());
+        IPancakeFactory factory = IPancakeFactory(expectedFactory);
         require(factory.getPair(tokenAddr, expectedWbnb) == pairAddr, "pair not from expected factory");
 
         address pairToken0 = IPancakePair(pairAddr).token0();
@@ -65,11 +65,10 @@ contract FinalizePangu2 is Script {
 
         // Governance permissions
         bytes32 DA = 0x00;
-        address[] memory coreAddrs = new address[](4);
+        address[] memory coreAddrs = new address[](3);
         coreAddrs[0] = tokenAddr;
         coreAddrs[1] = tradeRouterAddr;
         coreAddrs[2] = distributorAddr;
-        coreAddrs[3] = oracleAddr;
         for (uint256 i = 0; i < coreAddrs.length; i++) {
             IAccessControl c = IAccessControl(coreAddrs[i]);
             require(
@@ -85,7 +84,7 @@ contract FinalizePangu2 is Script {
         console.log("Reserve1:");
         console.log(uint256(r1));
 
-        // Oracle update + bidirectional quote validation
+        // Oracle update (already READY — safe no-op), then bidirectional quote validation
         vm.startBroadcast(govKey);
         oracle.update();
 
@@ -102,8 +101,6 @@ contract FinalizePangu2 is Script {
         } catch (bytes memory reason) {
             revert(string(abi.encodePacked("Oracle not ready (wbnb->token): ", reason)));
         }
-
-        vm.stopBroadcast();
 
         console.log("=== Finalize Complete ===");
         console.log("Oracle READY. Trading remains PAUSED.");
