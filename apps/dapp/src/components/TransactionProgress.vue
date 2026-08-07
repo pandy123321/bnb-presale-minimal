@@ -108,7 +108,7 @@ const link = computed(() =>
   <Transition name="tx-fade">
     <div v-if="show" class="tx-overlay">
       <div class="tx-panel">
-        <button v-if="isTerminal" class="tx-close" @click="emit('close')">✕</button>
+        <button type="button" v-if="isTerminal" class="tx-close" @click="emit('close')">✕</button>
         <div class="tx-header">
           <span class="tx-status" :class="statusClass">{{ displayLabel }}</span>
         </div>
@@ -122,9 +122,9 @@ const link = computed(() =>
         <div v-if="blockNumber" class="tx-info">Block: #{{ blockNumber }}</div>
         <div v-if="error" class="tx-err" :class="{rec:errorRecoverable}">{{ error }}</div>
         <div class="tx-actions" v-if="errorRecoverable||displayState==='APPROVAL_REQUIRED'">
-          <button class="btn" :class="displayState==='APPROVAL_REQUIRED'?'pri':'warn'" @click="emit('recover')">
+          <button type="button" class="btn" :class="displayState==='APPROVAL_REQUIRED'?'pri':'warn'" @click="emit('recover')">
             {{ displayState==='APPROVAL_REQUIRED'?'Approve':'Retry' }}</button>
-          <button class="btn sec" @click="emit('close')">Cancel</button>
+          <button type="button" class="btn sec" @click="emit('close')">Cancel</button>
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref } from "vue";
 import Card from "@pangu2/ui/components/Card.vue";
 import Tag from "@pangu2/ui/components/Tag.vue";
 import SectionHead from "@pangu2/ui/components/SectionHead.vue";
@@ -100,8 +100,8 @@ function toggleMode(m: "buy" | "sell") {
           <span class="token">BNB</span>
         </div>
         <div class="quick">
-          <button>25%</button><button>50%</button><button>75%</button
-          ><button>MAX</button>
+          <button type="button">25%</button><button type="button">50%</button><button type="button">75%</button
+          ><button type="button">MAX</button>
         </div>
       </div>
       <div class="swap-arrow">↓</div>
@@ -136,7 +136,7 @@ function toggleMode(m: "buy" | "sell") {
           <span>Pool depth</span><b>{{ noData }} BNB</b>
         </div>
       </div>
-      <button class="btn primary trade-submit" disabled>
+      <button type="button" class="btn primary trade-submit" disabled>
         Trading not yet activated
       </button>
     </Card>

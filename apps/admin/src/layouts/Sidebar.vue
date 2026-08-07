@@ -27,7 +27,7 @@ function isActive(item: typeof navItems[0]) {
       <div><h1>PANGU2</h1><p>链上运营控制台</p></div>
     </div>
     <nav class="nav">
-      <button v-for="item in navItems" :key="item.id" :class="{ active: isActive(item) }" @click="$router.push(item.route)">
+      <button type="button" v-for="item in navItems" :key="item.id" :class="{ active: isActive(item) }" @click="$router.push(item.route)">
         <span>{{ item.label }}</span>
       </button>
     </nav>

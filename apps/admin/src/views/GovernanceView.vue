@@ -29,7 +29,7 @@ const audit = useAudit();
           <span>{{ j.processed ?? 0 }} / {{ j.errors ?? 0 }}</span>
           <span>{{ j.last_run ? new Date(j.last_run).toLocaleString() : '—' }}</span>
           <span>
-            <button v-if="j.status==='FAILED'||j.status==='DEGRADED'" class="rbtn" @click="jobs.requestRetry(j.name)">重试</button>
+            <button type="button" v-if="j.status==='FAILED'||j.status==='DEGRADED'" class="rbtn" @click="jobs.requestRetry(j.name)">重试</button>
             <span v-if="jobs.retryingJob===j.name" class="retrying">重试中...</span>
             <span v-if="j.last_error" class="errhint" :title="j.last_error">ⓘ</span>
           </span>
@@ -43,7 +43,7 @@ const audit = useAudit();
         <div class="mpanel">
           <b>确认重试任务</b>
           <p>任务 <code>{{ jobs.retryConfirm }}</code> 将被重新触发。此操作需要 Idempotency-Key 保证幂等性。</p>
-          <div class="mbtns"><button class="btn danger" @click="jobs.confirmRetry()">确认重试</button><button class="btn sec" @click="jobs.cancelRetry()">取消</button></div>
+          <div class="mbtns"><button type="button" class="btn danger" @click="jobs.confirmRetry()">确认重试</button><button type="button" class="btn sec" @click="jobs.cancelRetry()">取消</button></div>
           <small v-if="jobs.retryMsg" :class="{ ok: jobs.retryMsg.includes('已排队') }">{{ jobs.retryMsg }}</small>
         </div>
       </div>

@@ -50,17 +50,17 @@ function supportedChainNames(): string {
 
       <div class="nb-action">
         <template v-if="wallet.isSwitchingNetwork">
-          <button class="nb-btn" disabled>
+          <button type="button" class="nb-btn" disabled>
             <span class="nb-spinner sm" /> 等待中
           </button>
         </template>
         <template v-else-if="wallet.hasError">
-          <button class="nb-btn" @click="wallet.switchToSupportedChain()">
+          <button type="button" class="nb-btn" @click="wallet.switchToSupportedChain()">
             重试
           </button>
         </template>
         <template v-else>
-          <button class="nb-btn" @click="wallet.switchToSupportedChain()">
+          <button type="button" class="nb-btn" @click="wallet.switchToSupportedChain()">
             切换网络
           </button>
         </template>

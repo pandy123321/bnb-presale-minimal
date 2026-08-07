@@ -62,7 +62,7 @@ defineExpose({ open, close });
           <div class="sheet-header">
             <img class="sheet-logo" src="/logo/bgp-logo-28.png" alt="BGP" width="28" height="28" />
             <h3>连接钱包</h3>
-            <button class="sheet-close" @click="close" aria-label="Close">
+            <button type="button" class="sheet-close" @click="close" aria-label="Close">
               <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
@@ -83,17 +83,17 @@ defineExpose({ open, close });
 
             <!-- ERROR: retry + dismiss -->
             <div v-else-if="wallet.hasError" class="sheet-error">
-              <button class="primary-btn" style="width:100%; margin-bottom:8px" @click="handleRetry">
+              <button type="button" class="primary-btn" style="width:100%; margin-bottom:8px" @click="handleRetry">
                 重试连接
               </button>
-              <button class="secondary-btn" style="width:100%" @click="close">
+              <button type="button" class="secondary-btn" style="width:100%" @click="close">
                 取消
               </button>
             </div>
 
             <!-- DISCONNECTED: connect button -->
             <div v-else class="sheet-wallets">
-              <button class="wallet-option" @click="handleConnect">
+              <button type="button" class="wallet-option" @click="handleConnect">
                 <span class="wallet-option-icon">
                   <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>
                 </span>
@@ -104,7 +104,7 @@ defineExpose({ open, close });
                 <span class="wallet-option-arrow">›</span>
               </button>
 
-              <button class="wallet-option" @click="handleConnect">
+              <button type="button" class="wallet-option" @click="handleConnect">
                 <span class="wallet-option-icon">
                   <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10"/><path d="M12 2a15.3 15.3 0 0 0-4 10 15.3 15.3 0 0 0 4 10"/></svg>
                 </span>

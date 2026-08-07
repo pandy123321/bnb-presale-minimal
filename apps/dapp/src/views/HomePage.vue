@@ -116,13 +116,13 @@ const shortAddr = computed(() =>
         </div>
       </div>
       <div class="asset-grid">
-        <button class="asset-action">
+        <button type="button" class="asset-action">
           <span>Rewards</span><b>{{ wallet.isConnected ? noData : noData }}</b>
         </button>
-        <button class="asset-action">
+        <button type="button" class="asset-action">
           <span>Locked</span><b>{{ wallet.isConnected ? noData : noData }}</b>
         </button>
-        <button class="asset-action">
+        <button type="button" class="asset-action">
           <span>Rank</span><b>{{ wallet.isConnected ? noData : noData }}</b>
         </button>
       </div>
@@ -132,7 +132,7 @@ const shortAddr = computed(() =>
     <div class="section">
       <SectionHead title="Protocol">
         <template #actions
-          ><button class="text-btn">Details</button></template
+          ><button type="button" class="text-btn">Details</button></template
         >
       </SectionHead>
       <div class="protocol-strip">

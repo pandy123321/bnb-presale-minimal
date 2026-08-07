@@ -205,7 +205,7 @@ const noData = "\u2014";
         <div v-if="loadingBuybacks" class="empty-state"><b>Loading...</b></div>
         <div v-else-if="buybackError" class="empty-state error">
           <b>Error</b><small>{{ buybackError }}</small>
-          <button class="btn-text" @click="fetchBuybacks">Retry</button>
+          <button type="button" class="btn-text" @click="fetchBuybacks">Retry</button>
         </div>
         <div v-else-if="buybackRows.length === 0" class="empty-state">
           <b>No buyback batches yet</b>
@@ -229,7 +229,7 @@ const noData = "\u2014";
         <div v-if="loadingBatches" class="empty-state"><b>Loading...</b></div>
         <div v-else-if="batchError" class="empty-state error">
           <b>Error</b><small>{{ batchError }}</small>
-          <button class="btn-text" @click="fetchBatches">Retry</button>
+          <button type="button" class="btn-text" @click="fetchBatches">Retry</button>
         </div>
         <div v-else-if="lockerRows.length === 0" class="empty-state">
           <b>No locker batches yet</b>

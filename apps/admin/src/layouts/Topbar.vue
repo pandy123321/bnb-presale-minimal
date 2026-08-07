@@ -22,7 +22,7 @@ const page = pageTitles[currentRoute] || pageTitles.overview;
     <div class="top-tools">
       <div class="env-pill">BSC TESTNET · 97</div>
       <div class="data-pill"><span :class="app.isLive ? 'dot' : 'dot warn'"></span>{{ app.statusLabel }}</div>
-      <button class="operation-btn">操作中心</button>
+      <button type="button" class="operation-btn">操作中心</button>
     </div>
   </header>
 </template>

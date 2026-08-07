@@ -13,7 +13,7 @@ defineExpose<{ open: (title?: string) => void; close: () => void }>({ open, clos
 <template>
   <Teleport to="body">
     <div v-if="visible" class="overlay show" @click.self="close">
-      <div class="sheet"><div class="handle"></div><div class="sheet-head"><h3>{{ title }}</h3><button class="icon-btn" @click="close" aria-label="Close">✕</button></div><slot /></div>
+      <div class="sheet"><div class="handle"></div><div class="sheet-head"><h3>{{ title }}</h3><button type="button" class="icon-btn" @click="close" aria-label="Close">✕</button></div><slot /></div>
     </div>
   </Teleport>
 </template>

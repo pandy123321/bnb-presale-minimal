@@ -37,7 +37,7 @@ function reset(): void {
       <b>{{ fallbackMessage ?? "Something went wrong" }}</b>
       <small>{{ errorMessage }}</small>
     </div>
-    <button class="eb-btn" @click="reset">Retry</button>
+    <button type="button" class="eb-btn" @click="reset">Retry</button>
   </div>
   <slot v-else />
 </template>

@@ -38,7 +38,7 @@ const emit = defineEmits<{
         <small v-if="retryable && !compact">This error is temporary. You can try again.</small>
       </div>
     </div>
-    <button v-if="retryable" class="retry-btn" @click="emit('retry')">
+    <button type="button" v-if="retryable" class="retry-btn" @click="emit('retry')">
       Retry
     </button>
   </div>

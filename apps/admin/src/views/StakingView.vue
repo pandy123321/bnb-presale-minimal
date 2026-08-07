@@ -57,7 +57,7 @@ function statusLabel(s: string): string {
         <p>管理 PANGU2 锁仓奖励池、覆盖率和用户仓位。充值奖励和设置速率需要 SUPER_ADMIN 权限。</p>
       </div>
       <div class="hero-side">
-        <strong v-if="staking.coverage?.coverageRatioPercent">{{ staking.coverage.coverageRatioPercent }}</strong>
+        <strong v-if="staking.coverage.value?.coverageRatioPercent">{{ staking.coverage.value.coverageRatioPercent }}</strong>
         <strong v-else>—</strong>
         <small>偿付率</small>
         <small v-if="staking.dataStatus !== 'LIVE'" class="mock-badge">MOCK DATA</small>
@@ -158,8 +158,8 @@ function statusLabel(s: string): string {
           <b>{{ staking.confirmModal.title }}</b>
           <p style="white-space:pre-line">{{ staking.confirmModal.summary }}</p>
           <div class="mbtns">
-            <button class="btn danger" @click="staking.confirmAction()">确认执行</button>
-            <button class="btn sec" @click="staking.cancelAction()">取消</button>
+            <button type="button" class="btn danger" @click="staking.confirmAction()">确认执行</button>
+            <button type="button" class="btn sec" @click="staking.cancelAction()">取消</button>
           </div>
         </div>
       </div>
@@ -176,7 +176,7 @@ function statusLabel(s: string): string {
             placeholder="输入钱包地址 0x..."
             @keyup.enter="staking.searchPositions(staking.searchAddress)"
           />
-          <button class="btn sec" @click="staking.searchPositions(staking.searchAddress)">查询</button>
+          <button type="button" class="btn sec" @click="staking.searchPositions(staking.searchAddress)">查询</button>
         </div>
 
         <!-- Loading -->

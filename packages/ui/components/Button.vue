@@ -1,7 +1,7 @@
 <script setup lang="ts">
 withDefaults(defineProps<{ variant?: "primary" | "secondary" | "text"; disabled?: boolean }>(), { variant: "primary", disabled: false });
 </script>
-<template><button class="btn-ui" :class="[variant, { disabled }]" :disabled="disabled"><slot /></button></template>
+<template><button type="button" class="btn-ui" :class="[variant, { disabled }]" :disabled="disabled"><slot /></button></template>
 <style scoped>
 .btn-ui {
   min-height: 48px; border-radius: var(--control-radius); padding: 0 16px;

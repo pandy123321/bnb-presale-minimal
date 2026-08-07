@@ -89,7 +89,7 @@ const shortAddr = computed(() =>
     <div class="section">
       <SectionHead title="Staking">
         <template #actions
-          ><button class="text-btn">Lock BGP</button></template
+          ><button type="button" class="text-btn">Lock BGP</button></template
         >
       </SectionHead>
       <Card variant="soft">

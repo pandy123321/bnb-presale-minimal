@@ -49,7 +49,7 @@ const contracts = useAdminContracts();
               :class="{
                 ok: c.status === 'ACTIVE',
                 warning: c.status === 'PAUSED' || c.status === 'UNKNOWN',
-                danger: c.status === 'UNAVAILABLE',
+                danger: (c.status as string) === 'UNAVAILABLE',
               }"
             >
               {{ c.status }}

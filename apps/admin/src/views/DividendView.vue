@@ -33,7 +33,7 @@ const heroStatus = computed(() =>
         <p>固定快照区块、计算有效持币、生成四档分配与Merkle Root。</p>
       </div>
       <div class="hero-side">
-        <strong v-if="eps.current">Epoch {{ eps.current.epoch_id }}</strong>
+        <strong v-if="eps.current.value">Epoch {{ eps.current.value.epoch_id }}</strong>
         <strong v-else>—</strong>
         <small>{{ heroStatus }}</small>
       </div>
@@ -44,10 +44,10 @@ const heroStatus = computed(() =>
 
     <!-- KPI Grid -->
     <div class="kpi-grid" v-if="eps.current">
-      <div class="kpi"><div class="kpi-head"><span>当前Epoch</span></div><strong>{{ eps.current.epoch_id }}</strong></div>
-      <div class="kpi"><div class="kpi-head"><span>快照区块</span></div><strong>#{{ eps.current.snapshot_block }}</strong></div>
-      <div class="kpi"><div class="kpi-head"><span>分红总量</span></div><strong>{{ eps.current.total_dividend_raw }}</strong></div>
-      <div class="kpi"><div class="kpi-head"><span>Merkle Root</span></div><strong class="mono">{{ eps.current.merkle_root?.slice(0, 10) }}...</strong></div>
+      <div class="kpi"><div class="kpi-head"><span>当前Epoch</span></div><strong>{{ eps.current.value.epoch_id }}</strong></div>
+      <div class="kpi"><div class="kpi-head"><span>快照区块</span></div><strong>#{{ eps.current.value.snapshot_block }}</strong></div>
+      <div class="kpi"><div class="kpi-head"><span>分红总量</span></div><strong>{{ eps.current.value.total_dividend_raw }}</strong></div>
+      <div class="kpi"><div class="kpi-head"><span>Merkle Root</span></div><strong class="mono">{{ eps.current.value.merkle_root?.slice(0, 10) }}...</strong></div>
     </div>
 
     <!-- Epoch Lifecycle -->
@@ -58,8 +58,8 @@ const heroStatus = computed(() =>
           <div v-for="st in epochSteps" :key="st.key" class="step" :class="{ done: st.done, active: st.active }">
             <b>{{ st.label }}</b>
             <span v-if="st.key === 'pending' && eps.current">等待快照</span>
-            <span v-else-if="st.key === 'snapshot_complete' && eps.current">#{{ eps.current.snapshot_block }}</span>
-            <span v-else-if="st.key === 'proof_generated' && eps.current">{{ eps.current.merkle_root?.slice(0, 8) }}...</span>
+            <span v-else-if="st.key === 'snapshot_complete' && eps.current.value">#{{ eps.current.value.snapshot_block }}</span>
+            <span v-else-if="st.key === 'proof_generated' && eps.current.value">{{ eps.current.value.merkle_root?.slice(0, 8) }}...</span>
             <span v-else-if="st.active">进行中</span>
             <span v-else-if="st.done">✓</span>
             <span v-else>—</span>
@@ -82,7 +82,7 @@ const heroStatus = computed(() =>
         </div>
       </div>
       <div class="card">
-        <div class="card-head"><h4>Root提案时间线</h4><span class="tag ok" v-if="eps.current">Epoch {{ eps.current.epoch_id }}</span></div>
+        <div class="card-head"><h4>Root提案时间线</h4><span class="tag ok" v-if="eps.current.value">Epoch {{ eps.current.value.epoch_id }}</span></div>
         <div class="card-body">
           <div class="metric-row"><span>分红总额(RAW)</span><b class="mono">{{ eps.current?.total_dividend_raw ?? '—' }}</b></div>
           <div class="metric-row"><span>Merkle Root</span><b class="mono">{{ eps.current?.merkle_root?.slice(0, 14) ?? '—' }}...</b></div>
