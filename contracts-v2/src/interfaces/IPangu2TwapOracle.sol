@@ -19,4 +19,7 @@ interface IPangu2TwapOracle {
 
     /// 更新预言机状态（permissionless）
     function update() external;
+
+    function minTokenReserve() external view returns (uint112);
+    function minWbnbReserve() external view returns (uint112);
 }

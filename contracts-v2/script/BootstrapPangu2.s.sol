@@ -142,26 +142,25 @@ contract BootstrapPangu2 is Script {
             require(pairAlreadyRegistered, "reserves exist but pair not registered -- inconsistent state");
             console.log("Bootstrap: liquidity already present (resume mode) -- skipping token/BNB injection");
 
-            // Cleanup: compute and revoke the LpProxy from the failed prior run
-            // The proxy was deployed at the LP's nonce immediately before the retry.
-            uint64 priorNonce = vm.getNonce(lpAddr) - 1;
-            address priorProxyAddr = _computeCreateAddress(lpAddr, priorNonce);
-            if (priorProxyAddr.code.length > 0) {
-                console.log("Prior LpProxy found at:");
-                console.logAddress(priorProxyAddr);
-                if (token.isLiquidityManager(priorProxyAddr)) {
-                    vm.startBroadcast(govKey);
-                    token.setLiquidityManager(priorProxyAddr, false);
-                    vm.stopBroadcast();
-                    console.log("Revoked stale liquidityManager on prior LpProxy");
-                }
-            } else {
-                console.log("Prior LpProxy not found -- manual cleanup may be needed");
+            // Cleanup: read prior LpProxy address from deployment artifact (saved by a prior Bootstrap)
+            string memory artifactPath = string(abi.encodePacked(vm.projectRoot(), "/broadcast/LATEST_LP_PROXY"));
+            string memory artifact = vm.readFile(artifactPath);
+            require(bytes(artifact).length > 0, "LpProxy artifact not found -- cannot resume Bootstrap");
+
+            address priorProxyAddr = address(uint160(vm.parseUint(artifact)));
+            require(priorProxyAddr.code.length > 0, "LpProxy from artifact has no code");
+            console.log("Prior LpProxy found at:");
+            console.logAddress(priorProxyAddr);
+
+            if (token.isLiquidityManager(priorProxyAddr)) {
+                vm.startBroadcast(govKey);
+                token.setLiquidityManager(priorProxyAddr, false);
+                vm.stopBroadcast();
+                require(!token.isLiquidityManager(priorProxyAddr), "LpProxy liquidityManager not revoked");
+                console.log("Revoked stale liquidityManager on prior LpProxy");
             }
 
-            // Step 7: Oracle update
-            uint256 minTokenReserveOpt = vm.envUint("MIN_TOKEN_RESERVE");
-            uint256 minWbnbReserveOpt = vm.envUint("MIN_WBNB_RESERVE");
+            // Step 7: Oracle update with on-chain minimum validation
             vm.startBroadcast(govKey);
             oracle.update();
             vm.stopBroadcast();
@@ -175,8 +174,10 @@ contract BootstrapPangu2 is Script {
             (uint112 tokenRes, uint112 wbnbRes) = (ot0 == tokenAddr)
                 ? (r0Check, r1Check)
                 : (r1Check, r0Check);
-            require(tokenRes >= minTokenReserveOpt, "token reserve below Oracle minimum");
-            require(wbnbRes >= minWbnbReserveOpt, "WBNB reserve below Oracle minimum");
+            uint112 chainMinToken = oracle.minTokenReserve();
+            uint112 chainMinWbnb = oracle.minWbnbReserve();
+            require(tokenRes >= chainMinToken, "token reserve below Oracle minimum");
+            require(wbnbRes >= chainMinWbnb, "WBNB reserve below Oracle minimum");
 
             console.log("=== Bootstrap Complete (resume) ===");
             console.log("Governance:");
@@ -201,6 +202,10 @@ contract BootstrapPangu2 is Script {
         vm.stopBroadcast();
         address lpProxyAddr = address(lpProxy);
         console.log("LpProxy deployed at:", lpProxyAddr);
+
+        // Record LpProxy address in deployment artifact for retry/resume scenarios
+        string memory artifactPath = string(abi.encodePacked(vm.projectRoot(), "/broadcast/LATEST_LP_PROXY"));
+        vm.writeFile(artifactPath, vm.toString(lpProxyAddr));
 
         // ── 2. Governance — register Pair + authorize LpProxy ──
         vm.startBroadcast(govKey);
@@ -260,39 +265,5 @@ contract BootstrapPangu2 is Script {
         console.log("LpProxy:");
         console.logAddress(lpProxyAddr);
         console.log("Oracle anchor set. Trading paused. Wait TWAP window -> run OpenTradingPangu2.");
-    }
-
-    // -- Helper: compute address of a contract deployed at a given sender nonce --
-    // Uses the Ethereum CREATE address formula: keccak256(rlp([sender, nonce]))[12:]
-    function _computeCreateAddress(address sender, uint64 nonce) private pure returns (address) {
-        if (nonce == 0) {
-            return address(
-                uint160(uint256(keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), sender, bytes1(0x80)))))
-            );
-        }
-        if (nonce < 0x80) {
-            return address(uint160(
-                uint256(keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), sender, bytes1(uint8(nonce)))))
-            ));
-        }
-        // nonce >= 0x80: need RLP length byte
-        bytes memory nonceBytes = new bytes(0);
-        uint64 n = nonce;
-        while (n > 0) {
-            nonceBytes = abi.encodePacked(bytes1(uint8(n & 0xff)), nonceBytes);
-            n >>= 8;
-        }
-        uint256 len = nonceBytes.length;
-        if (len == 1 && uint8(nonceBytes[0]) < 0x80) {
-            bytes memory listContent = abi.encodePacked(bytes1(0x94), sender, nonceBytes);
-            bytes1 listHead = bytes1(uint8(0xc0 + listContent.length));
-            return address(uint160(uint256(keccak256(abi.encodePacked(listHead, listContent)))));
-        }
-        bytes memory listContent = abi.encodePacked(
-            bytes1(0x94), sender,
-            bytes1(uint8(0x80 + len)), nonceBytes
-        );
-        bytes1 listHead = bytes1(uint8(0xc0 + listContent.length));
-        return address(uint160(uint256(keccak256(abi.encodePacked(listHead, listContent)))));
     }
 }
