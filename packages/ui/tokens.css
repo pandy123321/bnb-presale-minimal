@@ -35,4 +35,14 @@
 
   /* ── Shadows ── */
   --shadow: 0 18px 44px rgba(0, 0, 0, .22);
+
+  /* ── V1.1 legacy tokens (merged from global.css, only variables not in V7.1) ── */
+  --panel: #0a1024;
+  --panel2: #101933;
+  --muted: #8d9ab7;
+  --gold2: #f2d49a;
+  --violet: #8254f4;
+  --orange: #f0aa5d;
+  --nav: 70px;
+  --brand-gradient: linear-gradient(120deg, #e5b86f 0%, #f1d79c 28%, #22c3ff 62%, #8055ee 100%);
 }

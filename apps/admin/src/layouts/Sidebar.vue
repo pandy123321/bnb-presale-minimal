@@ -67,7 +67,7 @@ function isActive(item: typeof navItems[0]) {
 .side-status span { color: var(--muted); font-size: 11px; }
 .side-status b { font-size: 11px; }
 .side-status b.gold { color: var(--gold2); }
-.side-note { margin: 14px 0 0; color: var(--muted2); font-size: 10px; line-height: 1.6; }
+.side-note { margin: 14px 0 0; color: var(--muted); font-size: 10px; line-height: 1.6; }
 
 @media (max-width: 820px) { .sidebar { display: none; } }
 </style>

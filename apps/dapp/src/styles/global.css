@@ -1,27 +1,7 @@
 /* ═══════════════════════════════════════════
-   BGP DApp — Design Tokens (V1.1)
-   Deep navy + champagne gold + ice blue + violet
+   BGP DApp — Global Styles (V1.1)
+   Tokens merged into packages/ui/tokens.css
    ═══════════════════════════════════════════ */
-
-:root {
-  --bg: #03051a;
-  --panel: #0a1024;
-  --panel2: #101933;
-  --line: #20315a;
-  --text: #f5f7fc;
-  --muted: #8d9ab7;
-  --gold: #dcae6d;
-  --gold2: #f2d49a;
-  --cyan: #25c2ff;
-  --blue: #2962ff;
-  --violet: #8254f4;
-  --green: #35c99a;
-  --red: #ff6b7d;
-  --orange: #f0aa5d;
-  --radius: 18px;
-  --nav: 70px;
-  --brand-gradient: linear-gradient(120deg, #e5b86f 0%, #f1d79c 28%, #22c3ff 62%, #8055ee 100%);
-}
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
