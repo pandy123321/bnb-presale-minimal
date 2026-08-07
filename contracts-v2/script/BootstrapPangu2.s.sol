@@ -197,6 +197,32 @@ contract BootstrapPangu2 is Script {
             console.log("Pair already registered (retry mode -- liquidity not yet added)");
         }
 
+        // -- Revoke stale LpProxy from prior failed Bootstrap before deploying a new one --
+        string memory artifactPath = string(abi.encodePacked(
+            vm.projectRoot(), "/broadcast/bootstrap-",
+            vm.toString(block.chainid), "-",
+            _toHexString(tokenAddr, 40), "-",
+            _toHexString(pairAddr, 40), ".txt"
+        ));
+        try vm.readFile(artifactPath) returns (string memory oldArtifact) {
+            if (bytes(oldArtifact).length > 0) {
+                address oldProxy = address(uint160(vm.parseUint(oldArtifact)));
+                if (oldProxy.code.length > 0) {
+                    console.log("Found prior LpProxy, revoking before redeploy:");
+                    console.logAddress(oldProxy);
+                    if (token.isLiquidityManager(oldProxy)) {
+                        vm.startBroadcast(govKey);
+                        token.setLiquidityManager(oldProxy, false);
+                        vm.stopBroadcast();
+                        require(!token.isLiquidityManager(oldProxy), "stale LpProxy liquidityManager not revoked");
+                        console.log("Revoked stale liquidityManager");
+                    }
+                }
+            }
+        } catch {
+            // No prior artifact — first deployment
+        }
+
         require(token.balanceOf(holderAddr) >= initialTokenAmount, "holder has insufficient tokens");
         require(address(lpAddr).balance >= initialBnbAmount, "LP has insufficient BNB");
 
@@ -209,14 +235,7 @@ contract BootstrapPangu2 is Script {
         address lpProxyAddr = address(lpProxy);
         console.log("LpProxy deployed at:", lpProxyAddr);
 
-        // Record LpProxy address in deployment artifact for retry/resume scenarios
-        // Artifact is scoped by chainId/token/pair to prevent cross-deployment mismatch
-        string memory artifactPath = string(abi.encodePacked(
-            vm.projectRoot(), "/broadcast/bootstrap-",
-            vm.toString(block.chainid), "-",
-            _toHexString(tokenAddr, 40), "-",
-            _toHexString(pairAddr, 40), ".txt"
-        ));
+        // Record new LpProxy in artifact (overwrites previous — stale proxy already cleaned above)
         vm.writeFile(artifactPath, vm.toString(lpProxyAddr));
 
         // ── 2. Governance — register Pair + authorize LpProxy ──
