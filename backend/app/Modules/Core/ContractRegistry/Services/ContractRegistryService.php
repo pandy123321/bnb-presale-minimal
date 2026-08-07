@@ -147,12 +147,12 @@ final class ContractRegistryService
 
         foreach ($this->getEnvContractKeys() as $pair) {
             $name       = $pair['name'];
-            $envKey     = $pair['env_key'];
+            $configKey  = $pair['key'];
             $abiVersion = $pair['abi_version'];
 
             if (isset($seen[$name])) continue;
 
-            $address = env($envKey);
+            $address = config($configKey, '');
             if (empty($address)) continue;
 
             // Validate address format
@@ -194,7 +194,7 @@ final class ContractRegistryService
         foreach ($this->getEnvContractKeys() as $pair) {
             if ($pair['name'] !== $name) continue;
 
-            $address = env($pair['env_key']);
+            $address = config($pair['key'], '');
             if (empty($address)) return null;
 
             if (!$this->isValidAddress($address)) return null;
@@ -220,22 +220,31 @@ final class ContractRegistryService
     private function knownContractNames(): array
     {
         return [
-            'BNBPresale',
-            'SaleToken',
-            'WBNB',
+            'Pangu2Token',
+            'Pangu2TradeRouter',
             'DividendDistributor',
             'SupportPool',
+            'BuybackLocker',
+            'FeeVault',
+            'CostBasisManager',
             'Pangu2Staking',
-            'Pangu2TradeRouter',
+            'PancakeV2Adapter',
+            'PancakeV2TwapOracle',
+            'V2Pair',
         ];
     }
 
     private function getEnvContractKeys(): array
     {
         return [
-            ['name' => 'BNBPresale',           'env_key' => 'CONTRACT_PRESALE_ADDRESS',     'abi_version' => '1.0.0'],
-            ['name' => 'SaleToken',            'env_key' => 'CONTRACT_SALE_TOKEN_ADDRESS',   'abi_version' => '1.0.0'],
-            ['name' => 'WBNB',                 'env_key' => 'CONTRACT_WBNB_ADDRESS',         'abi_version' => '1.0.0'],
+            ['name' => 'Pangu2Token',         'key' => 'pangu2.token_address',                   'abi_version' => '1.0.0'],
+            ['name' => 'Pangu2TradeRouter',   'key' => 'pangu2.trade_router_address',            'abi_version' => '1.0.0'],
+            ['name' => 'DividendDistributor', 'key' => 'pangu2.dividend_distributor_address',    'abi_version' => '1.0.0'],
+            ['name' => 'SupportPool',         'key' => 'pangu2.support_pool_address',            'abi_version' => '1.0.0'],
+            ['name' => 'BuybackLocker',       'key' => 'pangu2.buyback_locker_address',          'abi_version' => '1.0.0'],
+            ['name' => 'FeeVault',            'key' => 'pangu2.fee_vault_address',               'abi_version' => '1.0.0'],
+            ['name' => 'CostBasisManager',    'key' => 'pangu2.cost_basis_manager_address',      'abi_version' => '1.0.0'],
+            ['name' => 'Pangu2Staking',       'key' => 'pangu2.staking_address',                 'abi_version' => '1.0.0'],
         ];
     }
 
