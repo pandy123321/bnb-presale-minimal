@@ -205,22 +205,49 @@ contract BootstrapPangu2 is Script {
             _toHexString(pairAddr, 40), ".txt"
         ));
         try vm.readFile(artifactPath) returns (string memory oldArtifact) {
+            // An empty artifact is a corrupt state -- fail closed in retry mode.
+            // In retry mode we MUST have a valid artifact to prove old permissions are shut.
+            if (pairAlreadyRegistered && bytes(oldArtifact).length == 0) {
+                revert("retry: LpProxy artifact is empty -- cannot resume");
+            }
             if (bytes(oldArtifact).length > 0) {
                 address oldProxy = address(uint160(vm.parseUint(oldArtifact)));
-                if (oldProxy.code.length > 0) {
-                    console.log("Found prior LpProxy, revoking before redeploy:");
+                if (oldProxy.code.length == 0) {
+                    console.log("Warning: prior LpProxy has no runtime code");
+                }
+                // P1/P2 FIX: always revoke regardless of code.length.
+                // The permission lives in Token state, not in the old proxy's bytecode.
+                if (token.isLiquidityManager(oldProxy)) {
+                    console.log("Found prior LpProxy, revoking liquidityManager before redeploy:");
                     console.logAddress(oldProxy);
-                    if (token.isLiquidityManager(oldProxy)) {
-                        vm.startBroadcast(govKey);
-                        token.setLiquidityManager(oldProxy, false);
-                        vm.stopBroadcast();
-                        require(!token.isLiquidityManager(oldProxy), "stale LpProxy liquidityManager not revoked");
-                        console.log("Revoked stale liquidityManager");
-                    }
+                    vm.startBroadcast(govKey);
+                    token.setLiquidityManager(oldProxy, false);
+                    vm.stopBroadcast();
+                    require(
+                        !token.isLiquidityManager(oldProxy),
+                        "stale LpProxy liquidityManager not revoked"
+                    );
+                    console.log("Revoked stale liquidityManager");
                 }
             }
         } catch {
-            // No prior artifact — first deployment
+            // In retry mode, a missing artifact is fatal -- we cannot prove old permissions are shut.
+            if (pairAlreadyRegistered) {
+                revert("retry: LpProxy artifact not found -- cannot resume");
+            }
+            // First deployment has no prior artifact -- allow continuing.
+        }
+
+        // P1 FIX: final gate -- in retry mode there must be no remaining old LpProxy authorization.
+        // This ensures we never deploy a new LpProxy while a stale one still holds liquidityManager.
+        if (pairAlreadyRegistered) {
+            address finalOldProxy = _tryReadOldProxy(artifactPath);
+            if (finalOldProxy != address(0)) {
+                require(
+                    !token.isLiquidityManager(finalOldProxy),
+                    "retry: old LpProxy still holds liquidityManager -- cannot deploy new proxy"
+                );
+            }
         }
 
         require(token.balanceOf(holderAddr) >= initialTokenAmount, "holder has insufficient tokens");
@@ -309,5 +336,18 @@ contract BootstrapPangu2 is Script {
             val >>= 4;
         }
         return string(str);
+    }
+
+    /// @dev Attempt to read the old LpProxy address from the artifact file.
+    ///      Returns address(0) if the artifact is missing, empty, or unparseable.
+    ///      This is a best-effort helper for the final gate; it must NOT be used
+    ///      as the sole decision-maker on whether to proceed.
+    function _tryReadOldProxy(string memory artifactPath) private view returns (address) {
+        try vm.readFile(artifactPath) returns (string memory raw) {
+            if (bytes(raw).length == 0) return address(0);
+            return address(uint160(vm.parseUint(raw)));
+        } catch {
+            return address(0);
+        }
     }
 }
