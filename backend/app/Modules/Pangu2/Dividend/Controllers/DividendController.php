@@ -186,16 +186,28 @@ class DividendController extends Controller
             ->where('epoch_id', $epochId)
             ->get();
 
-        $tiers = [];
-        foreach ([
+        if ($allocations->isNotEmpty()) {
+            $totalAllocated = (int) $allocations->sum('amount_raw');
+            if ($totalAllocated > 0) {
+                $tiers = [];
+                foreach ($allocations->groupBy('tier') as $tier => $group) {
+                    $tierAmount = (int) $group->sum('amount_raw');
+                    $sharePercent = (int) round(($tierAmount / $totalAllocated) * 100);
+                    $tiers[] = [
+                        'name' => "Tier {$tier}",
+                        'rank_range' => "—",
+                        'share_percent' => max($sharePercent, 0),
+                    ];
+                }
+                return $tiers;
+            }
+        }
+
+        return [
             ['name' => 'Tier 1', 'rank_range' => '1-10',  'share_percent' => 35],
             ['name' => 'Tier 2', 'rank_range' => '11-30', 'share_percent' => 25],
             ['name' => 'Tier 3', 'rank_range' => '31-60', 'share_percent' => 25],
             ['name' => 'Tier 4', 'rank_range' => '61-100','share_percent' => 15],
-        ] as $t) {
-            $tiers[] = $t;
-        }
-
-        return $tiers;
+        ];
     }
 }

@@ -51,7 +51,7 @@ final class TransactionProjector
                 continue;
             }
 
-            $projection = TransactionProjection::firstOrNew(
+            $projection = TransactionProjection::firstOrCreate(
                 ['chain_id' => $chainId, 'tx_hash' => $raw->transaction_hash],
                 [
                     'block_hash'       => $raw->block_hash,
