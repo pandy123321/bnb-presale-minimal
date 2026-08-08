@@ -181,23 +181,19 @@ SELECT assert_must_fail_as('SP-07', 'bgp_reconciler',
 -- SP-08: APPROVED + REQUESTED cancellation -> try REJECT request -> FAIL (frozen)
 -- When command is still APPROVED (not yet past cancellable states),
 -- resolving the cancellation request as REJECTED must fail with 55000.
--- Trigger: REJECTED only valid when command_state IN (SIGNING, SUBMITTED, CONFIRMED, FINALIZED, FAILED, EXPIRED).
+-- Trigger: REJECTED only valid when command_state IN (SIGNING,SUBMITTED,CONFIRMED,FINALIZED,FAILED,EXPIRED,REJECTED).
 -- APPROVED is NOT in that list -> FAIL.
 \echo 'TEST: SP-08'
 SELECT assert_must_fail_as('SP-08', 'bgp_reconciler',
     '55000', $$UPDATE governance_command_cancellation_requests SET state = 'REJECTED', resolved_at = now() WHERE command_id = 'f805f805-f805-f805-f805-f805f805f805'$$);
 
--- SP-09: REJECTED Command + REQUESTED cancellation -> REJECTED = FAIL (frozen)
--- After command is REJECTED (transitioned from APPROVED above), the cancellation request
--- resolution to REJECTED should STILL fail because REJECTED command state is not in the
--- accepted list for REJECTED cancellation resolution:
---   Trigger: REJECTED requires command NOT IN (SIGNING, SUBMITTED, CONFIRMED, FINALIZED, FAILED, EXPIRED)
---   REJECTED is NOT in that list, so condition is TRUE = RAISE EXCEPTION.
--- NOTE: The original-frozen acceptance criteria said this should PASS for REJECTED + REJECTED,
--- but the immutable trigger says otherwise. We test the trigger truth.
+-- SP-09: REJECTED Command + REQUESTED cancellation -> REJECTED = SUCCESS (frozen)
+-- After command is REJECTED, the cancellation request resolution to REJECTED must SUCCEED.
+-- Trigger: REJECTED resolution requires command_state IN (SIGNING,SUBMITTED,CONFIRMED,FINALIZED,FAILED,EXPIRED,REJECTED).
+-- REJECTED is in that list ? SUCCESS.
 \echo 'TEST: SP-09'
-SELECT assert_must_fail_as('SP-09', 'bgp_reconciler',
-    '55000', $$UPDATE governance_command_cancellation_requests SET state = 'REJECTED', resolved_at = now() WHERE command_id = 'f906f906-f906-f906-f906-f906f906f906'$$);
+SELECT assert_must_pass_as('SP-09', 'bgp_reconciler',
+    $$UPDATE governance_command_cancellation_requests SET state = 'REJECTED', resolved_at = now() WHERE command_id = 'f906f906-f906-f906-f906-f906f906f906'$$);
 
 -- SP-10: CANCELLED Command + REQUESTED cancellation -> CONSUMED = SUCCESS
 -- Trigger: CONSUMED requires command = 'CANCELLED'. fa07 was transitioned to CANCELLED above.

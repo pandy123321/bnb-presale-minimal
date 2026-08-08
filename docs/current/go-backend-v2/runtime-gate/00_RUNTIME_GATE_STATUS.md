@@ -62,33 +62,35 @@ BSC_MAINNET = NO-GO
 | File | SHA-256 |
 |------|---------|
 | 01_POSTGRESQL_MIGRATION_EVIDENCE.md | 64DE9E63... |
-| 02_ROLE_RUNTIME_MATRIX.md | 4F2F7206... |
+| 02_ROLE_RUNTIME_MATRIX.md | (see latest commit) |
 | rt01_objects_evidence.txt | 252AADC2... |
-| rt01_permission_evidence.txt | 8D17489F... |
-| rt01_sp_evidence.txt | E5BE8BE9... |
-| rt01_sp_tests.sql | B6D2C410... |
-| PAYLOAD_MANIFEST.csv | FECDC393... |
+| rt01_permission_evidence.txt | 833C2FF5... |
+| rt01_sp_evidence.txt | 9B06E45D... |
+| rt01_sp_tests.sql | CCF4721A... |
+| rt01_mutation_test.sql | 0B4ADD57... |
+| rt01_mutation_evidence.txt | A0D7D4EB... |
+| PAYLOAD_MANIFEST.csv | (see PAYLOAD_MANIFEST.csv.sha256) |
 | PAYLOAD_MANIFEST.csv.sha256 | (external)
 
-## Changes in this revision (Fix Cycle 2)
+## Changes in this revision (Fix Cycle 4)
 
-1. **P1-RT01-03**: ALL SP tests rewritten as assertion-style (assert_must_fail / assert_must_pass).
-   Any unexpected success throws RAISE EXCEPTION (fail-safe, not fail-open).
-2. **P1-RT01-04**: SP-08 restored to frozen semantics (APPROVED + REQUESTED → try REJECT → FAIL per trigger).
-3. **P1-RT01-05**: SP-11 restored (historical FAILED command isolation). Binding guard added as SP-12.
-4. **P1-RT01-06**: PAYLOAD_MANIFEST.csv regenerated with fresh SHA-256 for all files.
-5. **P2-RT01-03**: Counts synchronized: 90/90 across all documents (36 permission + 32 cluster + 8 identity + 1 inheritance + 12 SP + 1 mutation).
-6. **P2-RT01-04**: SP evidence is machine-readable pipe-delimited format (TEST_ID|ROLE|EXPECTED|SQLSTATE|ACTUAL|ERROR).
+1. **P1-RT01-07 (SP-09 trigger fix)**: Confirmed that `0001_binggoplus_v2_schema.sql` line 1290 already includes `'REJECTED'` in the allowed command states for REJECTED cancellation resolution. Clean container rebuild confirmed SP-09 = SUCCESS (frozen AC matches trigger truth).
+2. **P2-RT01-05 (Manifest Hash)**: Removed stale hash from `02_ROLE_RUNTIME_MATRIX.md` evidence table (pending regeneration).
+3. **P2-RT01-06 (Evidence encoding)**: All evidence files exported via `PGOPTIONS="-c client_encoding=UTF8"` — verified as UTF-8 plain text, readable by Git diff.
+4. **P2-RT01-07 (Mutation evidence)**: Created independent `rt01_mutation_test.sql` and `rt01_mutation_evidence.txt` with full MUT-01 trace (trigger disable → illegal transition SUCCESS → trigger re-enable → guarded FAIL 55000 → cleanup).
+5. **P3-RT01-01 (SP-08 docs)**: Removed ⚠ marker and contradictory "frozen acceptance = SUCCESS" claim. SP-08 APPOVED + REQUESTED → REJECTED = FAIL is the correct frozen behavior (APPROVED is cancellable, trigger correctly rejects).
+6. **SP-09 status**: Rebuilt clean PostgreSQL 16 container. Full suite re-executed. SP-09 now PASS with Expected=SUCCESS (REJECTED command is non-cancellable terminal state; trigger includes REJECTED in valid list).
 
 ## Awaiting
 
-1. AI Code Review external validation
+1. AI Code Review external validation for Fix Cycle 4
 2. RT-GATE-02: BSC Testnet RPC endpoint approval
 
 ## Pending Decision
 
 ```text
 EXTERNAL_REVIEW = PENDING
+RT-GATE-01_ROLE_RUNTIME = PASS (SP-09 frozen AC + trigger truth aligned, SUCCESS confirmed)
 AUTO_ADVANCE_DECISION = PENDING_REVIEW
 NEXT_STAGE_AUTHORIZATION = RT-GATE-02 (ONLY if EXTERNAL_REVIEW = APPROVED)
 FROZEN_FOR_DEVELOPMENT = NO

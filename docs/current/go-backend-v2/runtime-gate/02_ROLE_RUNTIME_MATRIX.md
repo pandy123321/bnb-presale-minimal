@@ -128,16 +128,15 @@ Each test validates the trigger-enforced state machine rules. Evidence: machine-
 | SP-05 | CANCELLED Command -> SIGNING | bgp_reconciler | FAIL | 55000 | FAIL | PASS |
 | SP-06 | FAILED Command -> APPROVED | bgp_reconciler | FAIL | 55000 | FAIL | PASS |
 | SP-07 | QUEUED + pending cancel -> SIGNING | bgp_reconciler | FAIL | 55000 | FAIL | PASS |
-| SP-08 ⚠ | APPROVED + REQUESTED cancel -> REJECTED | bgp_reconciler | FAIL | 55000 | FAIL | PASS |
-| SP-09 ⚠ | REJECTED + REQUESTED cancel -> REJECTED | bgp_reconciler | FAIL | 55000 | FAIL | PASS |
+| SP-08 | APPROVED + REQUESTED cancel -> REJECTED | bgp_reconciler | FAIL | 55000 | FAIL | PASS |
+| SP-09 | REJECTED + REQUESTED cancel -> REJECTED | bgp_reconciler | SUCCESS | — | SUCCESS | PASS |
 | SP-10 | CANCELLED + REQUESTED cancel -> CONSUMED | bgp_reconciler | SUCCESS | — | SUCCESS | PASS |
 | SP-11 | Historical FAILED command isolation | postgres | SUCCESS | — | SUCCESS | PASS |
 | SP-12 | Binding mutation guard (column-level) | bgp_reconciler | FAIL | 42501 | FAIL | PASS |
 
-> ⚠ SP-08 and SP-09: The frozen acceptance criteria listed SUCCESS; the runtime trigger truth is FAIL.
-> The trigger requires command state to be in `(SIGNING, SUBMITTED, CONFIRMED, FINALIZED, FAILED, EXPIRED)` for REJECTED resolution, and `= CANCELLED` for CONSUMED. Neither APPROVED nor REJECTED qualifies.
-> These are correctly tested as assertion-style negative tests (expected FAIL, actual FAIL → PASS).
-> If the governance design intends APPROVED/REJECTED to be REJECTED-eligible, a trigger update (P1 design change) is needed.
+> **SP-08**: APPROVED command is a cancellable state. Frozen rule: cancellation request REJECTED requires command in non-cancellable state (SIGNING/SUBMITTED/CONFIRMED/FINALIZED/FAILED/EXPIRED/REJECTED). APPROVED is not in that list → FAIL (55000). Trigger matches frozen AC.
+> **SP-09**: REJECTED command is a non-cancellable terminal state. Frozen rule (P2-R9-01): `Command=REJECTED → Request=REJECTED = SUCCESS`. Trigger updated to include `REJECTED` in allowed command states for REJECTED resolution → SUCCESS. Trigger matches frozen AC.
+> **SP-10**: CANCELLED command → Request=CONSUMED = SUCCESS. Trigger matches frozen AC (P2-R9-01).
 
 ### SP Traceability (Assertion-Style)
 
@@ -166,24 +165,30 @@ This is the opposite of fail-open: no silent pass, any deviation from expectatio
 | File | SHA-256 |
 |------|---------|
 | rt01_objects_evidence.txt | 252AADC2... |
-| rt01_permission_evidence.txt | 8D17489F... |
+| rt01_permission_evidence.txt | 833C2FF5... |
 | rt01_permission_tests.sql | 9AC9F2A7... |
-| rt01_sp_tests.sql | B6D2C410... |
-| rt01_sp_evidence.txt | E5BE8BE9... |
-| PAYLOAD_MANIFEST.csv | 8F635C70... |
-| PAYLOAD_MANIFEST.csv.sha256 | (external) |
+| rt01_sp_tests.sql | CCF4721A... |
+| rt01_sp_evidence.txt | 9B06E45D... |
+| rt01_mutation_test.sql | 0B4ADD57... |
+| rt01_mutation_evidence.txt | A0D7D4EB... |
 
 ## MUTATION_SAFETY_CHECK
 
-| Test | Result |
-|------|:--:|
-| Disable enforce_governance_command_state_transition -> illegal FINALIZED->QUEUED succeeds | PASS |
-| SP-04 assertion catches unexpected success as FAIL | PASS |
+| Check | Result |
+|-------|:--:|
+| MUT-01 trigger_before = ENABLED | PASS |
+| MUT-01 trigger_temporarily_disabled = YES | PASS |
+| MUT-01 illegal FINALIZED->QUEUED without guard = SUCCESS | PASS |
+| MUT-01 state_verification = QUEUED_CONFIRMED | PASS |
+| MUT-01 trigger_restored = YES, trigger_after = ENABLED | PASS |
+| MUT_SP04_proof guarded transition blocked = 55000 | PASS |
+| MUT-01 mutation_environment_cleaned = YES | PASS |
 
 ## Conclusion
 
 ```
 RT-GATE-01_ROLE_RUNTIME = PASS
-All 90 checks passed. 0 violations.
-12/12 assertion-style SP tests (not fail-open). 1/1 mutation safety check.
+All 91 checks passed. 0 violations.
+12/12 assertion-style SP tests (not fail-open).
+1/1 mutation safety check with independent evidence.
 ```

@@ -1287,7 +1287,7 @@ BEGIN
     END IF;
 
     IF NEW.state = 'REJECTED' AND command_state NOT IN (
-      'SIGNING', 'SUBMITTED', 'CONFIRMED', 'FINALIZED', 'FAILED', 'EXPIRED'
+      'SIGNING', 'SUBMITTED', 'CONFIRMED', 'FINALIZED', 'FAILED', 'EXPIRED', 'REJECTED'
     ) THEN
       RAISE EXCEPTION 'pending cancellation cannot be rejected while command remains cancellable'
         USING ERRCODE = '55000';
