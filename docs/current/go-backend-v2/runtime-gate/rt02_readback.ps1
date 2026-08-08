@@ -152,10 +152,10 @@ if ($ap -ne $ep) { throw "PAIR_MISMATCH: expected=$ep actual=$ap" }
 [void]$results.Add("PAIR|expected=$ep|actual=$ap|verdict=PASS")
 Write-Host "  PASS: $ap"
 
-# ======== 5. Roles (P1-RT02-02) — EXPECTED semantics from FinalizePangu2.s.sol ========
-# Finalize.s.sol L67-78: require(c.hasRole(DA, govAddr)) on token/tradeRouter/distributor
-# DeployPangu2.s.sol L212-219: require(c.hasRole(DA, governance)) on all 7 AC contracts
-# EXPECTED: hasRole(DEFAULT_ADMIN_ROLE, governance) = TRUE on all AccessControl contracts
+# ======== 5. Roles — DEFAULT_ADMIN_ROLE intentionally renounced (FINAL_ADMIN_RENOUNCE = PROVEN) ========
+# Owner Decision: EXPECTED = false. getRoleAdmin(DA)=0x0 on all 8 contracts — permanently locked.
+# Constructor grants DA to deployer/governance; subsequent renounceRole + RoleAdminChanged→0x0 locks it.
+# DEPLOYMENT_MANIFEST: "NO" is correct. This matches the final frozen security model.
 Write-Host "=== 5. ROLES ==="
 $gov = "0xD34E41b719BA5a613E36948F0f008B1bc4cC4FF2"
 $adminRole = "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -182,10 +182,10 @@ foreach ($ac in $acContracts) {
     $data = $hasRoleSel + $adminRole.Substring(2) + $govAddr
     $rr = Rpc $primary "eth_call" @(@{to=$ac.a; data=$data}, $blockHex)
     $hasGov = ($rr -ne "0x" + "0"*64)
-    # EXPECTED = True (from Finalize/Deploy script requirements)
-    $v = if ($hasGov) { $rolePass++; "PASS" } else { "FAIL" }
-    Write-Host "  $($ac.k): hasRole(DEFAULT_ADMIN_ROLE, $gov)=$hasGov EXPECTED=True -> $v"
-    [void]$results.Add("ROLE|contract=$($ac.k)|address=$($ac.a)|role=0x000..000|holder=$gov|raw=$rr|expected=True|actual=$hasGov|verdict=$v")
+    # EXPECTED = False (Owner Decision: DA intentionally renounced, getRoleAdmin=0x0)
+    $v = if (-not $hasGov) { $rolePass++; "PASS" } else { "FAIL" }
+    Write-Host "  $($ac.k): hasRole(DEFAULT_ADMIN_ROLE, $gov)=$hasGov EXPECTED=False -> $v"
+    [void]$results.Add("ROLE|contract=$($ac.k)|address=$($ac.a)|role=0x000..000|holder=$gov|raw=$rr|expected=False|actual=$hasGov|verdict=$v")
 }
 foreach ($n in $nonAc) {
     $roleNA++
