@@ -3,10 +3,10 @@
 | Gate | Status |
 |---|---|
 | RT-GATE-01 | PASS |
-| RT-GATE-02 | FIX_READY / INDEPENDENT_RETEST_PENDING |
+| RT-GATE-02 | BLOCKED_EVIDENCE / INDEPENDENT_RETEST_PENDING |
 | RT-GATE-03 | BOOTSTRAPPED (go build PASS, go vet PASS, FIX_READY) |
 
-## RT-GATE-02 — FIX_READY / INDEPENDENT_RETEST_PENDING
+## RT-GATE-02 — BLOCKED_EVIDENCE / INDEPENDENT_RETEST_PENDING
 
 | Field | Value |
 |---|---|
@@ -25,15 +25,15 @@
 
 | Finding | Status | Description |
 |---|---|---|
-| P1-RT02-14 | FIX_READY | New RPC Evidence with independent PRIMARY/BACKUP |
+| P1-RT02-14 | BLOCKED_EVIDENCE | Approved independent Primary/Backup RPCs unreachable; runtime retest not completed. Requires machine with direct Binance RPC access. |
 | P2-RT02-MANIFEST-03 | FIX_READY | Manifest frozen as RT02_FINAL_PAYLOAD_MANIFEST.csv |
 | P2-RT02-OWNER-HASH | FIX_READY | Self-hash removed from OWNER_SECURITY_DECISION.md |
 
-These three findings require Independent Review closure. Owner has accepted the risk but per governance rules the Independent Review must formally close them.
+These three findings require Independent Review closure. P1-RT02-14 is blocked on environmental RPC access.
 
 ### Owner Decision
 
-Owner signoff RT02-OWNER-2026-001 recorded in OWNER_SECURITY_DECISION.md (FROZEN_SECURITY_MODEL_CHANGE Expected=False). Owner has indicated intent to skip Fix Cycle 10 (environmental evidence re-run). Pending formal Independent Review closure.
+Owner signoff RT02-OWNER-2026-001 recorded in OWNER_SECURITY_DECISION.md (FROZEN_SECURITY_MODEL_CHANGE Expected=False). Owner has accepted the security model but per governance rules the Independent Review must formally close the findings.
 
 ## RT-GATE-03 — BOOTSTRAPPED (G1 Skeleton + Build/Vet Evidence)
 
@@ -51,10 +51,6 @@ Owner signoff RT02-OWNER-2026-001 recorded in OWNER_SECURITY_DECISION.md (FROZEN
 | MANIFEST | RT03_PAYLOAD_MANIFEST.csv (3 files) |
 | G0_STATUS | INCOMPLETE (awaiting RT02 Independent Review) |
 | G1_STATUS | BOOTSTRAPPED — FIX_READY for Independent Review |
-
-### Build/Vet Evidence
-
-See `rt03_build_evidence.txt` for machine-readable raw evidence recorded from `backend-go/` working directory.
 
 ### G1 合规检查
 

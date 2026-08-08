@@ -1,22 +1,18 @@
-﻿=== RT-GATE-02 READBACK EVIDENCE ===
-=== P1-RT02-14: DUAL RPC RUNTIME ===
+﻿=== RT-GATE-02 CURRENT RETEST ===
 
-STATUS: BLOCKED_EVIDENCE
-REASON: Approved RPC endpoints unreachable from execution environment.
-ENVIRONMENT: Windows sandbox — both Binance RPCs fail with "基础连接已经关闭: 发送时发生错误" (TLS/network unreachable).
-SCRIPT: rt02_readback.ps1 is correct — PRIMARY!=BACKUP enforcement, receipt-bound deploy blocks, 34 checks.
-APPROVED_PRIMARY: https://data-seed-prebsc-1-s1.binance.org:8545
-APPROVED_BACKUP: https://data-seed-prebsc-2-s1.binance.org:8545
-RPC_STATE: Both approved RPCs unreachable. Script exits non-zero with RPC_FAILED_AFTER_RETRY.
-ENVIRONMENTAL: This is an execution environment limitation, not a script error. Requires a machine with direct Binance RPC network access.
+STATUS=BLOCKED_EVIDENCE
+REASON=Approved RPC endpoints unreachable from execution environment.
+ENVIRONMENT=Windows sandbox — both Binance RPCs fail with "基础连接已经关闭: 发送时发生错误" (TLS/network unreachable).
+SCRIPT=rt02_readback.ps1 (PRIMARY!=BACKUP enforced, receipt-bound deploy blocks, 34 checks)
+APPROVED_PRIMARY=https://data-seed-prebsc-1-s1.binance.org:8545
+APPROVED_BACKUP=https://data-seed-prebsc-2-s1.binance.org:8545
+ATTEMPT=3 retries per RPC call
+RESULT=RPC_FAILED_AFTER_RETRY
+EXIT_CODE=1
+TIMESTAMP=2026-08-09T03:00:00+08:00
 
-=== HISTORICAL EVIDENCE (from Fix Cycle 8, commit ed5d267) ===
-Below is the last successful dual-RPC readback evidence when RPCs were reachable.
-CHAIN_ID|primary=97|backup=97|verdict=PASS
-BLOCK|number=123877114|hash=0x58a88daa53f87e9a2f44f784f6d6d8f2a4d2c6afe2f4e98e9e1e3aff3a3af37e|verdict=PASS
+=== HISTORICAL REFERENCE ===
 
-=== Last known full readback (Fix Cycle 8, Binance RPCs) ===
-10/10 BYTECODE IDENTITY_VERIFIED
-14/14 GETTER PASS
-8/8 ROLE PASS (Expected=False, Owner Decision bound)
-34/34 TOTAL PASS, exit 0
+HISTORICAL_REFERENCE_COMMIT=ed5d267eea28c7f07e751165ae454c9b4fdfbe2b
+NOTE=Historical evidence is preserved in the referenced commit. Do not copy chain data here.
+      To verify: git show ed5d267...:docs/current/go-backend-v2/runtime-gate/rt02_raw_evidence.txt
