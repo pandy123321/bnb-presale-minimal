@@ -5,16 +5,19 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { IPangu2Staking } from "./interfaces/IPangu2Staking.sol";
 import { IPangu2Token } from "./interfaces/IPangu2Token.sol";
 import { TransferContext } from "./libraries/TransferContext.sol";
 
-contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
+contract Pangu2Staking is AccessControl, Pausable, ReentrancyGuard, IPangu2Staking {
     using SafeERC20 for IERC20;
 
     IPangu2Token public immutable token;
 
     bytes32 public constant REWARD_MANAGER_ROLE = keccak256("REWARD_MANAGER_ROLE");
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant UNPAUSER_ROLE = keccak256("UNPAUSER_ROLE");
 
     // ── Staked principal ──
     uint256 public override totalStaked;
@@ -39,6 +42,10 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
     mapping(address => uint256) private _userRewardPerTokenPaid;
     mapping(address => uint256) private _unclaimedRewards;
 
+    // Per-position reward tracking — prevents claim→earlyUnstake bypass (P1-STK-02)
+    // and prevents stake dilution from lowering forfeiture (P1-STK-02-VARIANT)
+    mapping(address => mapping(uint256 => uint256)) private _positionPendingReward;
+
     // Individual positions (lock metadata only)
     mapping(address => StakePosition[]) private _positions;
     mapping(address => uint256) public override userPositionCount;
@@ -56,12 +63,23 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
     event RewardRateUpdated(uint256 newRate, uint256 periodFinish);
     event RewardClaimed(address indexed user, uint256 amount);
 
-    constructor(address token_, address governance) {
-        if (token_ == address(0) || governance == address(0)) revert ZeroAddress();
+    constructor(address token_, address governance, address emergencyAccount) {
+        if (token_ == address(0) || governance == address(0) || emergencyAccount == address(0)) {
+            revert ZeroAddress();
+        }
         token = IPangu2Token(token_);
         _grantRole(DEFAULT_ADMIN_ROLE, governance);
         _grantRole(REWARD_MANAGER_ROLE, governance);
+        _grantRole(PAUSER_ROLE, emergencyAccount);
+        _grantRole(UNPAUSER_ROLE, governance);
+        _setRoleAdmin(PAUSER_ROLE, DEFAULT_ADMIN_ROLE);
+        _setRoleAdmin(UNPAUSER_ROLE, DEFAULT_ADMIN_ROLE);
     }
+
+    // ── Pause (S4B) ──────────────────────────
+
+    function pause() external onlyRole(PAUSER_ROLE) { _pause(); }
+    function unpause() external onlyRole(UNPAUSER_ROLE) { _unpause(); }
 
     // ── Modifier ──────────────────────────────
 
@@ -115,7 +133,7 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
 
     // ── Admin: Fund + Rate ─────────────────────
 
-    function fundRewards(uint256 amount) external onlyRole(REWARD_MANAGER_ROLE) {
+    function fundRewards(uint256 amount) external onlyRole(REWARD_MANAGER_ROLE) whenNotPaused {
         if (amount == 0) revert InvalidAmount();
         uint256 beforeBalance = IERC20(address(token)).balanceOf(address(this));
         IERC20(address(token)).safeTransferFrom(msg.sender, address(this), amount);
@@ -126,6 +144,7 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
     }
 
     function setRewardRate(uint256 rate) external onlyRole(REWARD_MANAGER_ROLE) {
+        if (paused() && rate != 0) revert("setRewardRate: non-zero rate blocked while paused");
         if (rate > MAX_REWARD_RATE) revert InvalidRewardRate(rate, MAX_REWARD_RATE);
         _updateGlobalReward();
 
@@ -179,6 +198,7 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
     function stake(uint256 amount, uint64 lockSeconds)
         external
         nonReentrant
+        whenNotPaused
         updateReward(msg.sender)
         returns (uint256 positionId)
     {
@@ -197,6 +217,7 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
         _positions[msg.sender].push(
             StakePosition({ amount: received, lockedAt: uint64(block.timestamp), unlockAt: unlockAt, claimed: false })
         );
+        _positionPendingReward[msg.sender][positionId] = _unclaimedRewards[msg.sender];
 
         userPositionCount[msg.sender] = positionId + 1;
         userTotalStaked[msg.sender] += received;
@@ -233,15 +254,19 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
         penalty = (amount * EARLY_UNSTAKE_PENALTY_BPS) / 10_000;
         uint256 netAmount = amount - penalty;
 
-        // Forfeit only THIS position's proportional rewards
-        uint256 accountReward = _unclaimedRewards[msg.sender];
-        uint256 totalBefore = userTotalStaked[msg.sender];
-        uint256 forfeitedReward = totalBefore > 0 ? (accountReward * amount) / totalBefore : 0;
-        _unclaimedRewards[msg.sender] = accountReward - forfeitedReward;
+        // P1-STK-02 + P1-STK-02-VARIANT: per-position forfeiture based on this
+        // position's proportional share of pending rewards, not account aggregate.
+        // This prevents claim→earlyUnstake bypass and stake dilution attacks.
+        uint256 thisPositionPending = _positionPendingReward[msg.sender][positionId];
+        uint256 accountPending = _unclaimedRewards[msg.sender];
+        uint256 forfeitedReward = thisPositionPending;
+        if (forfeitedReward > accountPending) forfeitedReward = accountPending;
+        _unclaimedRewards[msg.sender] = accountPending - forfeitedReward;
 
-        // Sync liability: forfeited rewards are no longer owed
-        if (forfeitedReward > 0 && accruedRewardLiability >= forfeitedReward) {
+        // P2-STK-03: forfeited rewards return to available reserve
+        if (forfeitedReward > 0) {
             accruedRewardLiability -= forfeitedReward;
+            availableRewardReserve += forfeitedReward;
         }
 
         pos.claimed = true;
@@ -254,7 +279,7 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
         emit EarlyUnstake(msg.sender, amount, penalty, positionId);
     }
 
-    function claimRewards() external nonReentrant updateReward(msg.sender) returns (uint256 reward) {
+    function claimRewards() external nonReentrant whenNotPaused updateReward(msg.sender) returns (uint256 reward) {
         reward = _unclaimedRewards[msg.sender];
         if (reward == 0) return 0;
 
@@ -267,6 +292,13 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
         _unclaimedRewards[msg.sender] -= reward;
         accruedRewardLiability -= reward;
         totalRewardPaid += reward;
+
+        // P1-STK-02: after claiming, all position-level pending rewards are cleared.
+        // This prevents claim→earlyUnstake from double-dipping or bypassing forfeiture.
+        uint256 count = userPositionCount[msg.sender];
+        for (uint256 i = 0; i < count; i++) {
+            _positionPendingReward[msg.sender][i] = 0;
+        }
 
         token.systemTransfer(msg.sender, reward, TransferContext.Kind.STAKING_REWARD);
         emit RewardClaimed(msg.sender, reward);

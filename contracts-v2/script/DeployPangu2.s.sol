@@ -121,7 +121,7 @@ contract DeployPangu2 is Script {
         Pangu2TradeRouter tradeRouter = new Pangu2TradeRouter(
             address(token), WBNB, address(costBasis), address(adapter), address(oracle), deployer, emergencyAccount
         );
-        Pangu2Staking staking = new Pangu2Staking(address(token), governance);
+        Pangu2Staking staking = new Pangu2Staking(address(token), governance, emergencyAccount);
 
         // ── 4. 配置系统合约（deployer 临时持有 governance） ──
         token.configureCore(address(costBasis), address(feeVault));
