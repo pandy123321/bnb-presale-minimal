@@ -40,9 +40,10 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
     mapping(address => uint256) private _unclaimedRewards;
 
     // Per-position reward tracking — prevents claim→earlyUnstake bypass.
-    // Each position stores the global rewardPerToken at creation time,
-    // enabling precise per-position reward accrual computation.
-    // NOT an account aggregate snapshot; NOT cleared by claimRewards.
+    // Each position stores the global rewardPerToken at creation time.
+    // On earlyUnstake, positionEarned = amount * (RPT_global - RPT_position) / 1e18.
+    // Claiming does NOT reduce positionEarned — the bypass is prevented by
+    // computing forfeiture from earned, not from remaining _unclaimedRewards.
     mapping(address => mapping(uint256 => uint256)) private _positionRewardPerTokenPaid;
 
     // Individual positions (lock metadata only)
@@ -241,10 +242,10 @@ contract Pangu2Staking is AccessControl, ReentrancyGuard, IPangu2Staking {
         penalty = (amount * EARLY_UNSTAKE_PENALTY_BPS) / 10_000;
         uint256 netAmount = amount - penalty;
 
-        // P1-STK-02 FIX: per-position reward forfeiture based on actual
-        // reward-per-token accumulator delta since position creation.
-        // This position's earned reward = amount * (globalRPT - positionRPT) / 1e18
-        // Capped at _unclaimedRewards to prevent double-counting.
+        // Per-position reward forfeiture: positionEarned computed from RPT delta.
+        // Claiming reduces _unclaimedRewards but does NOT reduce positionEarned.
+        // forfeitedReward = min(positionEarned, accountPending) — the position
+        // forfeits all earned reward still held in the contract's unclaimed pool.
         uint256 positionRPT = _positionRewardPerTokenPaid[msg.sender][positionId];
         uint256 positionEarned = (amount * (rewardPerTokenStored - positionRPT)) / 1e18;
         uint256 accountPending = _unclaimedRewards[msg.sender];
