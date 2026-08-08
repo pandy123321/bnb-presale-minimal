@@ -50,24 +50,21 @@ if ($blk2.hash -ne $bh1) { throw "BLOCK_HASH_MISMATCH" }
 [void]$results.Add("BLOCK|number=$bn1|hash=$bh1|verdict=PASS")
 Write-Host "  PASS: block=$bn1 ($bh1)"
 
-# ======== 3. Bytecode with expected_hash comparison (P1-RT02-01) ========
+# ======== 3. Bytecode Identity — deploy-block runtime vs evidence-block runtime (P1-RT02-01) ========
 Write-Host "=== 3. BYTECODE ==="
 
-# Deployment transaction references from BSC_TESTNET_DEPLOYMENT_BASELINE.md
-# Bytecode identity: on-chain code === deployed code (verified via deployment tx)
-# Source build artifacts (contracts-v2/out/) not available at commit 3ef50b6 in git;
-# identity is proven by deployment transaction traceability.
-$deployTx = @{
-    "Pangu2Token"           = "0x8f6ddf160a6d010d78748095a0bfa0a576e8ca7cd93dbdcc671806b43805398f"
-    "CostBasisManager"      = "0x00dff4728b02e46d4aab34de4864ca8f260d9c3691070f8b589e039b107c489e"
-    "PancakeV2TwapOracle"   = "0xbd85ea70b006874a7a995ed047d1c8c83401335f61ede206de890da43e724382"
-    "SupportPool"           = "0x5e5c58303fa25fd937fc5d099478886c0d85a677d9d8603308b57f1feaf12b63"
-    "FeeVault"              = "0x418e592e4f56eabff5773b93f9053ac3a13372319c71ee64dbf13130f9659312"
-    "BuybackLocker"         = "0x7f299e80f5017b94d1db8c6c0783c1c397afbe03ebafd7235d6e368ce8271d1a"
-    "DividendDistributor"   = "0xb749c44f0e31ec21df27b386061da518bc321dbaa9d048a33e30dc57865d5591"
-    "Pangu2TradeRouter"     = "0x36d1b0662777c539732e726e47a0a5bc48471431f31ea0916a992a95510966bb"
-    "Pangu2Staking"         = "0xd503e6c381fa6fe8326ab3d6299e6263e038db3d94faf6155a4a79d85f80c1bf"
-    "PancakeV2Adapter"      = "0xcc6de4cd4a191d9e16c64a73999ef7bdff3eac2748b25c511749b3214b7ebe16"
+# Deploy blocks from BSC_TESTNET_DEPLOYMENT_BASELINE.md
+$deployBlocks = @{
+    "Pangu2Token"           = 123502176
+    "CostBasisManager"      = 123502181
+    "PancakeV2TwapOracle"   = 123502202
+    "SupportPool"           = 123502210
+    "FeeVault"              = 123502218
+    "BuybackLocker"         = 123502225
+    "DividendDistributor"   = 123502234
+    "Pangu2TradeRouter"     = 123502248
+    "Pangu2Staking"         = 123502253
+    "PancakeV2Adapter"      = 123502195
 }
 
 $contracts = @(
@@ -85,18 +82,47 @@ $contracts = @(
     @{k="PancakeFactory"; a="0x6725F303b657a9451d8BA641348b6761A6CC7a17"}
 )
 
-$bcIdentities = 0
+$bcVerified = 0; $bcFingerprints = 0
 foreach ($c in $contracts) {
-    $code = Rpc $primary "eth_getCode" @($c.a, $blockHex)
-    if (-not $code -or $code -eq "0x") { throw "EMPTY_CODE: $($c.k)" }
-    $hex = $code.Substring(2)
-    $size = $hex.Length / 2
-    $actualHash = Sha256Hex $hex
-    $ref = if ($deployTx[$c.k]) { $deployTx[$c.k].Substring(0,12) + ".." } else { "N/A (pre-existing)" }
-    $verdict = if ($deployTx[$c.k]) { "DEPLOYED_CODE_CAPTURED" } else { "FINGERPRINT_CAPTURED" }
-    Write-Host "  $($c.k): ${size}b sha256=$actualHash ref=$ref -> $verdict"
-    [void]$results.Add("BYTECODE|$($c.k)|$($c.a)|size=$size|runtime_sha256=$actualHash|deploy_tx=$ref|source=BSC_TESTNET_DEPLOYMENT_BASELINE|verdict=$verdict|block=$bn1")
-    if ($deployTx[$c.k]) { $bcIdentities++ }
+    # Current evidence-block runtime
+    $codeNow = Rpc $primary "eth_getCode" @($c.a, $blockHex)
+    if (-not $codeNow -or $codeNow -eq "0x") { throw "EMPTY_CODE: $($c.k) at evidence block" }
+    $hexNow = $codeNow.Substring(2)
+    $size = $hexNow.Length / 2
+    $hashNow = Sha256Hex $hexNow
+
+    $db = $deployBlocks[$c.k]
+    if ($db -gt 0) {
+        # Try deploy block, then +10, +50, +100 until unpruned (bytecode immutable)
+        $hashDeploy = $null; $usedBlock = $db
+        foreach ($offset in @(0, 10, 50, 100, 200, 500)) {
+            $tryBlock = $db + $offset
+            $tryHex = "0x" + $tryBlock.ToString('x')
+            try {
+                $codeDeploy = Rpc $primary "eth_getCode" @($c.a, $tryHex)
+                if ($codeDeploy -and $codeDeploy -ne "0x") {
+                    $hashDeploy = Sha256Hex $codeDeploy.Substring(2)
+                    $usedBlock = $tryBlock
+                    break
+                }
+            } catch { continue }
+        }
+        if (-not $hashDeploy) {
+            Write-Host "  $($c.k): PRUNED at all historical blocks -> UNABLE_TO_VERIFY"
+            [void]$results.Add("BYTECODE|$($c.k)|$($c.a)|size=$size|evidence_hash=$hashNow|verdict=UNABLE_TO_VERIFY_PRUNED|block=$bn1")
+            continue
+        }
+        $match = ($hashNow -eq $hashDeploy)
+        $verdict = if ($match) { "IDENTITY_VERIFIED" } else { "IDENTITY_MISMATCH" }
+        if ($match) { $bcVerified++ }
+        Write-Host "  $($c.k): deploy@${usedBlock}=$hashDeploy evidence@${bn1}=$hashNow match=$match -> $verdict"
+        [void]$results.Add("BYTECODE|$($c.k)|$($c.a)|size=$size|historical_hash@$usedBlock=$hashDeploy|evidence_hash@$bn1=$hashNow|match=$match|verdict=$verdict")
+    } else {
+        $verdict = "FINGERPRINT_CAPTURED"
+        $bcFingerprints++
+        Write-Host "  $($c.k): ${size}b sha256=$hashNow (pre-existing, no deploy block) -> $verdict"
+        [void]$results.Add("BYTECODE|$($c.k)|$($c.a)|size=$size|evidence_hash=$hashNow|verdict=$verdict|block=$bn1")
+    }
 }
 
 # ======== 4. Pair ========
@@ -204,11 +230,11 @@ $totalRoleRequired = $roleCheck
 $totalRoleNA = $roleNA
 $totalGetterRequired = $getters.Count
 $totalGetterNA = 0
-$totalRequired = $totalChain + $bcIdentities + $totalPair + $totalRoleRequired + $totalGetterRequired
-$passRequired = 1 + $bcIdentities + 1 + $rolePass + $getterPass  # chain + all bytecode + pair + role + getter
+$totalRequired = $totalChain + 10 + $totalPair + $totalRoleRequired + $totalGetterRequired  # 10 project contracts
+$passRequired = 1 + $bcVerified + 1 + $rolePass + $getterPass
 
 [void]$results.Add("COUNT|total_required=$totalRequired|pass=$passRequired|fail=$($totalRequired - $passRequired)")
-[void]$results.Add("COUNT_DETAIL|chain=1/1|bytecode_deployed=$bcIdentities/$totalBytecode|pair=1/1|role_expected_true_pass=$rolePass/$totalRoleRequired|role_na=$totalRoleNA|getter_pass=$getterPass/$totalGetterRequired|getter_fail=$getterFail/$totalGetterRequired")
+[void]$results.Add("COUNT_DETAIL|chain=1/1|bytecode_verified=$bcVerified/10|bytecode_fingerprint=$bcFingerprints|pair=1/1|role_expected_true_pass=$rolePass/$totalRoleRequired|role_na=$totalRoleNA|getter_pass=$getterPass/$totalGetterRequired|getter_fail=$getterFail/$totalGetterRequired")
 
 # ======== 8. Write evidence ========
 $out = "E:\github\bnb\bnb-presale-minimal\docs\current\go-backend-v2\runtime-gate\rt02_raw_evidence.txt"
@@ -219,5 +245,5 @@ $content = "$header`n$body"
 $sha.Dispose()
 
 Write-Host "`n=== COMPLETE ==="
-Write-Host "CHAIN: 1/1 | BYTECODE: $bcIdentities/12 deployed | PAIR: 1/1 | ROLE: $rolePass/$totalRoleRequired ($totalRoleNA NA) | GETTER: $getterPass/$totalGetterRequired ($getterFail fail)"
+Write-Host "CHAIN: 1/1 | BYTECODE: $bcVerified/10 verified ($bcFingerprints fingerprint) | PAIR: 1/1 | ROLE: $rolePass/$totalRoleRequired ($totalRoleNA NA) | GETTER: $getterPass/$totalGetterRequired ($getterFail fail)"
 Write-Host "TOTAL_REQUIRED=$totalRequired PASS=$passRequired FAIL=$(($totalRequired - $passRequired))"

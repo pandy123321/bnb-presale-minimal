@@ -7,7 +7,7 @@
 | RPC_APPROVAL_ID | RT02-RPC-2026-001 |
 | APPROVED_BY | Project Owner |
 | APPROVED_AT | 2026-08-08 |
-| DECISION_METHOD | Explicit signoff (Fix Cycle 3) |
+| DECISION_SOURCE | Owner explicit signoff in Fix Cycle 3 session |
 | SCOPE | RT-GATE-02 BSC Testnet Fixed-Block Readback |
 | CHAIN_ID | 97 (BSC Testnet) |
 
@@ -20,13 +20,10 @@
 
 ## Evidence Source
 
-These endpoints are the project-standard BSC Testnet RPCs, confirmed across all `.env` files:
-
 - `contracts-v2/.env` -- `RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545`
 - `backend/.env` -- `PANGU2_RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545`
 - `services/chain-worker/.env` -- `RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545`
 - `apps/dapp/.env` -- `VITE_RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545`
-- `infra/staging/.env.example` -- backup: `https://data-seed-prebsc-2-s1.binance.org:8545`
 
 ## Environment Variable Binding
 
@@ -42,6 +39,5 @@ Missing env causes `throw` with `BLOCKED_APPROVED_RPC_REQUIRED`.
 ## Constraints
 
 - NO fallback to hardcoded URLs
-- NO auto-discovery of RPC endpoints
-- NO public endpoint enumeration
+- NO auto-discovery
 - NO silent default
