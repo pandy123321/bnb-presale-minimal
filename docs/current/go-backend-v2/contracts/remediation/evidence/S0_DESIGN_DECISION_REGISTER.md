@@ -375,16 +375,37 @@ TransferContext allowlist member
 
 **Frozen result**: **NOT SUPPORTED — EOA-only.** Contract accounts (smart wallets, multisigs, counterfactual addresses) are not supported in the PANGU2 V2 baseline. This is a permanent product boundary for V2.
 
+**Decision Evidence**:
+
+```text
+Decision ID: D-11
+Decision Owner: pandy123321 (Project Owner, session 2026-08-07/BNB合约)
+Decision: Contract Accounts NOT SUPPORTED in PANGU2 V2
+EOA-only: YES
+Smart Wallet / Multisig / Counterfactual Support: NO
+Accepted Risk: smart wallets and counterfactual addresses cannot interact;
+their assets would be permanently locked — documented V2 limitation
+ACCEPTED_DEVIATION: YES (P3-TKN-01 closed by user-approved deviation)
+Decision Date: 2026-08-07
+Evidence Reference: S0-P2-10 revision (this document)
+```
+
 **Rationale**: The deployed baseline at `3ef50b6` does not support contract accounts. Adding contract account support would require a full lifecycle (APPROVED/EXIT_ONLY/REVOKED), identity constraints (initCodeHash, trusted factory), and deep integration across Token, CostBasis, TransferContext, and Router. This scope exceeds V2 remediation objectives.
 
+**Implementation Impact**: No contract-account compatibility Solidity implementation in V2. All contract-account-related ABI items (ContractStatus enum, setContractStatus, contractStatus, ContractStatusUpdated event, InvalidContractState error) are permanently REMOVED from S0 freeze.
+
+**Finding Closure Impact**: P3-TKN-01 closed via `ACCEPTED_DEVIATION` with user approval evidence above. S8 (Contract Account Lifecycle stage) REQUIRED — must document this deviation and verify no regression. M3 REQUIRED — the ACCEPTED_DEVIATION must be re-verified at final code exit gate. S9 cannot proceed until M3 is complete.
+
 **Consequences**:
-- All contract-account-related ABI items (ContractStatus enum, setContractStatus, contractStatus, ContractStatusUpdated event, InvalidContractState error) are REMOVED from S0 freeze
+- All contract-account-related ABI items are REMOVED from S0 freeze
 - REG-INV-02 (revocation) is DEFERRED / NOT_APPLICABLE to V2 EOA-only baseline
 - Smart wallets and counterfactual addresses cannot interact with PANGU2 V2; their assets would be permanently locked — this is a documented V2 limitation
 - Contract account support MAY be considered for a future V3 scope, with a full design freeze
 
-| **Impact** | NONE (V2 end-state is EOA-only) |
+| **Implementation Impact** | No contract-account support implementation in V2 |
+| **Finding Closure Impact** | S8 REQUIRED (document deviation) + M3 REQUIRED (re-verify at S9 gate) |
 | **Economic baseline change** | NO |
+| **P3-TKN-01 Status** | `ACCEPTED_DEVIATION` (user-approved) |
 | **Status** | `FROZEN` |
 
 ---

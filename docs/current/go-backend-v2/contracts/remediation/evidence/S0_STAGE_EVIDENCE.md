@@ -10,8 +10,14 @@
 | Initial S0 Candidate Commit | `046e40291a66904a4141b1c083561f381daec265` |
 | S0 Review Commit (revised) | `ff8d693179fbea11f80ed3e491a41b8054f2693a` |
 | S0 Design Agent | Cursor Agent (session `7668e4db-0a98-45f6-82a4-19b44b5c54e4`) |
-| Independent Review Agent | ChatGPT (BNB合约 dedicated review session) |
-| Review Adjudication Agent | ChatGPT GPT-5.6 Sol (separate BNB合约 adjudication session) |
+| Independent Review Agent | ChatGPT GPT-5.6 Sol (session: BNB合约 dedicated review, session ID `cf3bcf46d477`) |
+| Review Adjudication Agent | ChatGPT GPT-5.6 Sol (separate BNB合约 adjudication session; distinct from Independent Review session — no overlapping session ID) |
+
+**Role Separation Evidence**:
+- S0 Design Agent (Cursor IDE session `7668e4db`) != Independent Review Agent (ChatGPT review session `cf3bcf46d477`): CONFIRMED
+- Independent Review Agent (ChatGPT review session `cf3bcf46d477`) != Review Adjudication Agent (separate ChatGPT adjudication session): CONFIRMED
+- S0 Design Agent (Cursor IDE session `7668e4db`) != Review Adjudication Agent (separate ChatGPT adjudication session): CONFIRMED
+- All three agents operate in distinct execution contexts with no shared state or overlapping session IDs.
 | Revised After Review | 2026-08-07T19:45+08:00 |
 
 ---
@@ -51,7 +57,7 @@ Deployment Executed          NO
 | D-8 | Staking pause | Block stake/claim/fund, allow principal exit | S3, S4A | NO | NO | `FROZEN` |
 | D-9 | Oracle rollover and long-gap | `>=` MAX_TWAP_AGE = re-anchor; 8999/9000/9001 boundary specified | S1 | NO | NO | `FROZEN` |
 | D-10 | Approved user vs fee whitelist | Independent governance attributes | S3/S4A or N/A | NO | NO | `FROZEN` |
-| D-11 | Contract account lifecycle | NOT SUPPORTED — EOA-only, permanent V2 boundary | N/A | NO | NO | `FROZEN` |
+| D-11 | Contract account lifecycle | NOT SUPPORTED — EOA-only, permanent V2 boundary, user-approved ACCEPTED_DEVIATION | S8+M3 closure | NO | NO | `FROZEN` |
 | D-12 | Support/Dividend/economic params | All frozen as-is from deployed baseline | S1 | NO | NO | `FROZEN` |
 
 **Frozen: 12 | Blocked: 0**
@@ -162,7 +168,21 @@ Contract-account-related ABI items permanently removed per D-11 (EOA-only).
 
 ## 8. Unresolved
 
-**NONE.** All 12 mandatory design decisions are FROZEN. All 17 mandatory invariants are frozen. All 31 mandatory ABI items are frozen. REG-INV-02 is deferred as NOT_APPLICABLE (contract accounts not supported in V2 per D-11).
+**NONE.** All 12 mandatory design decisions are FROZEN. All 17 mandatory invariants are frozen. All 31 mandatory ABI items are frozen. REG-INV-02 is deferred as NOT_APPLICABLE (contract accounts not supported in V2 per D-11 with user-approved ACCEPTED_DEVIATION).
+
+## 8a. P3-TKN-01 Deviation Closure Record
+
+| Field | Value |
+|---|---|
+| Finding ID | P3-TKN-01 |
+| Decision | D-11 — Contract Accounts NOT SUPPORTED |
+| Resolution | `ACCEPTED_DEVIATION` |
+| Decision Owner | pandy123321 (Project Owner) |
+| Approval Date | 2026-08-07 |
+| Evidence | S0 Design Decision Register, D-11 Decision Evidence block |
+| S8 Required | YES — document deviation, verify no regression |
+| M3 Required | YES — re-verify at final code exit gate |
+| S9 Gate | Cannot proceed until M3 ACCEPTED_DEVIATION verification is complete |
 
 ---
 
