@@ -82,8 +82,8 @@ The original finding that Actual=False did not match the Original Expected=True 
 
 | Bind | Value |
 |---|---|
-| Manifest SHA | bound in PAYLOAD_MANIFEST.csv (OWNER_SECURITY_DECISION.md) |
-| OWNER_SECURITY_DECISION.md SHA256 | 95a47a3ed5c9e71eb5567ea4a4af72dda3e13032e274bd262f250962fa9dce27 |
+|| Manifest SHA | bound in RT02_FINAL_PAYLOAD_MANIFEST.csv (OWNER_SECURITY_DECISION.md) |
+|| External binding | RT02_FINAL_PAYLOAD_MANIFEST.csv → RT02_FINAL_PAYLOAD_MANIFEST.csv.sha256 |
 
 This decision is binding for:
 - RT-GATE-02 Role verification (Expected=False, 8/8 PASS)

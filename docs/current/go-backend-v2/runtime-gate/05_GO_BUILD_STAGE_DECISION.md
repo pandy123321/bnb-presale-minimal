@@ -3,31 +3,34 @@
 ## 状态
 
 ```text
-RT-GATE-03_GO_BUILD_STAGE = APPROVED
+RT-GATE-03_GO_BUILD_STAGE = FIX_READY / INDEPENDENT_RETEST_PENDING
 OWNER_DECISION_REF = OWNER_DECISION_V2.md (RT03-OWNER-2026-001)
 ```
 
 ## Decision 结论
 
 ```text
-RT-GATE-03 = APPROVED
+GO_VERSION_DECIDED = YES (1.26.5)
+APPROVE_DOWNLOAD = YES
+G1_BOOTSTRAP_SCOPE_AUTHORIZED = YES
 
-G0 = Pre-development Freeze（RT-GATE-01 PASS + RT-GATE-02 Owner Signoff）
-G1 = Go Skeleton / Bootstrap（G0 完成 → 骨架已创建）
+RT-GATE-03 = FIX_READY / INDEPENDENT_RETEST_PENDING
 
-CURRENT: backend-go/ exists, G1 bootstrapped with go build/go vet PASS.
-         See OWNER_DECISION_V2.md for Go 1.26.5 + dependency authorization.
+G0 = Pre-development Freeze（RT-GATE-01 PASS + RT-GATE-02 FIX_READY）
+G1 = Go Skeleton / Bootstrap（骨架已创建，go build/go vet PASS）
+
+CURRENT: backend-go/ exists, G1 BOOTSTRAPPED. Independent Review PENDING.
 ```
 
 ## 执行环境
 
 | 项 | 值 |
 |---|---|
-| `backend-go/` | 不存在 |
-| `go.mod` | 不存在 |
-| Go 工具链 | 未安装 |
-| Go 精确版本 | `UNRESOLVED_VERSION_PIN`（冻结文档声明） |
-| 开源依赖批准 | `NO_DOWNLOAD_AUTHORIZED`（所有依赖均为 ADOPTION_CANDIDATE / CONDITIONAL_ADOPTION_CANDIDATE） |
+| `backend-go/` | 已创建（G1 Bootstrap） |
+| `go.mod` | Go 1.26.5, chi v5.2.1 + pgx v5.7.4 |
+| Go 工具链 | 已安装 (go1.26.5 windows/amd64) |
+| Go 精确版本 | 1.26.5（OWNER_DECISION_V2.md RT03-OWNER-2026-001） |
+| 开源依赖批准 | APPROVED（OWNER_DECISION_V2.md RT03-OWNER-2026-001） |
 
 ## 执行 Agent 决策
 
@@ -156,13 +159,17 @@ G1 的 `go.mod` 已通过 `go mod tidy` 精简至仅包含实际所需的直接�
 ## Decision 结论
 
 ```text
-RT-GATE-03 = APPROVED
+GO_VERSION_DECIDED = YES (1.26.5)
+APPROVE_DOWNLOAD = YES
+G1_BOOTSTRAP_SCOPE_AUTHORIZED = YES
+
+RT-GATE-03 = FIX_READY / INDEPENDENT_RETEST_PENDING
 OWNER_DECISION_REF = OWNER_DECISION_V2.md (RT03-OWNER-2026-001)
 
-G0 = Pre-development Freeze（RT-GATE-01 PASS + RT-GATE-02 Owner Signoff）
-G1 = Go Skeleton / Bootstrap（G0 完成 → 骨架已创建，go build/go vet PASS）
+G0 = Pre-development Freeze（RT-GATE-01 PASS + RT-GATE-02 FIX_READY）
+G1 = Go Skeleton / Bootstrap（骨架已创建，go build/go vet PASS）
 
-CURRENT: backend-go/ exists, G1 BOOTSTRAPPED, FIX_READY for Independent Review
+CURRENT: backend-go/ exists, G1 BOOTSTRAPPED. Independent Review PENDING.
 ```
 
 本 Decision 不授权任何 Go 业务代码实现，不授权 G2 stage entry 直到 G1 通过 Independent Review。

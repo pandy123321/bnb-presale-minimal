@@ -1,8 +1,9 @@
-﻿COMMIT_SHA=d4c91ebcf30467d50001f4b2a87d316b0b7cff61
+SOURCE_CODE_COMMIT=d4c91ebcf30467d50001f4b2a87d316b0b7cff61
+WORKING_DIRECTORY=E:\github\bnb\bnb-presale-minimal\backend-go
 GO_VERSION=go version go1.26.5 windows/amd64
-GOENV_GOMOD=NUL
+GOENV_GOMOD=E:\github\bnb\bnb-presale-minimal\backend-go\go.mod
 GOPROXY=https://goproxy.cn,direct
-BUILD_TIME=2026-08-08T22:00:00+08:00
+BUILD_TIME=2026-08-08T22:20:00+08:00
 
 COMMAND=go mod tidy
 EXIT_CODE=0

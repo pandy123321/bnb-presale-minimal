@@ -83,5 +83,7 @@ This decision is binding for:
 
 | Bind | Value |
 |---|---|
-| Manifest SHA | bound in PAYLOAD_MANIFEST.csv (OWNER_DECISION_V2.md) |
-| External binding | PAYLOAD_MANIFEST.csv → PAYLOAD_MANIFEST.csv.sha256 |
+| Manifest SHA | bound in RT03_PAYLOAD_MANIFEST.csv (OWNER_DECISION_V2.md) |
+| External binding | RT03_PAYLOAD_MANIFEST.csv → RT03_PAYLOAD_MANIFEST.csv.sha256 |
+
+Note: This file is externally bound by the RT03 stage Manifest. Internal self-hash is intentionally omitted. See RT03_PAYLOAD_MANIFEST.csv for actual SHA binding.
