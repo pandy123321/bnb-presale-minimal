@@ -1,0 +1,14 @@
+﻿COMMIT_SHA=d4c91ebcf30467d50001f4b2a87d316b0b7cff61
+GO_VERSION=go version go1.26.5 windows/amd64
+GOENV_GOMOD=NUL
+GOPROXY=https://goproxy.cn,direct
+BUILD_TIME=2026-08-08T22:00:00+08:00
+
+COMMAND=go mod tidy
+EXIT_CODE=0
+
+COMMAND=go build ./...
+EXIT_CODE=0
+
+COMMAND=go vet ./...
+EXIT_CODE=0

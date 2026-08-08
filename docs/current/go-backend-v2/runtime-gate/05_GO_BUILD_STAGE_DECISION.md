@@ -3,7 +3,20 @@
 ## 状态
 
 ```text
-RT-GATE-03_GO_BUILD_STAGE = DECISION_READY
+RT-GATE-03_GO_BUILD_STAGE = APPROVED
+OWNER_DECISION_REF = OWNER_DECISION_V2.md (RT03-OWNER-2026-001)
+```
+
+## Decision 结论
+
+```text
+RT-GATE-03 = APPROVED
+
+G0 = Pre-development Freeze（RT-GATE-01 PASS + RT-GATE-02 Owner Signoff）
+G1 = Go Skeleton / Bootstrap（G0 完成 → 骨架已创建）
+
+CURRENT: backend-go/ exists, G1 bootstrapped with go build/go vet PASS.
+         See OWNER_DECISION_V2.md for Go 1.26.5 + dependency authorization.
 ```
 
 ## 执行环境
@@ -118,36 +131,38 @@ for development freeze.
 
 但当前 Responsible Owner Freeze 已签署为 `G0 → G1` 路径，不存在强制"Build 在 Freeze 之前"的冲突。因此本 Decision 采用推荐方案。
 
-## Go 版本 Decision
+### Go 版本 Decision
 
-根据 `07_FRAMEWORK_AND_DEPENDENCIES.md`：
+根据 `07_FRAMEWORK_AND_DEPENDENCIES.md` 和 `OWNER_DECISION_V2.md (RT03-OWNER-2026-001)`：
 
 ```text
-Go 精确 minor/patch 为 UNRESOLVED_VERSION_PIN
+Go 精确版本 = 1.26.5 (2026-07-07 发布，最新稳定版含安全修复)
+Owner Decision: "按照你的建议选" → APPROVED
 ```
-
-必须从 Go 官方稳定发布中选定版本。截至 2026-08，Go 最新稳定版本序列为 Go 1.23.x / 1.24.x（具体需核实 Go 官方 release page）。该 Decision 需要人工完成。
 
 ## 依赖准入
 
-所有依赖（chi, pgx, sqlc, goose, oapi-codegen, go-ethereum, river, opentelemetry, prometheus, uuid）均为 `ADOPTION_CANDIDATE` 或 `CONDITIONAL_ADOPTION_CANDIDATE`，等待 `APPROVE_DOWNLOAD`。
+所有依赖（chi, pgx, sqlc, goose, oapi-codegen, go-ethereum, river, opentelemetry, prometheus, uuid）已通过 `OWNER_DECISION_V2.md (RT03-OWNER-2026-001)` 获得 `APPROVE_DOWNLOAD`。
 
-特别是：
+G1 当前仅实际 import chi + pgx（Skeleton 所需）。其余依赖批准用于 G2+，不在 G1 阶段导入。
 
-- `go-ethereum`：LGPL/GPL 组件风险，必须逐包法律复核后才能集成
-- `river`：MPL-2.0 候选，需文件边界复核
+特别注意：
 
-G1 的 `go mod init` 在下发 `APPROVE_DOWNLOAD` 之前不得添加任何 `require` 行。
+- `go-ethereum`：LGPL/GPL 组件风险，G1 仅限 ABI JSON 读取；完整 EVM 集成需 G2 前法律复核
+- `river`：MPL-2.0 候选，G1 不导入；G2 前需文件边界复核
+
+G1 的 `go.mod` 已通过 `go mod tidy` 精简至仅包含实际所需的直接依赖和间接依赖。
 
 ## Decision 结论
 
 ```text
-RT-GATE-03 = DECISION_READY
+RT-GATE-03 = APPROVED
+OWNER_DECISION_REF = OWNER_DECISION_V2.md (RT03-OWNER-2026-001)
 
-G0 = Pre-development Freeze（包含 RT-GATE-01 + RT-GATE-02 + 依赖下载批准）
-G1 = Go Skeleton / Bootstrap（G0 完成后允许创建骨架，禁止业务实现）
+G0 = Pre-development Freeze（RT-GATE-01 PASS + RT-GATE-02 Owner Signoff）
+G1 = Go Skeleton / Bootstrap（G0 完成 → 骨架已创建，go build/go vet PASS）
 
-CURRENT: backend-go/ does not exist → G0 not yet complete → G1 not yet authorized
+CURRENT: backend-go/ exists, G1 BOOTSTRAPPED, FIX_READY for Independent Review
 ```
 
-本 Decision 不授权任何 Go 业务代码实现，不授权下载未经批准的依赖，不授权创建 `go.mod` 的 `require` 行。
+本 Decision 不授权任何 Go 业务代码实现，不授权 G2 stage entry 直到 G1 通过 Independent Review。
