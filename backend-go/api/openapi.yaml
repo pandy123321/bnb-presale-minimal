@@ -1,0 +1,1221 @@
+openapi: 3.1.0
+info:
+  title: BingGoPlus API V2
+  version: 2.0.0-freeze-candidate
+  description: >-
+    Greenfield Go API contract. The product name is BingGoPlus; deployed EVM
+    contract names remain Pangu2*. Mainnet is outside this specification.
+x-freeze-status: FREEZE_CANDIDATE
+x-chain-scope: [97]
+servers:
+  - url: /
+    description: Paths contain their complete Public/Admin V2 prefix.
+tags:
+  - {name: PublicSystem}
+  - {name: PublicAuth}
+  - {name: Quote}
+  - {name: Wallet}
+  - {name: Staking}
+  - {name: Dividend}
+  - {name: Buyback}
+  - {name: AdminAuth}
+  - {name: AdminRead}
+  - {name: Governance}
+paths:
+  /api/v2/projects/binggoplus/config:
+    get:
+      operationId: getBingGoPlusConfig
+      tags: [PublicSystem]
+      responses:
+        '200': {$ref: '#/components/responses/ConfigResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /api/v2/projects/binggoplus/system-status:
+    get:
+      operationId: getSystemStatus
+      tags: [PublicSystem]
+      responses:
+        '200': {$ref: '#/components/responses/SystemStatusResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /api/v2/projects/binggoplus/contracts:
+    get:
+      operationId: listPublicContracts
+      tags: [PublicSystem]
+      responses:
+        '200': {$ref: '#/components/responses/ContractListResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /api/v2/projects/binggoplus/market:
+    get:
+      operationId: getMarketSummary
+      tags: [PublicSystem]
+      responses:
+        '200': {$ref: '#/components/responses/MarketResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /api/v2/projects/binggoplus/auth/nonce:
+    post:
+      operationId: issueWalletChallenge
+      tags: [PublicAuth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WalletChallengeRequest'}
+      responses:
+        '201': {$ref: '#/components/responses/WalletChallengeResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /api/v2/projects/binggoplus/auth/verify:
+    post:
+      operationId: verifyWalletChallenge
+      tags: [PublicAuth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WalletVerifyRequest'}
+      responses:
+        '204': {description: Wallet session cookie created.}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /api/v2/projects/binggoplus/auth/logout:
+    post:
+      operationId: logoutWallet
+      tags: [PublicAuth]
+      security: [{walletSession: []}]
+      responses:
+        '204': {description: Wallet session revoked.}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /api/v2/projects/binggoplus/quotes/buy:
+    post:
+      operationId: previewBuy
+      tags: [Quote]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - {$ref: '#/components/schemas/QuotePolicy'}
+                - type: object
+                  required: [buyer, bnb_in_raw]
+                  properties:
+                    buyer: {$ref: '#/components/schemas/Address'}
+                    bnb_in_raw: {$ref: '#/components/schemas/Amount'}
+      responses:
+        '200': {$ref: '#/components/responses/QuoteResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /api/v2/projects/binggoplus/quotes/sell:
+    post:
+      operationId: previewSell
+      tags: [Quote]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - {$ref: '#/components/schemas/QuotePolicy'}
+                - type: object
+                  required: [seller, token_in_raw]
+                  properties:
+                    seller: {$ref: '#/components/schemas/Address'}
+                    token_in_raw: {$ref: '#/components/schemas/Amount'}
+      responses:
+        '200': {$ref: '#/components/responses/QuoteResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /api/v2/projects/binggoplus/wallets/{address}/summary:
+    get:
+      operationId: getWalletSummary
+      tags: [Wallet]
+      parameters: [{$ref: '#/components/parameters/AddressPath'}]
+      responses:
+        '200': {$ref: '#/components/responses/WalletSummaryResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /api/v2/projects/binggoplus/wallets/{address}/transactions:
+    get:
+      operationId: listWalletTransactions
+      tags: [Wallet]
+      parameters:
+        - {$ref: '#/components/parameters/AddressPath'}
+        - {$ref: '#/components/parameters/Limit'}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200': {$ref: '#/components/responses/ActivityListResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /api/v2/projects/binggoplus/wallets/{address}/staking/positions:
+    get:
+      operationId: listStakingPositions
+      tags: [Staking]
+      parameters: [{$ref: '#/components/parameters/AddressPath'}]
+      responses:
+        '200': {$ref: '#/components/responses/StakingPositionsResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /api/v2/projects/binggoplus/wallets/{address}/staking/earned:
+    get:
+      operationId: getStakingEarned
+      tags: [Staking]
+      parameters: [{$ref: '#/components/parameters/AddressPath'}]
+      responses:
+        '200': {$ref: '#/components/responses/AmountResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /api/v2/projects/binggoplus/staking/status:
+    get:
+      operationId: getPublicStakingStatus
+      tags: [Staking]
+      responses:
+        '200': {$ref: '#/components/responses/StakingStatusResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /api/v2/projects/binggoplus/dividends/epochs/current:
+    get:
+      operationId: getCurrentDividendEpoch
+      tags: [Dividend]
+      responses:
+        '200': {$ref: '#/components/responses/DividendEpochResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /api/v2/projects/binggoplus/dividends/epochs/{epoch_id}:
+    get:
+      operationId: getDividendEpoch
+      tags: [Dividend]
+      parameters: [{$ref: '#/components/parameters/EpochId'}]
+      responses:
+        '200': {$ref: '#/components/responses/DividendEpochResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /api/v2/projects/binggoplus/dividends/epochs/{epoch_id}/proofs/{address}:
+    get:
+      operationId: getDividendProof
+      tags: [Dividend]
+      parameters:
+        - {$ref: '#/components/parameters/EpochId'}
+        - {$ref: '#/components/parameters/AddressPath'}
+      responses:
+        '200': {$ref: '#/components/responses/DividendProofResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /api/v2/projects/binggoplus/buybacks:
+    get:
+      operationId: listBuybacks
+      tags: [Buyback]
+      parameters:
+        - {$ref: '#/components/parameters/Limit'}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200': {$ref: '#/components/responses/BuybackListResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /api/v2/projects/binggoplus/locker/batches:
+    get:
+      operationId: listLockerBatches
+      tags: [Buyback]
+      parameters:
+        - {$ref: '#/components/parameters/Limit'}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200': {$ref: '#/components/responses/LockerBatchListResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/csrf:
+    get:
+      operationId: issueAdminCsrf
+      tags: [AdminAuth]
+      responses:
+        '200':
+          description: CSRF token and cookie.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/BaseEnvelope'}
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [csrf_token]
+                        properties: {csrf_token: {type: string}}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/auth/login:
+    post:
+      operationId: loginAdmin
+      tags: [AdminAuth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [username, password]
+              properties:
+                username: {type: string, minLength: 1, maxLength: 128}
+                password: {type: string, minLength: 12, maxLength: 1024}
+      responses:
+        '204': {description: Admin session cookie created.}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/auth/me:
+    get:
+      operationId: getAdminMe
+      tags: [AdminAuth]
+      security: [{adminSession: []}]
+      responses:
+        '200': {$ref: '#/components/responses/AdminMeResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/auth/logout:
+    post:
+      operationId: logoutAdmin
+      tags: [AdminAuth]
+      security: [{adminSession: []}]
+      parameters: [{$ref: '#/components/parameters/Csrf'}]
+      responses:
+        '204': {description: Admin session revoked.}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/dashboard:
+    get:
+      operationId: getAdminDashboard
+      tags: [AdminRead]
+      security: [{adminSession: []}]
+      responses:
+        '200': {$ref: '#/components/responses/DashboardResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/contracts:
+    get:
+      operationId: listAdminContracts
+      tags: [AdminRead]
+      security: [{adminSession: []}]
+      responses:
+        '200': {$ref: '#/components/responses/ContractListResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/jobs:
+    get:
+      operationId: listJobs
+      tags: [AdminRead]
+      security: [{adminSession: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Limit'}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200': {$ref: '#/components/responses/JobListResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/jobs/{job_id}:
+    get:
+      operationId: getJob
+      tags: [AdminRead]
+      security: [{adminSession: []}]
+      parameters: [{$ref: '#/components/parameters/JobId'}]
+      responses:
+        '200': {$ref: '#/components/responses/JobResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/jobs/{job_id}/retry:
+    post:
+      operationId: retryJob
+      tags: [AdminRead]
+      security: [{adminSession: []}]
+      parameters:
+        - {$ref: '#/components/parameters/JobId'}
+        - {$ref: '#/components/parameters/Csrf'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      responses:
+        '202': {$ref: '#/components/responses/JobResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/audit-logs:
+    get:
+      operationId: listAuditLogs
+      tags: [AdminRead]
+      security: [{adminSession: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Limit'}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200': {$ref: '#/components/responses/AuditListResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/contracts/{contract_key}:
+    get:
+      operationId: getAdminContractEvidence
+      tags: [AdminRead]
+      security: [{adminSession: []}]
+      parameters: [{$ref: '#/components/parameters/ContractKey'}]
+      responses:
+        '200': {$ref: '#/components/responses/ContractResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/contracts/evidence/readback-jobs:
+    post:
+      operationId: createContractReadbackJob
+      tags: [AdminRead]
+      security: [{adminSession: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Csrf'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      responses:
+        '202': {$ref: '#/components/responses/JobResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/governance/read/{read_model}:
+    get:
+      operationId: getGovernanceReadModel
+      tags: [AdminRead]
+      security: [{adminSession: []}]
+      parameters:
+        - name: read_model
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [trading-status, buyback-status, oracle-status, pause-status, system-addresses, operator-balance]
+      responses:
+        '200': {$ref: '#/components/responses/GovernanceReadResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/staking/coverage:
+    get:
+      operationId: getAdminStakingCoverage
+      tags: [AdminRead]
+      security: [{adminSession: []}]
+      responses:
+        '200': {$ref: '#/components/responses/StakingStatusResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/governance/commands:
+    get:
+      operationId: listGovernanceCommands
+      tags: [Governance]
+      security: [{adminSession: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Limit'}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200': {$ref: '#/components/responses/CommandListResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/governance/commands/{command_id}:
+    get:
+      operationId: getGovernanceCommand
+      tags: [Governance]
+      security: [{adminSession: []}]
+      parameters: [{$ref: '#/components/parameters/CommandId'}]
+      responses:
+        '200': {$ref: '#/components/responses/CommandResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/governance/commands/{command_id}/{decision}:
+    post:
+      operationId: decideGovernanceCommand
+      tags: [Governance]
+      security: [{adminSession: []}]
+      parameters:
+        - {$ref: '#/components/parameters/CommandId'}
+        - name: decision
+          in: path
+          required: true
+          schema: {type: string, enum: [approve, reject, cancel]}
+        - {$ref: '#/components/parameters/Csrf'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties: {reason: {type: string, minLength: 1, maxLength: 2000}}
+      responses:
+        '202': {$ref: '#/components/responses/GovernanceDecisionResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/governance/actions/{action}:
+    post:
+      operationId: createGovernanceAction
+      description: >-
+        Fixed action-to-contract-and-selector allowlist. The request never accepts
+        target, selector, or arbitrary calldata.
+      tags: [Governance]
+      security: [{adminSession: []}]
+      parameters:
+        - name: action
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - token-set-pair
+              - token-set-fee-whitelist
+              - token-set-system-address
+              - contract-pause
+              - contract-unpause
+              - buyback-trigger
+              - oracle-update
+              - locker-release
+              - fee-vault-convert-support
+              - fee-vault-fund-dividend
+              - staking-fund-rewards
+              - staking-set-reward-rate
+        - {$ref: '#/components/parameters/Csrf'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/GovernanceActionRequest'}
+      responses:
+        '202': {$ref: '#/components/responses/CommandResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/dividends/epochs:
+    get:
+      operationId: listAdminDividendEpochs
+      tags: [Dividend]
+      security: [{adminSession: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Limit'}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200': {$ref: '#/components/responses/DividendEpochListResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+    post:
+      operationId: createDividendEpoch
+      tags: [Dividend]
+      security: [{adminSession: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Csrf'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [snapshot_block_number, snapshot_block_hash, total_reward_raw]
+              properties:
+                snapshot_block_number: {$ref: '#/components/schemas/Amount'}
+                snapshot_block_hash: {$ref: '#/components/schemas/Hash'}
+                total_reward_raw: {$ref: '#/components/schemas/Amount'}
+      responses:
+        '202': {$ref: '#/components/responses/DividendEpochResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/dividends/epochs/{epoch_id}/build:
+    post:
+      operationId: buildDividendEpoch
+      tags: [Dividend]
+      security: [{adminSession: []}]
+      parameters:
+        - {$ref: '#/components/parameters/EpochId'}
+        - {$ref: '#/components/parameters/Csrf'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DividendBuildRequest'}
+      responses:
+        '202': {$ref: '#/components/responses/DividendEpochResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/dividends/epochs/{epoch_id}/approve:
+    post:
+      operationId: approveDividendArtifact
+      tags: [Dividend]
+      security: [{adminSession: []}]
+      parameters:
+        - {$ref: '#/components/parameters/EpochId'}
+        - {$ref: '#/components/parameters/Csrf'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DividendApprovalRequest'}
+      responses:
+        '202': {$ref: '#/components/responses/DividendEpochResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/dividends/epochs/{epoch_id}/publish:
+    post:
+      operationId: publishDividendArtifact
+      tags: [Dividend]
+      security: [{adminSession: []}]
+      parameters:
+        - {$ref: '#/components/parameters/EpochId'}
+        - {$ref: '#/components/parameters/Csrf'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DividendPublishRequest'}
+      responses:
+        '202': {$ref: '#/components/responses/CommandResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/dividends/epochs/{epoch_id}/close:
+    post:
+      operationId: closeDividendEpoch
+      tags: [Dividend]
+      security: [{adminSession: []}]
+      parameters:
+        - {$ref: '#/components/parameters/EpochId'}
+        - {$ref: '#/components/parameters/Csrf'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DividendReasonRequest'}
+      responses:
+        '202': {$ref: '#/components/responses/DividendEpochResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+  /admin-api/v2/projects/binggoplus/dividends/epochs/{epoch_id}/cancel:
+    post:
+      operationId: cancelDividendEpoch
+      tags: [Dividend]
+      security: [{adminSession: []}]
+      parameters:
+        - {$ref: '#/components/parameters/EpochId'}
+        - {$ref: '#/components/parameters/Csrf'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DividendReasonRequest'}
+      responses:
+        '202': {$ref: '#/components/responses/DividendEpochResponse'}
+        default: {$ref: '#/components/responses/ErrorResponse'}
+components:
+  securitySchemes:
+    walletSession: {type: apiKey, in: cookie, name: __Host-bgp-wallet}
+    adminSession: {type: apiKey, in: cookie, name: __Host-bgp-admin}
+  parameters:
+    AddressPath:
+      name: address
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/Address'}
+    EpochId:
+      name: epoch_id
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/Amount'}
+    JobId:
+      name: job_id
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/Uuid'}
+    CommandId:
+      name: command_id
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/Uuid'}
+    ContractKey:
+      name: contract_key
+      in: path
+      required: true
+      schema: {type: string, minLength: 1, maxLength: 64}
+    Limit:
+      name: limit
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 100, default: 25}
+    Cursor:
+      name: cursor
+      in: query
+      schema: {type: string, maxLength: 2048}
+    Csrf:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema: {type: string, minLength: 32, maxLength: 512}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string, minLength: 16, maxLength: 128}
+  schemas:
+    DividendBuildRequest:
+      type: object
+      additionalProperties: false
+      required: [algorithm_version, schema_version, projector_manifest]
+      properties:
+        algorithm_version: {type: string, minLength: 1, maxLength: 100}
+        schema_version: {type: string, minLength: 1, maxLength: 100}
+        projector_manifest: {type: object, minProperties: 1, additionalProperties: {type: integer, minimum: 1}}
+    DividendApprovalRequest:
+      type: object
+      additionalProperties: false
+      required: [artifact_id, artifact_sha256, expected_merkle_root, expected_total_reward_raw, decision]
+      properties:
+        artifact_id: {$ref: '#/components/schemas/Uuid'}
+        artifact_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        expected_merkle_root: {$ref: '#/components/schemas/Hash'}
+        expected_total_reward_raw: {$ref: '#/components/schemas/Amount'}
+        decision: {type: string, enum: [APPROVE, REJECT]}
+        reason: {type: string, maxLength: 2000}
+    DividendPublishRequest:
+      type: object
+      additionalProperties: false
+      required: [artifact_id, publish_preflight_id, artifact_sha256, expected_merkle_root, expected_total_reward_raw]
+      properties:
+        artifact_id: {$ref: '#/components/schemas/Uuid'}
+        publish_preflight_id: {$ref: '#/components/schemas/Uuid'}
+        artifact_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        expected_merkle_root: {$ref: '#/components/schemas/Hash'}
+        expected_total_reward_raw: {$ref: '#/components/schemas/Amount'}
+    DividendReasonRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: {type: string, minLength: 1, maxLength: 2000}
+    Uuid: {type: string, format: uuid}
+    Address: {type: string, pattern: '^0x[0-9a-f]{40}$'}
+    Hash: {type: string, pattern: '^0x[0-9a-f]{64}$'}
+    Amount: {type: string, pattern: '^(0|[1-9][0-9]*)$'}
+    Timestamp: {type: string, format: date-time}
+    DataStatus: {type: string, enum: [SYNCING, LIVE, STALE, DEGRADED, UNAVAILABLE]}
+    ObservedBlock:
+      type: object
+      additionalProperties: false
+      required: [number, hash, finality]
+      properties:
+        number: {$ref: '#/components/schemas/Amount'}
+        hash: {$ref: '#/components/schemas/Hash'}
+        finality: {type: string, enum: [OBSERVED, CONFIRMED, FINALIZED]}
+    Meta:
+      type: object
+      additionalProperties: false
+      required: [request_id, project, environment, chain_id, deployment_set_id, data_status, generated_at, schema_version]
+      properties:
+        request_id: {$ref: '#/components/schemas/Uuid'}
+        project: {type: string, const: binggoplus}
+        environment: {type: string, enum: [local, dev, shadow, bsc_testnet]}
+        chain_id: {type: integer, const: 97}
+        deployment_set_id: {$ref: '#/components/schemas/Uuid'}
+        data_status: {$ref: '#/components/schemas/DataStatus'}
+        observed_block:
+          oneOf: [{$ref: '#/components/schemas/ObservedBlock'}, {type: 'null'}]
+        generated_at: {$ref: '#/components/schemas/Timestamp'}
+        schema_version: {type: string, const: v2}
+        next_cursor: {type: [string, 'null']}
+    BaseEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: {}
+        meta: {$ref: '#/components/schemas/Meta'}
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [error, meta]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, retryable]
+          properties:
+            code: {type: string}
+            message: {type: string}
+            details: {type: object, additionalProperties: true}
+            retryable: {type: boolean}
+        meta: {$ref: '#/components/schemas/Meta'}
+    Contract:
+      type: object
+      additionalProperties: false
+      required: [contract_key, evm_name, address, deploy_block_number, verification_status]
+      properties:
+        contract_key: {type: string}
+        evm_name: {type: string, description: Immutable deployed Pangu2* contract identity.}
+        address: {$ref: '#/components/schemas/Address'}
+        deploy_tx_hash: {$ref: '#/components/schemas/Hash'}
+        deploy_block_number: {$ref: '#/components/schemas/Amount'}
+        deploy_block_hash: {$ref: '#/components/schemas/Hash'}
+        runtime_code_hash: {oneOf: [{$ref: '#/components/schemas/Hash'}, {type: 'null'}]}
+        verification_status: {type: string, enum: [STATIC_VERIFIED, LIVE_VERIFIED, UNVERIFIED, FAILED]}
+    QuotePolicy:
+      type: object
+      additionalProperties: false
+      required: [slippage_bps, deadline_seconds]
+      properties:
+        slippage_bps: {type: integer, minimum: 0, maximum: 300}
+        deadline_seconds: {type: integer, minimum: 1, maximum: 300}
+    Quote:
+      type: object
+      additionalProperties: false
+      required: [direction, amount_in_raw, amount_out_raw, minimum_out_raw, tax_bps, tax, oracle_status, deadline, router]
+      properties:
+        direction: {type: string, enum: [BUY, SELL]}
+        amount_in_raw: {$ref: '#/components/schemas/Amount'}
+        amount_out_raw: {$ref: '#/components/schemas/Amount'}
+        minimum_out_raw: {$ref: '#/components/schemas/Amount'}
+        tax_bps: {type: integer, minimum: 0, maximum: 10000}
+        tax:
+          type: object
+          required: [total_raw, dividend_raw, support_raw, burn_raw]
+          properties:
+            total_raw: {$ref: '#/components/schemas/Amount'}
+            dividend_raw: {$ref: '#/components/schemas/Amount'}
+            support_raw: {$ref: '#/components/schemas/Amount'}
+            burn_raw: {$ref: '#/components/schemas/Amount'}
+        cost_state: {type: [string, 'null'], enum: [NONE, KNOWN, UNKNOWN, null]}
+        oracle_status: {type: string, enum: [READY]}
+        deadline: {$ref: '#/components/schemas/Timestamp'}
+        router: {$ref: '#/components/schemas/Address'}
+    WalletChallengeRequest:
+      type: object
+      additionalProperties: false
+      required: [address, chain_id]
+      properties:
+        address: {$ref: '#/components/schemas/Address'}
+        chain_id: {type: integer, const: 97}
+    WalletVerifyRequest:
+      type: object
+      additionalProperties: false
+      required: [challenge_id, address, signature]
+      properties:
+        challenge_id: {$ref: '#/components/schemas/Uuid'}
+        address: {$ref: '#/components/schemas/Address'}
+        signature: {type: string, pattern: '^0x[0-9a-fA-F]{130}$'}
+    WalletSummary:
+      type: object
+      additionalProperties: false
+      required: [address, token_balance_raw, bnb_balance_raw, staked_principal_raw, accrued_reward_raw]
+      properties:
+        address: {$ref: '#/components/schemas/Address'}
+        token_balance_raw: {$ref: '#/components/schemas/Amount'}
+        bnb_balance_raw: {$ref: '#/components/schemas/Amount'}
+        staked_principal_raw: {$ref: '#/components/schemas/Amount'}
+        accrued_reward_raw: {$ref: '#/components/schemas/Amount'}
+        effective_balance_raw: {oneOf: [{$ref: '#/components/schemas/Amount'}, {type: 'null'}]}
+        dividend_rank: {type: [integer, 'null'], minimum: 1, maximum: 100}
+        claimable_dividend_raw: {oneOf: [{$ref: '#/components/schemas/Amount'}, {type: 'null'}]}
+    DividendEpoch:
+      type: object
+      additionalProperties: false
+      required: [epoch_id, state]
+      properties:
+        epoch_id: {$ref: '#/components/schemas/Amount'}
+        state: {type: string}
+        snapshot_block: {oneOf: [{$ref: '#/components/schemas/ObservedBlock'}, {type: 'null'}]}
+        total_reward_raw: {oneOf: [{$ref: '#/components/schemas/Amount'}, {type: 'null'}]}
+        merkle_root: {oneOf: [{$ref: '#/components/schemas/Hash'}, {type: 'null'}]}
+        claim_start: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+        claim_end: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+        carry_raw: {$ref: '#/components/schemas/Amount'}
+        artifact_sha256: {type: [string, 'null'], pattern: '^[0-9a-f]{64}$'}
+    GovernanceActionRequest:
+      type: object
+      additionalProperties: false
+      required: [parameters, expected_state]
+      properties:
+        parameters: {$ref: '#/components/schemas/GovernanceActionParameters'}
+        expected_state:
+          type: object
+          additionalProperties: false
+          required: [observed_block_number, observed_block_hash]
+          properties:
+            observed_block_number: {$ref: '#/components/schemas/Amount'}
+            observed_block_hash: {$ref: '#/components/schemas/Hash'}
+            state_fingerprint: {type: string, pattern: '^[0-9a-f]{64}$'}
+        reason: {type: string, minLength: 1, maxLength: 2000}
+        expires_at: {$ref: '#/components/schemas/Timestamp'}
+      x-action-schema-mapping:
+        token-set-pair: TokenSetPairParameters
+        token-set-fee-whitelist: TokenFeeWhitelistParameters
+        token-set-system-address: TokenSystemAddressParameters
+        contract-pause: ContractPauseParameters
+        contract-unpause: ContractPauseParameters
+        buyback-trigger: NoParameters
+        oracle-update: NoParameters
+        locker-release: LockerReleaseParameters
+        fee-vault-convert-support: FeeConvertParameters
+        fee-vault-fund-dividend: DividendFundingParameters
+        staking-fund-rewards: StakingFundingParameters
+        staking-set-reward-rate: StakingRateParameters
+    GovernanceActionParameters:
+      oneOf:
+        - {$ref: '#/components/schemas/TokenSetPairParameters'}
+        - {$ref: '#/components/schemas/TokenFeeWhitelistParameters'}
+        - {$ref: '#/components/schemas/TokenSystemAddressParameters'}
+        - {$ref: '#/components/schemas/ContractPauseParameters'}
+        - {$ref: '#/components/schemas/NoParameters'}
+        - {$ref: '#/components/schemas/LockerReleaseParameters'}
+        - {$ref: '#/components/schemas/FeeConvertParameters'}
+        - {$ref: '#/components/schemas/DividendFundingParameters'}
+        - {$ref: '#/components/schemas/StakingFundingParameters'}
+        - {$ref: '#/components/schemas/StakingRateParameters'}
+    TokenSetPairParameters:
+      type: object
+      additionalProperties: false
+      required: [pair]
+      properties: {pair: {$ref: '#/components/schemas/Address'}}
+    TokenFeeWhitelistParameters:
+      type: object
+      additionalProperties: false
+      required: [account, enabled]
+      properties:
+        account: {$ref: '#/components/schemas/Address'}
+        enabled: {type: boolean}
+    TokenSystemAddressParameters:
+      type: object
+      additionalProperties: false
+      required: [account, enabled, system_type]
+      properties:
+        account: {$ref: '#/components/schemas/Address'}
+        enabled: {type: boolean}
+        system_type: {type: string, enum: [ROUTER, FEE_VAULT, SUPPORT_POOL, LOCKER, DIVIDEND, STAKING, LIQUIDITY_GATEWAY]}
+    ContractPauseParameters:
+      type: object
+      additionalProperties: false
+      required: [contract_key]
+      properties:
+        contract_key: {type: string, enum: [token, trade_router, fee_vault, support_pool, dividend_distributor]}
+    NoParameters:
+      type: object
+      additionalProperties: false
+      maxProperties: 0
+    LockerReleaseParameters:
+      type: object
+      additionalProperties: false
+      required: [batch_id]
+      properties: {batch_id: {$ref: '#/components/schemas/Amount'}}
+    FeeConvertParameters:
+      type: object
+      additionalProperties: false
+      required: [token_amount_raw, slippage_bps, deadline_seconds]
+      properties:
+        token_amount_raw: {$ref: '#/components/schemas/Amount'}
+        slippage_bps: {type: integer, minimum: 0, maximum: 300}
+        deadline_seconds: {type: integer, minimum: 1, maximum: 300}
+    DividendFundingParameters:
+      type: object
+      additionalProperties: false
+      required: [epoch_id, amount_raw]
+      properties:
+        epoch_id: {$ref: '#/components/schemas/Amount'}
+        amount_raw: {$ref: '#/components/schemas/Amount'}
+    StakingFundingParameters:
+      type: object
+      additionalProperties: false
+      required: [amount_raw]
+      properties: {amount_raw: {$ref: '#/components/schemas/Amount'}}
+    StakingRateParameters:
+      type: object
+      additionalProperties: false
+      required: [reward_rate_raw]
+      properties: {reward_rate_raw: {$ref: '#/components/schemas/Amount'}}
+    GovernanceCommand:
+      type: object
+      additionalProperties: false
+      required: [id, action, target_contract_key, state, request_hash, requested_by, created_at]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        action: {type: string}
+        target_contract_key: {type: string}
+        target_address: {$ref: '#/components/schemas/Address'}
+        selector: {type: string, pattern: '^0x[0-9a-f]{8}$'}
+        parameters: {$ref: '#/components/schemas/GovernanceActionParameters'}
+        dividend_publish_preflight_id: {oneOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}]}
+        dividend_artifact_id: {oneOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}]}
+        dividend_artifact_sha256: {type: [string, 'null'], pattern: '^[0-9a-f]{64}$'}
+        dividend_expected_merkle_root: {oneOf: [{$ref: '#/components/schemas/Hash'}, {type: 'null'}]}
+        dividend_expected_total_reward_raw: {oneOf: [{$ref: '#/components/schemas/Amount'}, {type: 'null'}]}
+        state: {type: string, enum: [CREATED, VALIDATED, PENDING_APPROVAL, APPROVED, QUEUED, SIGNING, SUBMITTED, CONFIRMED, FINALIZED, REJECTED, CANCELLED, FAILED, EXPIRED]}
+        request_hash: {type: string, pattern: '^[0-9a-f]{64}$'}
+        requested_by: {$ref: '#/components/schemas/Uuid'}
+        tx_hash: {oneOf: [{$ref: '#/components/schemas/Hash'}, {type: 'null'}]}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+    GovernanceCommandCancellationRequest:
+      type: object
+      additionalProperties: false
+      required: [id, command_id, requested_by, request_hash, state, created_at]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        command_id: {$ref: '#/components/schemas/Uuid'}
+        requested_by: {$ref: '#/components/schemas/Uuid'}
+        reason: {type: string, minLength: 1, maxLength: 2000}
+        request_hash: {type: string, pattern: '^[0-9a-f]{64}$'}
+        state: {type: string, enum: [REQUESTED, CONSUMED, REJECTED]}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+        resolved_at: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+    BingGoPlusConfig:
+      type: object
+      additionalProperties: false
+      required: [brand, on_chain_token, chain_id, trading_open, contracts, quote_limits]
+      properties:
+        brand: {type: string, const: BingGoPlus}
+        on_chain_token:
+          type: object
+          additionalProperties: false
+          required: [name, symbol, decimals]
+          properties:
+            name: {type: string, const: PANGU2}
+            symbol: {type: string, const: PANGU2}
+            decimals: {type: integer, const: 18}
+        chain_id: {type: integer, const: 97}
+        trading_open: {type: boolean}
+        contracts: {type: array, items: {$ref: '#/components/schemas/Contract'}}
+        quote_limits:
+          type: object
+          additionalProperties: false
+          required: [max_slippage_bps, max_deadline_seconds]
+          properties:
+            max_slippage_bps: {type: integer, const: 300}
+            max_deadline_seconds: {type: integer, const: 300}
+    MarketSummary:
+      type: object
+      additionalProperties: false
+      required: [price, token_reserve_raw, wbnb_reserve_raw, holder_count, volume_24h_raw, high_24h, low_24h]
+      properties:
+        price:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [numerator_raw, denominator_raw]
+              properties:
+                numerator_raw: {$ref: '#/components/schemas/Amount'}
+                denominator_raw: {$ref: '#/components/schemas/Amount'}
+            - {type: 'null'}
+        token_reserve_raw: {oneOf: [{$ref: '#/components/schemas/Amount'}, {type: 'null'}]}
+        wbnb_reserve_raw: {oneOf: [{$ref: '#/components/schemas/Amount'}, {type: 'null'}]}
+        holder_count: {type: [integer, 'null'], minimum: 0}
+        volume_24h_raw: {oneOf: [{$ref: '#/components/schemas/Amount'}, {type: 'null'}]}
+        high_24h: {type: [object, 'null'], additionalProperties: false, properties: {numerator_raw: {$ref: '#/components/schemas/Amount'}, denominator_raw: {$ref: '#/components/schemas/Amount'}}}
+        low_24h: {type: [object, 'null'], additionalProperties: false, properties: {numerator_raw: {$ref: '#/components/schemas/Amount'}, denominator_raw: {$ref: '#/components/schemas/Amount'}}}
+    Activity:
+      type: object
+      additionalProperties: false
+      required: [activity_type, tx_hash, log_index, block_number, block_hash, occurred_at]
+      properties:
+        activity_type: {type: string, enum: [BUY, SELL, TRANSFER_IN, TRANSFER_OUT, STAKE, UNSTAKE, EARLY_UNSTAKE, REWARD_CLAIM, DIVIDEND_CLAIM]}
+        tx_hash: {$ref: '#/components/schemas/Hash'}
+        log_index: {type: integer, minimum: 0}
+        block_number: {$ref: '#/components/schemas/Amount'}
+        block_hash: {$ref: '#/components/schemas/Hash'}
+        amount_in_raw: {oneOf: [{$ref: '#/components/schemas/Amount'}, {type: 'null'}]}
+        amount_out_raw: {oneOf: [{$ref: '#/components/schemas/Amount'}, {type: 'null'}]}
+        tax_bps: {type: [integer, 'null'], minimum: 0, maximum: 10000}
+        occurred_at: {$ref: '#/components/schemas/Timestamp'}
+    StakingPosition:
+      type: object
+      additionalProperties: false
+      required: [position_id, principal_raw, accrued_reward_raw, unlock_at, state]
+      properties:
+        position_id: {$ref: '#/components/schemas/Amount'}
+        principal_raw: {$ref: '#/components/schemas/Amount'}
+        accrued_reward_raw: {$ref: '#/components/schemas/Amount'}
+        unlock_at: {$ref: '#/components/schemas/Timestamp'}
+        state: {type: string, enum: [ACTIVE, WITHDRAWN, EARLY_WITHDRAWN]}
+    StakingStatus:
+      type: object
+      additionalProperties: false
+      required: [reward_rate_raw, max_reward_rate_raw, reward_reserve_raw, reward_liability_raw, total_staked_raw, early_penalty_bps, max_lock_seconds]
+      properties:
+        reward_rate_raw: {$ref: '#/components/schemas/Amount'}
+        max_reward_rate_raw: {$ref: '#/components/schemas/Amount'}
+        reward_reserve_raw: {$ref: '#/components/schemas/Amount'}
+        reward_liability_raw: {$ref: '#/components/schemas/Amount'}
+        total_staked_raw: {$ref: '#/components/schemas/Amount'}
+        early_penalty_bps: {type: integer, const: 1000}
+        max_lock_seconds: {type: integer, const: 63072000}
+    Buyback:
+      type: object
+      additionalProperties: false
+      required: [buyback_id, trigger, bnb_amount_raw, token_amount_raw, locker, tx_hash, block_number, executed_at]
+      properties:
+        buyback_id: {$ref: '#/components/schemas/Amount'}
+        trigger: {$ref: '#/components/schemas/Address'}
+        bnb_amount_raw: {$ref: '#/components/schemas/Amount'}
+        token_amount_raw: {$ref: '#/components/schemas/Amount'}
+        locker: {$ref: '#/components/schemas/Address'}
+        tx_hash: {$ref: '#/components/schemas/Hash'}
+        block_number: {$ref: '#/components/schemas/Amount'}
+        executed_at: {$ref: '#/components/schemas/Timestamp'}
+    LockerBatch:
+      type: object
+      additionalProperties: false
+      required: [batch_id, buyback_id, token_amount_raw, unlock_at, recipient, state, lock_tx_hash]
+      properties:
+        batch_id: {$ref: '#/components/schemas/Amount'}
+        buyback_id: {$ref: '#/components/schemas/Amount'}
+        token_amount_raw: {$ref: '#/components/schemas/Amount'}
+        unlock_at: {$ref: '#/components/schemas/Timestamp'}
+        recipient: {$ref: '#/components/schemas/Address'}
+        state: {type: string, enum: [LOCKED, RELEASED, PERMANENT]}
+        lock_tx_hash: {$ref: '#/components/schemas/Hash'}
+        release_tx_hash: {oneOf: [{$ref: '#/components/schemas/Hash'}, {type: 'null'}]}
+    Job:
+      type: object
+      additionalProperties: false
+      required: [id, job_type, state, attempt, created_at]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        job_type: {type: string}
+        state: {type: string, enum: [QUEUED, RUNNING, SUCCEEDED, FAILED, CANCELLED, DEAD_LETTER]}
+        attempt: {type: integer, minimum: 0}
+        dedupe_key: {type: [string, 'null']}
+        started_at: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+        finished_at: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+        error_code: {type: [string, 'null']}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+    AuditLog:
+      type: object
+      additionalProperties: false
+      required: [id, request_id, action, outcome, created_at]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        admin_user_id: {oneOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}]}
+        request_id: {$ref: '#/components/schemas/Uuid'}
+        action: {type: string}
+        resource_type: {type: [string, 'null']}
+        resource_id: {type: [string, 'null']}
+        outcome: {type: string, enum: [ALLOWED, DENIED, SUCCESS, FAILURE]}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+    Dashboard:
+      type: object
+      additionalProperties: false
+      required: [system_status, trade_count, buy_count, sell_count, active_locker_batches, open_anomalies]
+      properties:
+        system_status: {$ref: '#/components/schemas/DataStatus'}
+        trade_count: {type: integer, minimum: 0}
+        buy_count: {type: integer, minimum: 0}
+        sell_count: {type: integer, minimum: 0}
+        current_dividend_epoch: {oneOf: [{$ref: '#/components/schemas/DividendEpoch'}, {type: 'null'}]}
+        buyback_count: {type: integer, minimum: 0}
+        active_locker_batches: {type: integer, minimum: 0}
+        open_anomalies: {type: integer, minimum: 0}
+    TradingStatus:
+      type: object
+      additionalProperties: false
+      required: [trading_open, trading_open_at, launch_protection_active]
+      properties:
+        trading_open: {type: boolean}
+        trading_open_at: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+        launch_protection_active: {type: boolean}
+        fee_whitelist_count: {type: integer, minimum: 0}
+    BuybackStatus:
+      type: object
+      additionalProperties: false
+      required: [pool_balance_raw, fixed_buyback_amount_raw, minimum_interval_seconds, next_eligible_at]
+      properties:
+        pool_balance_raw: {$ref: '#/components/schemas/Amount'}
+        fixed_buyback_amount_raw: {$ref: '#/components/schemas/Amount'}
+        minimum_interval_seconds: {type: integer, const: 60}
+        last_executed_at: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+        next_eligible_at: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+    OracleStatus:
+      type: object
+      additionalProperties: false
+      required: [status, window_seconds, max_deviation_bps, stale]
+      properties:
+        status: {type: string, enum: [UNINITIALIZED, ACCUMULATING, READY, LIQUIDITY_LOW]}
+        window_seconds: {type: integer, const: 1800}
+        max_deviation_bps: {type: integer, const: 300}
+        stale: {type: boolean}
+        last_completed_at: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+    PauseStatus:
+      type: object
+      additionalProperties: false
+      required: [contracts]
+      properties:
+        contracts:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [contract_key, paused]
+            properties:
+              contract_key: {type: string}
+              paused: {type: boolean}
+    SystemAddresses:
+      type: object
+      additionalProperties: false
+      required: [addresses]
+      properties:
+        addresses:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [kind, address]
+            properties:
+              kind: {type: string}
+              address: {$ref: '#/components/schemas/Address'}
+    OperatorBalance:
+      type: object
+      additionalProperties: false
+      required: [address, bnb_balance_raw]
+      properties:
+        address: {$ref: '#/components/schemas/Address'}
+        bnb_balance_raw: {$ref: '#/components/schemas/Amount'}
+    GovernanceReadModel:
+      oneOf:
+        - {$ref: '#/components/schemas/TradingStatus'}
+        - {$ref: '#/components/schemas/BuybackStatus'}
+        - {$ref: '#/components/schemas/OracleStatus'}
+        - {$ref: '#/components/schemas/PauseStatus'}
+        - {$ref: '#/components/schemas/SystemAddresses'}
+        - {$ref: '#/components/schemas/OperatorBalance'}
+    ActivityList:
+      type: array
+      items: {$ref: '#/components/schemas/Activity'}
+  responses:
+    ErrorResponse:
+      description: Error envelope.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    ConfigResponse:
+      description: Active deployment and client configuration.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/BingGoPlusConfig'}}}]}}}
+    SystemStatusResponse:
+      description: System status.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {type: object, required: [status, trading_open, paused, oracle_status], properties: {status: {$ref: '#/components/schemas/DataStatus'}, trading_open: {type: boolean}, paused: {type: boolean}, oracle_status: {type: string}}}}}]}}}
+    ContractListResponse:
+      description: Contract list.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Contract'}}}}]}}}
+    ContractResponse:
+      description: Contract evidence.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/Contract'}}}]}}}
+    MarketResponse:
+      description: Market summary; unavailable metrics are null, never fabricated.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/MarketSummary'}}}]}}}
+    WalletChallengeResponse:
+      description: One-time challenge.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {type: object, required: [challenge_id, message, expires_at], properties: {challenge_id: {$ref: '#/components/schemas/Uuid'}, message: {type: string}, expires_at: {$ref: '#/components/schemas/Timestamp'}}}}}]}}}
+    QuoteResponse:
+      description: Contract-authoritative quote.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/Quote'}}}]}}}
+    WalletSummaryResponse:
+      description: Wallet summary.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/WalletSummary'}}}]}}}
+    ActivityListResponse:
+      description: Cursor-paginated activities.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/ActivityList'}}}]}}}
+    StakingPositionsResponse:
+      description: Staking positions.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/StakingPosition'}}}}]}}}
+    AmountResponse:
+      description: Raw amount.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {type: object, required: [amount_raw], properties: {amount_raw: {$ref: '#/components/schemas/Amount'}}}}}]}}}
+    StakingStatusResponse:
+      description: Staking reserve and limits.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/StakingStatus'}}}]}}}
+    DividendEpochResponse:
+      description: Dividend epoch.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/DividendEpoch'}}}]}}}
+    DividendProofResponse:
+      description: Merkle allocation and proof bound to artifact checksum.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {type: object, required: [epoch_id, address, amount_raw, leaf, proof, artifact_sha256], properties: {epoch_id: {$ref: '#/components/schemas/Amount'}, address: {$ref: '#/components/schemas/Address'}, amount_raw: {$ref: '#/components/schemas/Amount'}, leaf: {$ref: '#/components/schemas/Hash'}, proof: {type: array, items: {$ref: '#/components/schemas/Hash'}}, artifact_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}}}}}]}}}
+    DividendEpochListResponse:
+      description: Cursor-paginated dividend epochs.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/DividendEpoch'}}}}]}}}
+    BuybackListResponse:
+      description: Cursor-paginated buybacks.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Buyback'}}}}]}}}
+    LockerBatchListResponse:
+      description: Cursor-paginated locker batches.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/LockerBatch'}}}}]}}}
+    AdminMeResponse:
+      description: Admin identity and permissions.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {type: object, required: [id, username, role, permissions], properties: {id: {$ref: '#/components/schemas/Uuid'}, username: {type: string}, role: {type: string, enum: [SUPER_ADMIN, OPERATOR, AUDITOR, VIEWER]}, permissions: {type: array, items: {type: string}}}}}}]}}}
+    DashboardResponse:
+      description: Admin dashboard.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/Dashboard'}}}]}}}
+    GovernanceReadResponse:
+      description: One of the frozen governance read models selected by the path enum.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/GovernanceReadModel'}}}]}}}
+    JobResponse:
+      description: Job.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/Job'}}}]}}}
+    JobListResponse:
+      description: Cursor-paginated jobs.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Job'}}}}]}}}
+    AuditListResponse:
+      description: Cursor-paginated append-only audit entries.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/AuditLog'}}}}]}}}
+    CommandResponse:
+      description: Governance command.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/GovernanceCommand'}}}]}}}
+    GovernanceDecisionResponse:
+      description: Approve/reject returns a Command; cancel returns its immutable cancellation request and is completed asynchronously by the Reconciler.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {oneOf: [{$ref: '#/components/schemas/GovernanceCommand'}, {$ref: '#/components/schemas/GovernanceCommandCancellationRequest'}]}}}]}}}
+    CommandListResponse:
+      description: Governance commands.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/GovernanceCommand'}}}}]}}}
