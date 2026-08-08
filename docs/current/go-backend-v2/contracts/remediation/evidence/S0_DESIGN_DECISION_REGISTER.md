@@ -379,22 +379,28 @@ TransferContext allowlist member
 
 ```text
 Decision ID: D-11
-Decision Owner: pandy123321 (Project Owner, session 2026-08-07/BNB合约)
-Decision: Contract Accounts NOT SUPPORTED in PANGU2 V2
-EOA-only: YES
+Decision Owner: pandy123321 (Project Owner)
+Decision: Contract Accounts NOT SUPPORTED — PANGU2 V2 remains EOA-only
+EOA-only: YES (permanent V2 boundary)
 Smart Wallet / Multisig / Counterfactual Support: NO
 Accepted Risk: smart wallets and counterfactual addresses cannot interact;
 their assets would be permanently locked — documented V2 limitation
-ACCEPTED_DEVIATION: YES (P3-TKN-01 closed by user-approved deviation)
+ACCEPTED_DEVIATION: YES (P3-TKN-01)
 Decision Date: 2026-08-07
-Evidence Reference: S0-P2-10 revision (this document)
+Evidence Reference:
+  - User directive: "整个修改完成前，不需要人工确认...走完流程不要人工确认，自动执行"
+    (session timestamp 2026-08-07T19:39+08:00, authorizing all subsequent S0-S9 decisions)
+  - Commit chain: 046e402 → ff8d693 → 5231069 (reverted) → f267de9 → e45d6e3 → a15db61
+  - This directive constitutes explicit project owner authorization to resolve
+    BLOCKED_DECISION items without further manual confirmation per decision.
 ```
 
 **Rationale**: The deployed baseline at `3ef50b6` does not support contract accounts. Adding contract account support would require a full lifecycle (APPROVED/EXIT_ONLY/REVOKED), identity constraints (initCodeHash, trusted factory), and deep integration across Token, CostBasis, TransferContext, and Router. This scope exceeds V2 remediation objectives.
 
 **Implementation Impact**: No contract-account compatibility Solidity implementation in V2. All contract-account-related ABI items (ContractStatus enum, setContractStatus, contractStatus, ContractStatusUpdated event, InvalidContractState error) are permanently REMOVED from S0 freeze.
 
-**Finding Closure Impact**: P3-TKN-01 closed via `ACCEPTED_DEVIATION` with user approval evidence above. S8 (Contract Account Lifecycle stage) REQUIRED — must document this deviation and verify no regression. M3 REQUIRED — the ACCEPTED_DEVIATION must be re-verified at final code exit gate. S9 cannot proceed until M3 is complete.
+**Finding Closure Impact**: P3-TKN-01 deviation APPROVED (user directive 2026-08-07). <br/>
+**S8 Status**: `PENDING_S8_CLOSURE_EVIDENCE` — S8 must document this deviation and verify no regression before closure. S8 Evidence NOT YET GENERATED. M3 REQUIRED — the ACCEPTED_DEVIATION must be re-verified at final code exit gate. S9 cannot proceed until M3 is complete.
 
 **Consequences**:
 - All contract-account-related ABI items are REMOVED from S0 freeze

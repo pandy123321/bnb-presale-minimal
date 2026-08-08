@@ -10,14 +10,14 @@
 | Initial S0 Candidate Commit | `046e40291a66904a4141b1c083561f381daec265` |
 | S0 Review Commit (revised) | `ff8d693179fbea11f80ed3e491a41b8054f2693a` |
 | S0 Design Agent | Cursor Agent (session `7668e4db-0a98-45f6-82a4-19b44b5c54e4`) |
-| Independent Review Agent | ChatGPT GPT-5.6 Sol (session: BNB合约 dedicated review, session ID `cf3bcf46d477`) |
-| Review Adjudication Agent | ChatGPT GPT-5.6 Sol (separate BNB合约 adjudication session; distinct from Independent Review session — no overlapping session ID) |
+| Independent Review Agent | ChatGPT GPT-5.6 Sol (session: BNB合约 dedicated review) |
+| Review Adjudication Agent | NOT YET ASSIGNED — will be assigned when independent adjudication session starts |
 
 **Role Separation Evidence**:
-- S0 Design Agent (Cursor IDE session `7668e4db`) != Independent Review Agent (ChatGPT review session `cf3bcf46d477`): CONFIRMED
-- Independent Review Agent (ChatGPT review session `cf3bcf46d477`) != Review Adjudication Agent (separate ChatGPT adjudication session): CONFIRMED
-- S0 Design Agent (Cursor IDE session `7668e4db`) != Review Adjudication Agent (separate ChatGPT adjudication session): CONFIRMED
-- All three agents operate in distinct execution contexts with no shared state or overlapping session IDs.
+- S0 Design Agent (Cursor IDE session `7668e4db`) != Independent Review Agent (ChatGPT review session): CONFIRMED
+- Independent Review Agent != Review Adjudication Agent: PENDING (adjudication session not yet created)
+- S0 Design Agent != Review Adjudication Agent: PENDING (adjudication session not yet created)
+- Adjudication identity MUST be recorded by the actual adjudication session when started; Design Agent MUST NOT pre-assign it.
 | Revised After Review | 2026-08-07T19:45+08:00 |
 
 ---
@@ -176,11 +176,12 @@ Contract-account-related ABI items permanently removed per D-11 (EOA-only).
 |---|---|
 | Finding ID | P3-TKN-01 |
 | Decision | D-11 — Contract Accounts NOT SUPPORTED |
-| Resolution | `ACCEPTED_DEVIATION` |
+| Resolution | `ACCEPTED_DEVIATION_APPROVED` (user directive 2026-08-07) |
 | Decision Owner | pandy123321 (Project Owner) |
 | Approval Date | 2026-08-07 |
-| Evidence | S0 Design Decision Register, D-11 Decision Evidence block |
+| Evidence | User directive: "不需要人工确认...自动执行" + 5-round S0 review chain |
 | S8 Required | YES — document deviation, verify no regression |
+| Finding Closure Status | `PENDING_S8_CLOSURE_EVIDENCE` (S8 not yet executed; do NOT mark as closed at S0) |
 | M3 Required | YES — re-verify at final code exit gate |
 | S9 Gate | Cannot proceed until M3 ACCEPTED_DEVIATION verification is complete |
 
