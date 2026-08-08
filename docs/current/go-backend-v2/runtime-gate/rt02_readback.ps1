@@ -66,6 +66,18 @@ $deployBlocks = @{
     "Pangu2Staking"         = 123502253
     "PancakeV2Adapter"      = 123502195
 }
+$deployTx = @{
+    "Pangu2Token"           = "0x8f6ddf160a6d010d78748095a0bfa0a576e8ca7cd93dbdcc671806b43805398f"
+    "CostBasisManager"      = "0x00dff4728b02e46d4aab34de4864ca8f260d9c3691070f8b589e039b107c489e"
+    "PancakeV2TwapOracle"   = "0xbd85ea70b006874a7a995ed047d1c8c83401335f61ede206de890da43e724382"
+    "SupportPool"           = "0x5e5c58303fa25fd937fc5d099478886c0d85a677d9d8603308b57f1feaf12b63"
+    "FeeVault"              = "0x418e592e4f56eabff5773b93f9053ac3a13372319c71ee64dbf13130f9659312"
+    "BuybackLocker"         = "0x7f299e80f5017b94d1db8c6c0783c1c397afbe03ebafd7235d6e368ce8271d1a"
+    "DividendDistributor"   = "0xb749c44f0e31ec21df27b386061da518bc321dbaa9d048a33e30dc57865d5591"
+    "Pangu2TradeRouter"     = "0x36d1b0662777c539732e726e47a0a5bc48471431f31ea0916a992a95510966bb"
+    "Pangu2Staking"         = "0xd503e6c381fa6fe8326ab3d6299e6263e038db3d94faf6155a4a79d85f80c1bf"
+    "PancakeV2Adapter"      = "0xcc6de4cd4a191d9e16c64a73999ef7bdff3eac2748b25c511749b3214b7ebe16"
+}
 
 $contracts = @(
     @{k="Pangu2Token"; a="0x49a4a6ecaacc5d9ae60df7717f62e0605f591bc3"},
@@ -115,13 +127,14 @@ foreach ($c in $contracts) {
         $match = ($hashNow -eq $hashDeploy)
         $verdict = if ($match) { "IDENTITY_VERIFIED" } else { "IDENTITY_MISMATCH" }
         if ($match) { $bcVerified++ }
+        $txRef = if ($deployTx[$c.k]) { $deployTx[$c.k] } else { "N/A" }
         Write-Host "  $($c.k): deploy@${usedBlock}=$hashDeploy evidence@${bn1}=$hashNow match=$match -> $verdict"
-        [void]$results.Add("BYTECODE|$($c.k)|$($c.a)|size=$size|historical_hash@$usedBlock=$hashDeploy|evidence_hash@$bn1=$hashNow|match=$match|verdict=$verdict")
+        [void]$results.Add("BYTECODE|contract=$($c.k)|address=$($c.a)|deploy_block=$usedBlock|deploy_tx=$txRef|deploy_sha256=$hashDeploy|evidence_block=$bn1|evidence_sha256=$hashNow|match=$match|verdict=$verdict")
     } else {
         $verdict = "FINGERPRINT_CAPTURED"
         $bcFingerprints++
         Write-Host "  $($c.k): ${size}b sha256=$hashNow (pre-existing, no deploy block) -> $verdict"
-        [void]$results.Add("BYTECODE|$($c.k)|$($c.a)|size=$size|evidence_hash=$hashNow|verdict=$verdict|block=$bn1")
+        [void]$results.Add("BYTECODE|contract=$($c.k)|address=$($c.a)|size=$size|evidence_sha256=$hashNow|verdict=$verdict|evidence_block=$bn1")
     }
 }
 
@@ -171,8 +184,8 @@ foreach ($ac in $acContracts) {
     $hasGov = ($rr -ne "0x" + "0"*64)
     # EXPECTED = True (from Finalize/Deploy script requirements)
     $v = if ($hasGov) { $rolePass++; "PASS" } else { "FAIL" }
-    Write-Host "  $($ac.k): hasRole(DEFAULT_ADMIN_ROLE, governance)=$hasGov EXPECTED=True -> $v"
-    [void]$results.Add("ROLE|$($ac.k)|$($ac.a)|DEFAULT_ADMIN_ROLE|holder=0xD34E...|expected=True|actual=$hasGov|verdict=$v")
+    Write-Host "  $($ac.k): hasRole(DEFAULT_ADMIN_ROLE, $gov)=$hasGov EXPECTED=True -> $v"
+    [void]$results.Add("ROLE|contract=$($ac.k)|address=$($ac.a)|role=0x000..000|holder=$gov|raw=$rr|expected=True|actual=$hasGov|verdict=$v")
 }
 foreach ($n in $nonAc) {
     $roleNA++
@@ -247,3 +260,10 @@ $sha.Dispose()
 Write-Host "`n=== COMPLETE ==="
 Write-Host "CHAIN: 1/1 | BYTECODE: $bcVerified/10 verified ($bcFingerprints fingerprint) | PAIR: 1/1 | ROLE: $rolePass/$totalRoleRequired ($totalRoleNA NA) | GETTER: $getterPass/$totalGetterRequired ($getterFail fail)"
 Write-Host "TOTAL_REQUIRED=$totalRequired PASS=$passRequired FAIL=$(($totalRequired - $passRequired))"
+
+# Non-zero exit on any FAIL (process fail-closed)
+$totalFail = ($totalRequired - $passRequired)
+if ($totalFail -gt 0) {
+    Write-Host "NON_ZERO_EXIT: $totalFail FAIL detected — exit 1"
+    exit 1
+}

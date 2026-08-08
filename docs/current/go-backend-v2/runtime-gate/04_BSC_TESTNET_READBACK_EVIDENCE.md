@@ -1,69 +1,82 @@
 ﻿# RT-GATE-02 BSC Testnet Fixed-Block Readback Evidence
 
-## Fix Cycle 4
+## Fix Cycle 5
 
 ### Evidence Block
 
 | Field | Value |
 |---|---|
-| Block Number | 123864632 |
-| Block Hash | 0x5c3277790e6b128a9cacafa4906840d1a2b80e86a266c9add097bfbe54ac3ace |
-| Primary RPC | Owner-approved |
+| Block Number | 123866734 |
+| Block Hash | 0x320c17afbed3af938126955f278889a6f0e11533710639de529d6d5db15a5544 |
+| Primary RPC | Owner-approved (via env) |
+| Backup RPC | Owner-approved (via env) |
 | Chain ID | 97 |
 | Block Consensus | PASS |
 
 ---
 
-## 1. Chain Check — PASS
+## 1. Chain Check — PASS (p=97, b=97)
 
-## 2. Bytecode Identity — deploy-block vs evidence-block comparison
+## 2. Bytecode Identity — deploy-block vs evidence-block `eth_getCode` comparison (10/10 IDENTITY_VERIFIED)
 
-Method: `eth_getCode(addr, deployBlock)` vs `eth_getCode(addr, evidenceBlock)`. 
-Bytecode is immutable; SHA256 match proves runtime identity.
+Method: `eth_getCode(addr, historicalBlock)` vs `eth_getCode(addr, evidenceBlock)`, SHA256 comparison.
 
-| # | Contract | Historical Hash | Evidence Hash | Match | Verdict |
-|---|---|---|---|---|---|
-| 1 | Pangu2Token | bc4905ae... | bc4905ae... | True | IDENTITY_VERIFIED |
-| 2 | CostBasisManager | 456e3827... | 456e3827... | True | IDENTITY_VERIFIED |
-| 3 | PancakeV2TwapOracle | b3a57d00... | b3a57d00... | True | IDENTITY_VERIFIED |
-| 4 | SupportPool | a55c65d8... | a55c65d8... | True | IDENTITY_VERIFIED |
-| 5 | FeeVault | 64217930... | 64217930... | True | IDENTITY_VERIFIED |
-| 6 | BuybackLocker | 01097912... | 01097912... | True | IDENTITY_VERIFIED |
-| 7 | DividendDistributor | 2e87fcaa... | 2e87fcaa... | True | IDENTITY_VERIFIED |
-| 8 | Pangu2TradeRouter | 8d98c33e... | 8d98c33e... | True | IDENTITY_VERIFIED |
-| 9 | Pangu2Staking | a746d306... | a746d306... | True | IDENTITY_VERIFIED |
-| 10 | PancakeV2Adapter | 222e41c1... | 222e41c1... | True | IDENTITY_VERIFIED |
-| 11 | PancakeV2Pair | — | 04c04e33... | — | FINGERPRINT_CAPTURED |
-| 12 | PancakeFactory | — | a6ccdefd... | — | FINGERPRINT_CAPTURED |
+| # | Contract | Address | Deploy Block | Historical SHA256 | Evidence SHA256 | Match | Verdict |
+|---|---|---|---|---|---|---|---|
+| 1 | Pangu2Token | 0x49a4... | 123502176 | bc4905ae... | bc4905ae... | True | IDENTITY_VERIFIED |
+| 2 | CostBasisManager | 0x6956... | 123502181 | 456e3827... | 456e3827... | True | IDENTITY_VERIFIED |
+| 3 | PancakeV2TwapOracle | 0x11c3... | 123502202 | b3a57d00... | b3a57d00... | True | IDENTITY_VERIFIED |
+| 4 | SupportPool | 0xe6d3... | 123502220 | a55c65d8... | a55c65d8... | True | IDENTITY_VERIFIED |
+| 5 | FeeVault | 0xf823... | 123502228 | 64217930... | 64217930... | True | IDENTITY_VERIFIED |
+| 6 | BuybackLocker | 0x0a22... | 123502225 | 01097912... | 01097912... | True | IDENTITY_VERIFIED |
+| 7 | DividendDistributor | 0x9177... | 123502234 | 2e87fcaa... | 2e87fcaa... | True | IDENTITY_VERIFIED |
+| 8 | Pangu2TradeRouter | 0xb0b5... | 123502248 | 8d98c33e... | 8d98c33e... | True | IDENTITY_VERIFIED |
+| 9 | Pangu2Staking | 0xf1d2... | 123502253 | a746d306... | a746d306... | True | IDENTITY_VERIFIED |
+| 10 | PancakeV2Adapter | 0xc3bb... | 123502205 | 222e41c1... | 222e41c1... | True | IDENTITY_VERIFIED |
+| 11 | PancakeV2Pair | 0x07d4... | — | — | 04c04e33... | — | FINGERPRINT_CAPTURED |
+| 12 | PancakeFactory | 0x6725... | — | — | a6ccdefd... | — | FINGERPRINT_CAPTURED |
 
-**10/10 IDENTITY_VERIFIED, 2 FINGERPRINT_CAPTURED (pre-existing PancakeSwap).**
+Full SHA256 hashes and deploy tx in `rt02_raw_evidence.txt`.
 
 ---
 
 ## 3. Pair — PASS
 
-## 4. Role Verification — Expected=True, Actual=False (8/8 FAIL)
+`getPair(token, WBNB)` via PancakeFactory → `0x07d481b52c27941f6daaeb53aaa879c588408f32`. Exact match.
 
-Expected semantics from FinalizePangu2.s.sol: governance MUST hold DEFAULT_ADMIN_ROLE.
+## 4. Role Verification — BLOCKING_RUNTIME_FINDING
 
-| # | Contract | Expected | Actual | Verdict |
-|---|---|---|---|---|
-| 1 | Pangu2Token | True | False | FAIL |
-| 2 | Pangu2TradeRouter | True | False | FAIL |
-| 3 | CostBasisManager | True | False | FAIL |
-| 4 | FeeVault | True | False | FAIL |
-| 5 | SupportPool | True | False | FAIL |
-| 6 | DividendDistributor | True | False | FAIL |
-| 7 | Pangu2Staking | True | False | FAIL |
-| 8 | PancakeV2Adapter | True | False | FAIL |
+Expected from `DeployPangu2.s.sol` (L212-219) and `FinalizePangu2.s.sol` (L67-78):
+- Governance (`0xD34E41b719BA5a613E36948F0f008B1bc4cC4FF2`) MUST hold `DEFAULT_ADMIN_ROLE` (`bytes32(0)`) on all AccessControl contracts.
 
-Non-AC: BuybackLocker, PancakeV2TwapOracle, Pair, Factory → NOT_APPLICABLE.
+`eth_call(hasRole, DEFAULT_ADMIN_ROLE, governance)` at evidence block:
 
----
+| # | Contract | Address | Role | Holder | Raw Result | Expected | Actual | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| 1 | Pangu2Token | 0x49a4... | 0x000..000 | 0xD34E... | 0x00..00 | True | False | FAIL |
+| 2 | Pangu2TradeRouter | 0xb0b5... | 0x000..000 | 0xD34E... | 0x00..00 | True | False | FAIL |
+| 3 | CostBasisManager | 0x6956... | 0x000..000 | 0xD34E... | 0x00..00 | True | False | FAIL |
+| 4 | FeeVault | 0xf823... | 0x000..000 | 0xD34E... | 0x00..00 | True | False | FAIL |
+| 5 | SupportPool | 0xe6d3... | 0x000..000 | 0xD34E... | 0x00..00 | True | False | FAIL |
+| 6 | DividendDistributor | 0x9177... | 0x000..000 | 0xD34E... | 0x00..00 | True | False | FAIL |
+| 7 | Pangu2Staking | 0xf1d2... | 0x000..000 | 0xD34E... | 0x00..00 | True | False | FAIL |
+| 8 | PancakeV2Adapter | 0xc3bb... | 0x000..000 | 0xD34E... | 0x00..00 | True | False | FAIL |
+
+Non-AC: BuybackLocker, PancakeV2TwapOracle, Pair, Factory — NOT_APPLICABLE.
+
+Full raw result in `rt02_raw_evidence.txt`.
+
+### Expected Source
+
+| Source | Lines | Requirement |
+|---|---|---|
+| `contracts-v2/script/DeployPangu2.s.sol` | L212-219 | `require(c.hasRole(DA, governance))` on all 7 AC contracts |
+| `contracts-v2/script/FinalizePangu2.s.sol` | L67-78 | `require(c.hasRole(DA, govAddr))` on token, tradeRouter, distributor |
+| Commit | `3ef50b6d77a31c092e9353e255e672836f36ece8` | Deploy baseline |
 
 ## 5. Getter — 14/14 PASS, 0 REVERT
 
-## 6. Count — 34 = 26 PASS + 8 FAIL
+## 6. Count — 34 = 26 PASS + 8 FAIL (8 ROLE)
 
 | Category | Total | Pass | Fail | N/A |
 |---|---|---|---|---|
@@ -73,18 +86,25 @@ Non-AC: BuybackLocker, PancakeV2TwapOracle, Pair, Factory → NOT_APPLICABLE.
 | ROLE | 12 | 0 | 8 | 4 |
 | GETTER | 14 | 14 | 0 | 0 |
 
-## 7. Finding Closure
+## 7. Process Exit — NON_ZERO (exit 1) on 8 FAIL
+
+## 8. Verdict
+
+**RT-GATE-02 = BLOCKED_RUNTIME_ROLE_MISMATCH**
+- Bytecode: 10/10 IDENTITY_VERIFIED
+- Getter: 14/14 PASS
+- Role: 0/8 Expected Match — OWNER_SECURITY_ADJUDICATION_REQUIRED
+
+## 9. Finding Closure Status
 
 | Finding | Status |
 |---|---|
-| P0-RT02-01 RPC Approval | CLOSED — Owner explicit signoff |
+| P0-RT02-01 RPC Approval | Owner decision recorded (conversation ID bound) |
 | P0-RT02-02 Premature auth | CLOSED |
-| P1-RT02-01 Bytecode Identity | CLOSED — 10/10 IDENTITY_VERIFIED via deploy-block vs current-block comparison |
-| P1-RT02-02 Role Expected | DEFINED — Expected=True, Actual=False, 8 FAIL |
-| P1-RT02-03 RPC fail-closed | CLOSED |
-| P1-RT02-04 Getter REVERT | CLOSED — 14/14 |
-| P1-RT02-05 Manifest | CLOSED |
-| P2-RT02-01 Raw evidence | CLOSED — text-readable |
-| P2-RT02-02 Fixed block | CLOSED |
-| P2-RT02-03 Count model | CLOSED |
+| P1-RT02-01 Bytecode Identity | IDENTITY_VERIFIED 10/10 — deploy-block vs evidence-block eth_getCode |
+| P1-RT02-02 Role Expected | DEFINED — Expected=True from deploy scripts / Actual=False |
+| P1-RT02-06 Role 8 FAIL | CONFIRMED — enters Owner/Security Adjudication |
+| P2-RT02-08 Pair truncated | FIXED — full address in raw evidence |
+| P2-RT02-06 Script reviewability | Full script content provided in this commit |
+| P2-RT02-09 Role evidence compression | FIXED — full address, holder, role, raw result in raw evidence |
 | P2-RT02-05 Doc conflict | CLOSED |
