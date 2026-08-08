@@ -153,7 +153,7 @@ contract BootstrapPangu2 is Script {
             string memory artifact = vm.readFile(artifactPath);
             require(bytes(artifact).length > 0, "LpProxy artifact not found -- cannot resume Bootstrap");
 
-            address priorProxyAddr = address(uint160(vm.parseUint(artifact)));
+            address priorProxyAddr = _parseArtifact(artifact);
             require(priorProxyAddr.code.length > 0, "LpProxy from artifact has no code");
             console.log("Prior LpProxy found at:");
             console.logAddress(priorProxyAddr);
@@ -211,7 +211,18 @@ contract BootstrapPangu2 is Script {
                 revert("retry: LpProxy artifact is empty -- cannot resume");
             }
             if (bytes(oldArtifact).length > 0) {
-                address oldProxy = address(uint160(vm.parseUint(oldArtifact)));
+                uint256 parsed = vm.parseUint(oldArtifact);
+                require(
+                    parsed <= type(uint160).max,
+                    "LpProxy artifact exceeds address range"
+                );
+                address oldProxy = address(uint160(parsed));
+                if (pairAlreadyRegistered) {
+                    require(
+                        oldProxy != address(0),
+                        "State B: zero LpProxy artifact -- cannot resume"
+                    );
+                }
                 if (pairAlreadyRegistered && oldProxy.code.length == 0) {
                     revert("State B: prior LpProxy artifact has no code -- cannot resume");
                 }
@@ -348,9 +359,15 @@ contract BootstrapPangu2 is Script {
     function _tryReadOldProxy(string memory artifactPath) private view returns (address) {
         try vm.readFile(artifactPath) returns (string memory raw) {
             if (bytes(raw).length == 0) return address(0);
-            return address(uint160(vm.parseUint(raw)));
+            return _parseArtifact(raw);
         } catch {
             return address(0);
         }
+    }
+
+    function _parseArtifact(string memory raw) private pure returns (address) {
+        uint256 parsed = vm.parseUint(raw);
+        if (parsed > type(uint160).max) return address(0);
+        return address(uint160(parsed));
     }
 }
