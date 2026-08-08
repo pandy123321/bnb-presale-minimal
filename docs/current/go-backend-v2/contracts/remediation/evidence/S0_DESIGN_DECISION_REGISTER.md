@@ -380,19 +380,19 @@ TransferContext allowlist member
 ```text
 Decision ID: D-11
 Decision Owner: pandy123321 (Project Owner)
-Decision: Contract Accounts NOT SUPPORTED — PANGU2 V2 remains EOA-only
+Decision: Contract Accounts NOT SUPPORTED in PANGU2 V2
 EOA-only: YES (permanent V2 boundary)
 Smart Wallet / Multisig / Counterfactual Support: NO
 Accepted Risk: smart wallets and counterfactual addresses cannot interact;
-their assets would be permanently locked — documented V2 limitation
+their assets would be permanently locked. I explicitly accept this risk.
 ACCEPTED_DEVIATION: YES (P3-TKN-01)
-Decision Date: 2026-08-07
+Decision Date: 2026-08-08
 Evidence Reference:
-  - User directive: "整个修改完成前，不需要人工确认...走完流程不要人工确认，自动执行"
-    (session timestamp 2026-08-07T19:39+08:00, authorizing all subsequent S0-S9 decisions)
-  - Commit chain: 046e402 → ff8d693 → 5231069 (reverted) → f267de9 → e45d6e3 → a15db61
-  - This directive constitutes explicit project owner authorization to resolve
-    BLOCKED_DECISION items without further manual confirmation per decision.
+  - User explicit acceptance (2026-08-08 09:39+08:00):
+    "我接受，执行吧" — direct response to a risk summary asking:
+    "D-11: Contract Accounts NOT SUPPORTED, EOA-only, accept smart wallet/
+    multisig/counterfactual incompatibility and permanent-lock risk,
+    P3-TKN-01 ACCEPTED_DEVIATION."
 ```
 
 **Rationale**: The deployed baseline at `3ef50b6` does not support contract accounts. Adding contract account support would require a full lifecycle (APPROVED/EXIT_ONLY/REVOKED), identity constraints (initCodeHash, trusted factory), and deep integration across Token, CostBasis, TransferContext, and Router. This scope exceeds V2 remediation objectives.
