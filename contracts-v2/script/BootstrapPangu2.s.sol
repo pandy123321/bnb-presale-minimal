@@ -212,8 +212,11 @@ contract BootstrapPangu2 is Script {
             }
             if (bytes(oldArtifact).length > 0) {
                 address oldProxy = address(uint160(vm.parseUint(oldArtifact)));
-                if (oldProxy.code.length == 0) {
-                    console.log("Warning: prior LpProxy has no runtime code");
+                if (pairAlreadyRegistered && oldProxy.code.length == 0) {
+                    revert("State B: prior LpProxy artifact has no code -- cannot resume");
+                }
+                if (oldProxy.code.length == 0 && !pairAlreadyRegistered) {
+                    console.log("Warning: prior LpProxy has no runtime code (State A)");
                 }
                 // P1/P2 FIX: always revoke regardless of code.length.
                 // The permission lives in Token state, not in the old proxy's bytecode.
