@@ -1,13 +1,24 @@
 # BingGoPlus Go Backend V2 — G1 Skeleton Bootstrap
 
-状态：`BOOTSTRAPPED / AWAITING_GO_TOOLCHAIN`
+状态：`BOOTSTRAPPED / GO_BUILD_PASS / GO_VET_PASS / FIX_READY`
+
+## 构建证据 (Fix Cycle 1, 2026-08-08)
+
+```
+go version go1.26.5 windows/amd64
+
+go mod tidy   → exit 0 (goproxy.cn)
+go build ./... → exit 0
+go vet ./...   → exit 0
+```
 
 ## 目录结构
 
 ```
 backend-go/
-├── go.mod                          # Go 1.26.5, 依赖已声明 (需 go mod tidy)
-├── .env.example                    # 环境变量模板
+├── go.mod                          # Go 1.26.5
+├── go.sum                          # 由 go mod tidy 生成
+├── .env.example                    # 纯占位符
 ├── cmd/
 │   ├── api/main.go                 # Public API 服务 (chi + health + graceful shutdown)
 │   ├── indexer/main.go             # 链上事件索引器骨架
@@ -39,17 +50,6 @@ backend-go/
 └── tools/tools.go                  # 生成工具入口 (占位)
 ```
 
-## G1 验证步骤
-
-在安装 Go 1.26.5 后执行：
-
-```bash
-cd backend-go
-go mod tidy      # 解析依赖、更新 go.sum
-go build ./...   # 全部编译通过
-go vet ./...     # 静态检查通过
-```
-
 ## G1 禁止事项
 
 - 不实现任何业务逻辑（交易、分红、治理、质押等）
@@ -58,6 +58,26 @@ go vet ./...     # 静态检查通过
 - 不修改已部署合约字节码或 ABI
 - 不连接 BSC Mainnet
 
-## G1 完成后
+## G1 验证通过
 
-G1 通过 `go build ./...` 和 `go vet ./...` 后，标记 `GO_BUILD_GATE = PASS`，再进入 G2 业务实现。
+```
+GO_BUILD = PASS (exit 0)
+GO_VET   = PASS (exit 0)
+```
+
+## G1 负面测试（待环境就绪后运行）
+
+```
+PRIMARY RPC missing  → non-zero
+PRIMARY == BACKUP   → non-zero
+chain 56 config     → reject
+missing DB config   → fail closed
+health ready        → DB dependency
+liveness            → no DB dependency
+graceful shutdown   → works
+no chain write path → confirmed
+```
+
+## 下一阶段
+
+通过 Independent Review 后标记 `G1 APPROVED`，进入 G2 业务实现。
