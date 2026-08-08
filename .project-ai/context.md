@@ -14,6 +14,8 @@
 - **Responsible Owner Freeze**：`pd123` 已签署 GATE-01~05（2026-08-08），`RESPONSIBLE_OWNER_FREEZE_SIGNOFF = COMPLETE`
 - **Runtime Gate**：已执行（2026-08-08），结论 `BLOCKED` — 三个 Gate 中 RT-GATE-03 为 `DECISION_READY`，RT-GATE-01/02 因环境缺失被阻断
 - `FROZEN_FOR_DEVELOPMENT = NO`，`DEVELOPMENT_START = NO`
+- `G0_STATUS = BLOCKED`（RT-GATE-01/02 阻断），`G1_ENTRY_ALLOWED = NO`，`G2_ENTRY_ALLOWED = NO`
+- Responsible Owner Freeze 或 Design Freeze 单独完成不能授权 G1；只有 `FROZEN_FOR_DEVELOPMENT = YES` 后才允许进入 G1
 
 **合约安全修复包（S0-S9）**方案已冻结，尚未启动执行。
 
@@ -126,7 +128,7 @@ G2 = 业务实现
 - Raw Event 无物理 `PROJECTED`；投影完成度由 versioned `projection_receipts` 推导；`bgp_projector` 对 Raw Event 只读。
 - Dividend Artifact 禁止读 `token_balances_current` / `staking_positions`；必须经四个 `security_barrier` 历史视图按固定 block/hash 重建。
 - 团队/推荐/佣金 = `OUT_OF_SCOPE / ROADMAP_NOT_APPROVED`，当前 V2 不实现、不 Mock、不从转账图猜测。
-- PostgreSQL 8 个运行角色（bgp_api/ indexer/ projector/ dividend/ reconciler/ auditor/ readonly/ migrator），`current_user` exact role model，NO INHERIT。
+- PostgreSQL 共 8 个 LOGIN Roles：7 个运行时角色（bgp_api/indexer/projector/dividend/reconciler/auditor/readonly）+ 1 个 migration-only 角色（bgp_migrator），`current_user` exact role model，NO INHERIT。bgp_migrator 不由任何运行时角色继承或持有。
 - 文档审核权威规则：`docs/current/DOCUMENT_REVIEW_RULES_V1.0.md`。
 
 ### DApp 前端 V7.1（✅ 5 阶段 + 安全修复完成）
@@ -157,7 +159,7 @@ G2 = 业务实现
 |------|------|:--:|
 | TASK-20260805-001 | DApp V7.1 Frontend Refactor | ✅ COMPLETED |
 | TASK-20260807-001 | Contract Remediation S0-S9 | ⏳ 待用户批准 S0 |
-| TASK-20260807-002 | Go Backend V2 Migration | ⏳ FREEZE_CANDIDATE |
+| TASK-20260807-002 | Go Backend V2 Migration | ⏳ RESPONSIBLE_OWNER_FREEZE_COMPLETE_RUNTIME_GATE_BLOCKED |
 | TASK-20260807-003 | Go V2 Round5 提审包归一 | ✅ FIX_READY |
 | TASK-20260808-001 | Runtime Gate 准备与执行 | ✅ EXECUTED (BLOCKED) |
 

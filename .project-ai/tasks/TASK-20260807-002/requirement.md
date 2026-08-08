@@ -35,4 +35,8 @@
 | G8 | Dividend Builder 与业务 Job |
 | G9 | 停用旧后端 |
 
-## Status: FREEZE_CANDIDATE — 等待 F00-F08 签署
+## Status: RESPONSIBLE_OWNER_FREEZE_COMPLETE_RUNTIME_GATE_BLOCKED
+
+Responsible Owner Freeze（pd123, 2026-08-08）已完成 GATE-01~05 签署。
+但 `FROZEN_FOR_DEVELOPMENT = NO`：RT-GATE-01/02 因环境缺失仍 BLOCKED。
+G1 Entry 尚未授权。

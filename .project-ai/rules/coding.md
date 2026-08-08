@@ -33,7 +33,7 @@
 - Job Retry: Idempotency-Key + RetryTokenJob
 - ChainOperatorService: private key from config only, never in code/response/log
 
-## 文档与规划修订（文档优化项目）
+## 文档与规划修订（Freeze / SQL / OpenAPI / State / Governance）
 - 权威顺序遵循 `docs/current/go-backend-v2/README.md`；低权威 Markdown 不得覆盖 SQL/OpenAPI/YAML/已部署事实
 - 机器规范与说明文档必须同 revision；提审包须含 SUBMISSION_MANIFEST（path/size/sha256）
 - Finding 作者侧仅 `FIX_READY / INDEPENDENT_RETEST_PENDING`；不得自标独立审核 `CLOSED`
@@ -49,7 +49,7 @@
 - 不得在无 PostgreSQL 16+ 实例时声称 Migration 通过
 - 不得自行寻找公共 RPC 冒充批准输入
 
-### G1 阶段约束（Freeze 完成后允许）
+### G1 阶段约束（仅 FROZEN_FOR_DEVELOPMENT = YES 后允许；Responsible Owner Freeze 或 Design Freeze 单独完成不能授权 G1）
 - 单一 Go Module，模块化单体
 - 金额: DB `NUMERIC(78,0)`, Go `big.Int`, JSON 十进制整数字符串
 - 前端类型只从 OpenAPI 生成

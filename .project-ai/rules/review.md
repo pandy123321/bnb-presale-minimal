@@ -1,8 +1,13 @@
 # BingGoPlus — Review Rules
 
-## 本项目审核模式（文档优化优先）
+## 本项目审核模式
 
-本 MCP 项目「文档优化」以文档策划、修订与审核为主，不是代码实现审核。
+项目：`bnb1` / BingGoPlus。
+
+默认审核模式按变更类型区分：
+- Commit 含 Go/Solidity/PHP/TS 等实现代码 → 代码审核契约
+- Commit 仅涉及 Go V2 Freeze / SQL / OpenAPI / State / Governance 文档 → 遵守 `DOCUMENT_REVIEW_RULES_V1.0`
+- 不允许项目身份决定错误审核模式
 
 权威规则原文：`docs/current/DOCUMENT_REVIEW_RULES_V1.0.md`（ACTIVE）。
 

@@ -118,7 +118,7 @@ Admin → Backend API (Session+CSRF+RBAC) → Dashboard/Jobs/Governance
 Admin 写操作 → ChainOperatorService → eth_sendRawTransaction → BSC Testnet
 
 未来 (Go V2):
-Go Indexer → RPC getLogs → binggoplus_go.chain_raw_events
+Go Indexer → RPC getLogs → binggoplus_v2.chain_raw_events (Database: binggoplus_go, Schema: binggoplus_v2)
 Go Projector → chain_raw_events → projection_receipts → 领域投影
 Go API → HTTP → Public/Admin 读 (LIVE only)
 Admin 写 → Go API → governance_commands → Go Reconciler → Signer → BSC Testnet

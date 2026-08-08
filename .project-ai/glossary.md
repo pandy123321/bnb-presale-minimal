@@ -56,7 +56,7 @@ Trading Gate → Fee Whitelist → Launch Protection (15min 30%) → Normal Cost
 
 | 术语 | 说明 |
 |------|------|
-| FREEZE_CANDIDATE | 设计冻结候选状态，未获所有责任人签署 |
+| FREEZE_CANDIDATE | 设计冻结候选状态（已弃用。当前使用 RESPONSIBLE_OWNER_FREEZE_SIGNOFF + FROZEN_FOR_DEVELOPMENT + RT-GATE 分阶段判定） |
 | FROZEN_FOR_DEVELOPMENT | 所有 Gate 通过后的开发冻结状态（当前 = NO） |
 | Round9 Verdict | `APPROVED_FOR_RESPONSIBLE_OWNER_FREEZE` — 第九轮独立复验通过 |
 | Round10 Verdict | `APPROVED_FOR_RESPONSIBLE_OWNER_FREEZE` — 第十轮关闭 P2-R9-01 |
