@@ -72,7 +72,7 @@ Technical facts:
 | Finding | Status |
 |---|---|
 | P0-RT02-01 RPC independence | FIXED — PRIMARY==BACKUP throw |
-| P0-GOV-RT02-02 Owner Decision | CLOSED — OWNER_SECURITY_DECISION.md refined |
+| P0-GOV-RT02-02 Owner Decision | FIX_READY — OWNER_SECURITY_DECISION.md refined |
 | P1-RT02-MANIFEST-01 Manifest SHA | FIXED — regenerated |
 | P1-RT02-MANIFEST-02 Missing evidence | FIXED — RPC_APPROVAL + role_evidence.txt restored |
 | P1-GOV-RT02-03 STATE_ONLY overstatement | FIXED — qualified UNVERIFIED |
