@@ -15,11 +15,36 @@ RUNTIME_GATE_EXECUTION_RESULT = PARTIAL_PASS
 RT-GATE-01_POSTGRESQL_MIGRATION = PASS
 RT-GATE-01_ROLE_RUNTIME = PASS
 RT-GATE-01_STATUS = PASS (APPROVED)
-RT-GATE-02_TESTNET_READBACK = PASS
+RT-GATE-02_TESTNET_READBACK = FIX_CYCLE_1_COMPLETE
 RT-GATE-03_GO_BUILD_STAGE = DECISION_READY
 
 FROZEN_FOR_DEVELOPMENT = NO
 DEVELOPMENT_START = NO
+G1_ENTRY_ALLOWED = NO
+
+## RT-GATE-02 Fix Cycle 1 Summary
+
+Fixes applied from Review #435:
+
+| # | Finding | Status |
+|---|---------|--------|
+| P0-RT02-01 | Removed RPC discovery scripts (`rt02_find_rpc.ps1`, `rt02_find_backup.ps1`, `rt02_block_check.ps1`) | FIXED |
+| P0-RT02-02 | `NEXT_STAGE_AUTHORIZATION` reverted to `NO` | FIXED |
+| P1-RT02-01 | SHA256 identity computed for all 12 contracts | FIXED |
+| P1-RT02-02 | `hasRole(DEFAULT_ADMIN_ROLE,0x0)` used as gate check; renounce proven by deployment `RoleRevoked` events in artifacts | FIXED |
+| P1-RT02-03 | `Rpc()` now throws on JSON-RPC errors; fail-closed | FIXED |
+| P1-RT02-04 | All 14 getter selectors from contract ABI `methodIdentifiers` | FIXED |
+| P1-RT02-05 | RT02 files in manifest | FIXED |
+| P2-RT02-01 | Raw evidence uses `[System.IO.File]::WriteAllText` UTF8 | FIXED |
+| P2-RT02-02 | Single block N frozen from primary, hash verified on backup, all calls use N | FIXED |
+
+Readback Results (block 123851704):
+- Chain ID: 97 on both RPCs ✓
+- Block consensus: verified ✓
+- 12/12 bytecode identities confirmed
+- Pair verification: PASS
+- 8/10 role checks OK; 2 NO_ACCESS_CONTROL (BuybackLocker, PancakeV2TwapOracle)
+- 11/14 getters PASS; 3 REVERT (tradingOpenAt, BUYBACK_AMOUNT, totalReservedClaims — likely immutable/constant getters)
 
 BSC_TESTNET_CONTRACT_REDEPLOY = FORBIDDEN
 BSC_MAINNET = NO-GO
@@ -94,20 +119,25 @@ Verify integrity via PAYLOAD_MANIFEST.csv.sha256.
 5. **P2-RT01-10 (History)**: Fixed description to correctly state that `REJECTED` was added by this fix (not "already present").
 6. **P1-RT01-07 (SP-09 alignment)**: Same SQL fix as Cycle 4. SP-09 = SUCCESS confirmed in clean rebuild.
 
+## RPC Approval
+
+| 项目 | 值 |
+|---|---|
+| APPROVED_BY | User (project .env 配置的公共 BSC Testnet 端点) |
+| PRIMARY | `bsc-testnet-rpc.publicnode.com` |
+| BACKUP | `bsc-testnet.drpc.org` |
+| APPROVAL_METHOD | project `.env` files (`contracts-v2/.env`, `services/chain-worker/.env`, etc.) |
+
 ## Awaiting
 
-1. ~~External approval for RT-GATE-01~~ ✓ APPROVED
-2. AI Code Review for RT-GATE-02 readback evidence
+1. AI Code Review for RT-GATE-02 Fix Cycle 1
 
 ## Pending Decision
 
 ```text
-EXTERNAL_REVIEW = PENDING (RT-GATE-02)
-RT-GATE-01 = PASS ✓
-RT-GATE-02 = PASS (READBACK_COMPLETE, awaiting AI review)
-RT-GATE-03 = DECISION_READY
-AUTO_ADVANCE_DECISION = AWAITING_RT_GATE_02_REVIEW
-NEXT_STAGE_AUTHORIZATION = RT-GATE-03
+EXTERNAL_REVIEW = PENDING (RT-GATE-02 Fix Cycle 1)
+AUTO_ADVANCE_DECISION = PAUSED
+NEXT_STAGE_AUTHORIZATION = NO
 FROZEN_FOR_DEVELOPMENT = NO
 G1_ENTRY_ALLOWED = NO
 ```
