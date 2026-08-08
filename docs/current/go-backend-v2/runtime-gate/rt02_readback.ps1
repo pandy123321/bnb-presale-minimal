@@ -6,6 +6,13 @@ $backup  = $env:BGP_BSC_TESTNET_RPC_BACKUP
 if ([string]::IsNullOrWhiteSpace($primary)) { throw "BGP_BSC_TESTNET_RPC_PRIMARY not set — BLOCKED_APPROVED_RPC_REQUIRED" }
 if ([string]::IsNullOrWhiteSpace($backup))  { throw "BGP_BSC_TESTNET_RPC_BACKUP not set — BLOCKED_APPROVED_RPC_REQUIRED" }
 
+# Normalize URLs for comparison (strip trailing slash, lowercase)
+$normPrimary = $primary.TrimEnd('/').ToLowerInvariant()
+$normBackup  = $backup.TrimEnd('/').ToLowerInvariant()
+if ($normPrimary -eq $normBackup) {
+    throw "PRIMARY_EQUALS_BACKUP: both resolve to same RPC host — BLOCKED_INDEPENDENT_BACKUP_RPC_REQUIRED (cannot verify dual-source consensus with identical endpoints)"
+}
+
 # ======== RPC helper (fail-closed with retry) ========
 function Rpc($url, $method, $params) {
     $body = @{ jsonrpc = "2.0"; method = $method; params = $params; id = 1 } | ConvertTo-Json -Compress -Depth 10
@@ -43,7 +50,7 @@ Write-Host "=== 1. CHAIN ID ==="
 $c1 = HexToInt (Rpc $primary "eth_chainId" @())
 $c2 = HexToInt (Rpc $backup "eth_chainId" @())
 if ($c1 -ne 97 -or $c2 -ne 97) { throw "CHAIN_ID_FAIL: p=$c1 b=$c2" }
-[void]$results.Add("CHAIN_ID|primary=$c1|backup=$c2|verdict=PASS")
+[void]$results.Add("CHAIN_ID|primary=$c1|backup=$c2|primary_host=$normPrimary|backup_host=$normBackup|verdict=PASS")
 Write-Host "  PASS: p=$c1 b=$c2"
 
 # ======== 2. Evidence Block ========
@@ -52,8 +59,8 @@ $blk1 = Rpc $primary "eth_getBlockByNumber" @("latest", $false)
 $bn1 = HexToInt $blk1.number; $bh1 = $blk1.hash
 $blockHex = "0x" + $bn1.ToString('x')
 $blk2 = Rpc $backup "eth_getBlockByNumber" @($blockHex, $false)
-if ($blk2.hash -ne $bh1) { throw "BLOCK_HASH_MISMATCH" }
-[void]$results.Add("BLOCK|number=$bn1|hash=$bh1|verdict=PASS")
+if ($blk2.hash -ne $bh1) { throw "BLOCK_HASH_MISMATCH: primary=$bh1 backup=$($blk2.hash)" }
+[void]$results.Add("BLOCK|number=$bn1|primary_hash=$bh1|backup_hash=$($blk2.hash)|primary_host=$normPrimary|backup_host=$normBackup|verdict=PASS")
 Write-Host "  PASS: block=$bn1 ($bh1)"
 
 # ======== 3. Bytecode Identity — receipt-bound deploy block (P1-RT02-BLOCK-BINDING) ========
