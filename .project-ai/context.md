@@ -16,6 +16,7 @@
 - `FROZEN_FOR_DEVELOPMENT = NO`，`DEVELOPMENT_START = NO`
 - `G0_STATUS = BLOCKED`（RT-GATE-01/02 阻断），`G1_ENTRY_ALLOWED = NO`，`G2_ENTRY_ALLOWED = NO`
 - Responsible Owner Freeze 或 Design Freeze 单独完成不能授权 G1；只有 `FROZEN_FOR_DEVELOPMENT = YES` 后才允许进入 G1
+- **AI 外部审核**：Record #425（Commit `822edc9`）发现 2 P1 + 3 P2 → 修复提交 `8f2295c` → Record #426 审核通过（**建议合并**）。P1-01/P1-02/P2-01/P2-02 全部关闭。仅 P2-03（机器规范独立核验）留待 `FROZEN_FOR_DEVELOPMENT = YES` 前处理。
 
 **合约安全修复包（S0-S9）**方案已冻结，尚未启动执行。
 
@@ -162,6 +163,7 @@ G2 = 业务实现
 | TASK-20260807-002 | Go Backend V2 Migration | ⏳ RESPONSIBLE_OWNER_FREEZE_COMPLETE_RUNTIME_GATE_BLOCKED |
 | TASK-20260807-003 | Go V2 Round5 提审包归一 | ✅ FIX_READY |
 | TASK-20260808-001 | Runtime Gate 准备与执行 | ✅ EXECUTED (BLOCKED) |
+| TASK-20260808-002 | AI Code Review 闭环（Commit 822edc9 + 8f2295c） | ✅ MERGED — Record #425/#426 外部审核通过 |
 
 ---
 
