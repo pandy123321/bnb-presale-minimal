@@ -1,49 +1,57 @@
 ﻿# RT-GATE-02 BSC Testnet Fixed-Block Readback Evidence
 
-## Fix Cycle 6 (Final)
+## Fix Cycle 7
 
 ### Evidence Block
 
 | Field | Value |
 |---|---|
-| Block Number | 123872606 |
-| Block Hash | 0x62ddd3f65760dd6e1be4f6e76153d52d49705cbf0e0d8088eb91b9620af78610 |
-| Primary RPC | Owner-approved (via env) |
+| Block Number | 123877114 |
+| Block Hash | 0x7b21cf04b7062412f9ec975f4fb8e80a724a5274040af1d20a941bcb2ecc5ded |
+| Primary RPC | publicnode (env-injected) |
+| Backup RPC | publicnode (same — alternative RPCs unavailable, noted) |
 | Chain ID | 97 |
-| Block Consensus | PASS |
 
 ---
 
-## 1. Chain — PASS
+### 1. Chain — PASS
 
-## 2. Bytecode — 10/10 IDENTITY_VERIFIED
+### 2. Bytecode — 10/10 IDENTITY_VERIFIED (receipt-bound)
 
-`eth_getCode(addr, deployBlock)` vs `eth_getCode(addr, evidenceBlock)` SHA256 comparison. All 10 project contracts exact match.
+Deploy blocks from eth_getTransactionReceipt, NOT hardcoded. Receipt validated: status=0x1, blockNumber, blockHash.
 
-## 3. Pair — PASS
+| # | Contract | Deploy Block | Deploy SHA256 | Evidence SHA256 | Match |
+|---|---|---|---|---|---|
+| 1 | Pangu2Token | 123502176 | bc4905ae... | bc4905ae... | True |
+| 2 | CostBasisManager | 123502181 | 456e3827... | 456e3827... | True |
+| 3 | PancakeV2TwapOracle | 123502202 | b3a57d00... | b3a57d00... | True |
+| 4 | SupportPool | 123502210 | a55c65d8... | a55c65d8... | True |
+| 5 | FeeVault | 123502218 | 64217930... | 64217930... | True |
+| 6 | BuybackLocker | 123502225 | 01097912... | 01097912... | True |
+| 7 | DividendDistributor | 123502234 | 2e87fcaa... | 2e87fcaa... | True |
+| 8 | Pangu2TradeRouter | 123502248 | 8d98c33e... | 8d98c33e... | True |
+| 9 | Pangu2Staking | 123502253 | a746d306... | a746d306... | True |
+| 10 | PancakeV2Adapter | 123502195 | 222e41c1... | 222e41c1... | True |
 
-`getPair(token, WBNB)` → `0x07d481b52c27941f6daaeb53aaa879c588408f32`. Exact match.
+PancakeV2Pair + PancakeFactory: FINGERPRINT_CAPTURED (no deploy tx in baseline).
 
-## 4. Role — 8/8 PASS (Expected=False, Owner Decision)
+DEPLOY_BLOCK_SOURCE = TRANSACTION_RECEIPT. No hardcoded blocks, no offset fallback. Deploy block drift from Cycle 5/6 eliminated (Staking 123502753→123502253, Adapter 123502295→123502195, SupportPool 123502220→123502210, FeeVault 123502228→123502218).
 
-DEFAULT_ADMIN_ROLE intentionally renounced. `getRoleAdmin(DA)=0x0` permanently locked on all 8 AccessControl contracts. This is by design, not a defect.
+### 3. Pair — PASS
 
-| # | Contract | hasRole | Expected | Verdict |
-|---|---|---|---|---|
-| 1 | Pangu2Token | False | False | PASS |
-| 2 | Pangu2TradeRouter | False | False | PASS |
-| 3 | CostBasisManager | False | False | PASS |
-| 4 | FeeVault | False | False | PASS |
-| 5 | SupportPool | False | False | PASS |
-| 6 | DividendDistributor | False | False | PASS |
-| 7 | Pangu2Staking | False | False | PASS |
-| 8 | PancakeV2Adapter | False | False | PASS |
+### 4. Role — 8/8 PASS (Expected=False, Owner Decision)
 
-Non-AC: BuybackLocker, TwapOracle, Pair, Factory → N/A.
+OWNER_DESIRED_STATE: governance_has_DA = false. DEPLOYMENT_MANIFEST "NO" is correct.
 
-## 5. Getter — 14/14 PASS, 0 REVERT
+getRoleAdmin(DA) = DA (self-admin, normal AccessControl). Not interpreted as permanent lock claim.
 
-## 6. Count — 34/34 PASS
+ROLE_EVIDENCE = STATE_ONLY. Historical events (RoleGranted/RoleRevoked/RoleAdminChanged) unverified due to public RPC pruning. 0 new DA holders reconstructed beyond governance+deployer.
+
+FINAL_ADMIN_RENOUNCE = STATE_CONSISTENT_NOT_PROVEN.
+
+### 5. Getter — 14/14 PASS
+
+### 6. Count — 34/34 PASS, exit 0
 
 | Category | Pass |
 |---|---|
@@ -53,15 +61,13 @@ Non-AC: BuybackLocker, TwapOracle, Pair, Factory → N/A.
 | ROLE | 8/8 |
 | GETTER | 14/14 |
 
-## 7. Verdict — RT-GATE-02 = PASS
+### 7. Verdict — FIX_READY / INDEPENDENT_RETEST_PENDING
 
-All 34 required checks pass. Process exit 0.
-
-## 8. Finding Closure
+### 8. Finding Closure
 
 | Finding | Status |
 |---|---|
-| P0-RT02-01 RPC | Owner approved |
-| P1-RT02-01 Bytecode | CLOSED — 10/10 IDENTITY_VERIFIED |
-| P1-RT02-02 Role Expected | CLOSED — Owner Decision: Expected=False |
-| All P2 evidence issues | CLOSED |
+| P0-RT02-02 Premature Auth | FIXED — NEXT_STAGE_AUTHORIZATION=NO until review PASS |
+| P1-RT02-BLOCK-BINDING | FIXED — receipt-bound, no drift |
+| P1-RT02-ROLE-SEMANTICS | FIXED — self-admin, not permanent lock |
+| P2-RT02-SUBMISSION | FIXED — UTF-8 NO BOM, full scripts in manifest |
