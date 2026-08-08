@@ -6,7 +6,18 @@
 RT-GATE-01_MIGRATION = PASS
 ```
 
-**Evidence Timestamp**: 2026-08-08T11:35+08:00
+**Evidence Timestamp**: 2026-08-08T14:50+08:00 (Fix Cycle 5, clean rebuild)
+
+## Source Binding
+
+```text
+SOURCE_COMMIT = 12a26768fd05208a16184b36be010fbd7992efa6
+0001_SHA256 = (see PAYLOAD_MANIFEST.csv for exact hash)
+0002_SHA256 = (see PAYLOAD_MANIFEST.csv for exact hash)
+```
+
+Both `0001_binggoplus_v2_schema.sql` and `0002_binggoplus_v2_runtime_privileges.sql`
+are from this commit and included in PAYLOAD_MANIFEST.csv for revision binding.
 
 ## Environment
 

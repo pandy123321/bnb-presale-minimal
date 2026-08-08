@@ -1,5 +1,7 @@
 -- RT-GATE-01 State Protection Tests (SP-01 ~ SP-12)
 -- Assertion-style: RAISE EXCEPTION on unexpected result; exit non-zero on any failure.
+\set ON_ERROR_STOP on
+\set VERBOSITY verbose
 \echo 'HEADER|TEST_ID|ROLE|EXPECTED|SQLSTATE|ACTUAL|ERROR'
 \echo '====================================================================='
 

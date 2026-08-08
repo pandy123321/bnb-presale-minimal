@@ -1,4 +1,5 @@
 -- RT-GATE-01 Role Runtime Permission Boundary Tests
+\set ON_ERROR_STOP on
 \echo '=== RT-GATE-01 PERMISSION TESTS ==='
 
 -- bgp_api

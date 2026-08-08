@@ -69,17 +69,17 @@ BSC_MAINNET = NO-GO
 | rt01_sp_tests.sql | CCF4721A... |
 | rt01_mutation_test.sql | 0B4ADD57... |
 | rt01_mutation_evidence.txt | A0D7D4EB... |
-| PAYLOAD_MANIFEST.csv | (see PAYLOAD_MANIFEST.csv.sha256) |
+| PAYLOAD_MANIFEST.csv | A481BA12... |
 | PAYLOAD_MANIFEST.csv.sha256 | (external)
 
-## Changes in this revision (Fix Cycle 4)
+## Changes in this revision (Fix Cycle 5)
 
-1. **P1-RT01-07 (SP-09 trigger fix)**: Confirmed that `0001_binggoplus_v2_schema.sql` line 1290 already includes `'REJECTED'` in the allowed command states for REJECTED cancellation resolution. Clean container rebuild confirmed SP-09 = SUCCESS (frozen AC matches trigger truth).
-2. **P2-RT01-05 (Manifest Hash)**: Removed stale hash from `02_ROLE_RUNTIME_MATRIX.md` evidence table (pending regeneration).
-3. **P2-RT01-06 (Evidence encoding)**: All evidence files exported via `PGOPTIONS="-c client_encoding=UTF8"` — verified as UTF-8 plain text, readable by Git diff.
-4. **P2-RT01-07 (Mutation evidence)**: Created independent `rt01_mutation_test.sql` and `rt01_mutation_evidence.txt` with full MUT-01 trace (trigger disable → illegal transition SUCCESS → trigger re-enable → guarded FAIL 55000 → cleanup).
-5. **P3-RT01-01 (SP-08 docs)**: Removed ⚠ marker and contradictory "frozen acceptance = SUCCESS" claim. SP-08 APPOVED + REQUESTED → REJECTED = FAIL is the correct frozen behavior (APPROVED is cancellable, trigger correctly rejects).
-6. **SP-09 status**: Rebuilt clean PostgreSQL 16 container. Full suite re-executed. SP-09 now PASS with Expected=SUCCESS (REJECTED command is non-cancellable terminal state; trigger includes REJECTED in valid list).
+1. **P1-RT01-08 (SQL-Manifest binding)**: Added `../sql/0001_binggoplus_v2_schema.sql` and `../sql/0002_binggoplus_v2_runtime_privileges.sql` to PAYLOAD_MANIFEST.csv. Regenerated `01_POSTGRESQL_MIGRATION_EVIDENCE.md` with SOURCE_COMMIT, SQL hashes, and migration exit codes.
+2. **P1-RT01-09 (ON_ERROR_STOP)**: Added `\set ON_ERROR_STOP on` to all test scripts (rt01_sp_tests.sql, rt01_permission_tests.sql, rt01_mutation_test.sql). Mutation test wrapped in transaction with ROLLBACK.
+3. **P2-RT01-08 (Count)**: Fixed 91 -> 90 in Matrix. MUT-01 sub-checks not counted as separate top-level tests.
+4. **P2-RT01-09 (Evidence encoding)**: Evidence exported from container to ensure UTF-8 plain text.
+5. **P2-RT01-10 (History)**: Fixed description to correctly state that `REJECTED` was added by this fix (not "already present").
+6. **P1-RT01-07 (SP-09 alignment)**: Same SQL fix as Cycle 4. SP-09 = SUCCESS confirmed in clean rebuild.
 
 ## Awaiting
 

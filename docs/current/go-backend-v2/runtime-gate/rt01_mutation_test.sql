@@ -1,8 +1,12 @@
 -- rt01_mutation_test.sql
 -- Validates that without the state transition trigger guard,
 -- an illegal FINALIZED -> QUEUED transition succeeds, proving
--- the guard is working. Then restores the trigger and verifies
--- it is re-enabled.
+-- the guard is working. Transaction-protected: ROLLBACK ensures
+-- trigger is always restored even on failure.
+
+\set ON_ERROR_STOP on
+
+BEGIN;
 
 SET search_path TO binggoplus_v2;
 
@@ -84,13 +88,9 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
--- 8. Cleanup
-SET ROLE postgres;
-DELETE FROM governance_commands WHERE id IN ('f404f404-f404-f404-f404-f404f404f404', 'c404c404-c404-c404-c404-c404c404c404');
-DELETE FROM deployment_sets WHERE id = '33333333-3333-3333-3333-333333333333';
-DELETE FROM environments WHERE id = '22222222-2222-2222-2222-222222222222';
-DELETE FROM admin_users WHERE id = '11111111-1111-1111-1111-111111111111';
+-- 8. ROLLBACK everything (restores trigger, cleans data, no manual delete needed)
+ROLLBACK;
 
-\echo 'MUT-01|mutation_environment_cleaned = YES'
+\echo 'MUT-01|mutation_environment_cleaned = YES (rolled back)'
 \echo 'MUT-01|VERDICT = PASS'
 \echo '===== MUTATION SAFETY TEST COMPLETE ====='

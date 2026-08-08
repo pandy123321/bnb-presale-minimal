@@ -162,15 +162,15 @@ This is the opposite of fail-open: no silent pass, any deviation from expectatio
 
 ## Evidence Files
 
-| File | SHA-256 |
-|------|---------|
-| rt01_objects_evidence.txt | 252AADC2... |
-| rt01_permission_evidence.txt | 833C2FF5... |
-| rt01_permission_tests.sql | 9AC9F2A7... |
-| rt01_sp_tests.sql | CCF4721A... |
-| rt01_sp_evidence.txt | 9B06E45D... |
-| rt01_mutation_test.sql | 0B4ADD57... |
-| rt01_mutation_evidence.txt | A0D7D4EB... |
+All evidence file SHA-256 hashes are recorded in PAYLOAD_MANIFEST.csv.
+Refer to PAYLOAD_MANIFEST.csv.sha256 for integrity verification.
+
+File list: 00_RUNTIME_GATE_STATUS.md, 01_POSTGRESQL_MIGRATION_EVIDENCE.md, 02_ROLE_RUNTIME_MATRIX.md,
+../sql/0001_binggoplus_v2_schema.sql, ../sql/0002_binggoplus_v2_runtime_privileges.sql,
+rt01_setup_env.sql, rt01_transfer_ownership.sql, rt01_validate_objects.sql,
+rt01_permission_tests.sql, rt01_sp_tests.sql, rt01_mutation_test.sql,
+rt01_objects_evidence.txt, rt01_permission_evidence.txt, rt01_sp_evidence.txt,
+rt01_mutation_evidence.txt
 
 ## MUTATION_SAFETY_CHECK
 
@@ -182,13 +182,13 @@ This is the opposite of fail-open: no silent pass, any deviation from expectatio
 | MUT-01 state_verification = QUEUED_CONFIRMED | PASS |
 | MUT-01 trigger_restored = YES, trigger_after = ENABLED | PASS |
 | MUT_SP04_proof guarded transition blocked = 55000 | PASS |
-| MUT-01 mutation_environment_cleaned = YES | PASS |
+| MUT-01 mutation_environment_cleaned = YES (rolled back) | PASS |
 
 ## Conclusion
 
 ```
 RT-GATE-01_ROLE_RUNTIME = PASS
-All 91 checks passed. 0 violations.
+All 90 checks passed. 0 violations.
 12/12 assertion-style SP tests (not fail-open).
 1/1 mutation safety check with independent evidence.
 ```
