@@ -1,0 +1,108 @@
+SET
+ count 
+-------
+     0
+(1 row)
+
+DO
+DO
+DO
+DO
+DO
+RESET
+SET
+ count 
+-------
+     0
+(1 row)
+
+DO
+DO
+DO
+DO
+DO
+RESET
+SET
+ count 
+-------
+     0
+(1 row)
+
+DO
+DO
+DO
+DO
+DO
+RESET
+SET
+ count 
+-------
+     0
+(1 row)
+
+DO
+DO
+DO
+DO
+DO
+DO
+RESET
+SET
+ count 
+-------
+     0
+(1 row)
+
+DO
+DO
+DO
+DO
+DO
+DO
+RESET
+SET
+ count 
+-------
+     0
+(1 row)
+
+ count 
+-------
+     0
+(1 row)
+
+DO
+DO
+DO
+DO
+DO
+RESET
+SET
+ count 
+-------
+     0
+(1 row)
+
+ count 
+-------
+     0
+(1 row)
+
+ count 
+-------
+     0
+(1 row)
+
+DO
+DO
+DO
+DO
+DO
+RESET
+SET
+ count 
+-------
+     0
+(1 row)
+
+RESET
