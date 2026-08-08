@@ -1,1 +1,148 @@
-﻿SETHEADER|TEST_ID|ROLE|EXPECTED|SQLSTATE|ACTUAL|ERROR=====================================================================CREATE SCHEMASETCREATE FUNCTIONCREATE FUNCTIONCREATE FUNCTIONCREATE FUNCTIONINSERT 0 1INSERT 0 1INSERT 0 1INSERT 0 3INSERT 0 1INSERT 0 1INSERT 0 1INSERT 0 1INSERT 0 8--- Creating cancellation requests ---SETINSERT 0 1INSERT 0 1INSERT 0 1INSERT 0 1RESETSETUPDATE 1RESETSETUPDATE 1RESETTEST: SP-01psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:147: NOTICE:  00000: SP-01|bgp_dividend|FAIL|PASS|55000|55000|bgp_dividend cannot apply dividend epoch transition CANCELLED -> DRAFTLOCATION:  exec_stmt_raise, pl_exec.c:3897 assert_must_fail_as --------------------- (1 row)TEST: SP-02psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:152: NOTICE:  00000: SP-02|bgp_dividend|FAIL|PASS|55000|55000|bgp_dividend cannot apply dividend epoch transition CLOSED -> DRAFTLOCATION:  exec_stmt_raise, pl_exec.c:3897 assert_must_fail_as --------------------- (1 row)TEST: SP-03psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:157: NOTICE:  00000: SP-03|bgp_dividend|FAIL|PASS|42501|42501|permission denied for table dividend_epochsLOCATION:  exec_stmt_raise, pl_exec.c:3897 assert_must_fail_as --------------------- (1 row)TEST: SP-04psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:162: NOTICE:  00000: SP-04|bgp_reconciler|FAIL|PASS|55000|55000|bgp_reconciler cannot apply governance command transition FINALIZED -> QUEUEDLOCATION:  exec_stmt_raise, pl_exec.c:3897 assert_must_fail_as --------------------- (1 row)TEST: SP-05psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:167: NOTICE:  00000: SP-05|bgp_reconciler|FAIL|PASS|55000|55000|bgp_reconciler cannot apply governance command transition CANCELLED -> SIGNINGLOCATION:  exec_stmt_raise, pl_exec.c:3897 assert_must_fail_as --------------------- (1 row)TEST: SP-06psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:172: NOTICE:  00000: SP-06|bgp_reconciler|FAIL|PASS|55000|55000|bgp_reconciler cannot apply governance command transition FAILED -> APPROVEDLOCATION:  exec_stmt_raise, pl_exec.c:3897 assert_must_fail_as --------------------- (1 row)TEST: SP-07psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:179: NOTICE:  00000: SP-07_step1|bgp_reconciler|SUCCESS|PASS|||successLOCATION:  exec_stmt_raise, pl_exec.c:3897 assert_must_pass_as --------------------- (1 row)psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:181: NOTICE:  00000: SP-07|bgp_reconciler|FAIL|PASS|55000|55000|queued command with a pending cancellation request cannot enter signingLOCATION:  exec_stmt_raise, pl_exec.c:3897 assert_must_fail_as --------------------- (1 row)TEST: SP-08psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:190: NOTICE:  00000: SP-08|bgp_reconciler|FAIL|PASS|55000|55000|pending cancellation cannot be rejected while command remains cancellableLOCATION:  exec_stmt_raise, pl_exec.c:3897 assert_must_fail_as --------------------- (1 row)TEST: SP-09psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:198: NOTICE:  00000: SP-09|bgp_reconciler|SUCCESS|PASS|||successLOCATION:  exec_stmt_raise, pl_exec.c:3897 assert_must_pass_as --------------------- (1 row)TEST: SP-10psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:204: NOTICE:  00000: SP-10|bgp_reconciler|SUCCESS|PASS|||successLOCATION:  exec_stmt_raise, pl_exec.c:3897 assert_must_pass_as --------------------- (1 row)TEST: SP-11psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:233: NOTICE:  00000: SP-11|postgres|SUCCESS|PASS|||historical FAILED command does not contaminate publish bindingLOCATION:  exec_stmt_raise, pl_exec.c:3897DOTEST: SP-12psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:241: NOTICE:  00000: SP-12|bgp_reconciler|FAIL|PASS|42501|42501|permission denied for table governance_commandsLOCATION:  exec_stmt_raise, pl_exec.c:3897 assert_must_fail_as --------------------- (1 row)--- CLEANUP ---SETDELETE 4DELETE 8DELETE 4DELETE 3DELETE 1DELETE 1DELETE 1RESETpsql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:256: NOTICE:  00000: drop cascades to 4 other objectsDETAIL:  drop cascades to function assert_must_fail(text,text,text)drop cascades to function assert_must_pass(text,text)drop cascades to function assert_must_fail_as(text,text,text,text)drop cascades to function assert_must_pass_as(text,text,text)LOCATION:  reportDependentObjects, dependency.c:1221DROP SCHEMA===== ALL STATE PROTECTION TESTS COMPLETE =====
+﻿SET
+HEADER|TEST_ID|ROLE|EXPECTED|SQLSTATE|ACTUAL|ERROR
+=====================================================================
+CREATE SCHEMA
+SET
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 3
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 8
+--- Creating cancellation requests ---
+SET
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+RESET
+SET
+UPDATE 1
+RESET
+SET
+UPDATE 1
+RESET
+TEST: SP-01
+psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:147: NOTICE:  00000: SP-01|bgp_dividend|FAIL|PASS|55000|55000|bgp_dividend cannot apply dividend epoch transition CANCELLED -> DRAFT
+LOCATION:  exec_stmt_raise, pl_exec.c:3897
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-02
+psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:152: NOTICE:  00000: SP-02|bgp_dividend|FAIL|PASS|55000|55000|bgp_dividend cannot apply dividend epoch transition CLOSED -> DRAFT
+LOCATION:  exec_stmt_raise, pl_exec.c:3897
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-03
+psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:157: NOTICE:  00000: SP-03|bgp_dividend|FAIL|PASS|42501|42501|permission denied for table dividend_epochs
+LOCATION:  exec_stmt_raise, pl_exec.c:3897
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-04
+psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:162: NOTICE:  00000: SP-04|bgp_reconciler|FAIL|PASS|55000|55000|bgp_reconciler cannot apply governance command transition FINALIZED -> QUEUED
+LOCATION:  exec_stmt_raise, pl_exec.c:3897
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-05
+psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:167: NOTICE:  00000: SP-05|bgp_reconciler|FAIL|PASS|55000|55000|bgp_reconciler cannot apply governance command transition CANCELLED -> SIGNING
+LOCATION:  exec_stmt_raise, pl_exec.c:3897
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-06
+psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:172: NOTICE:  00000: SP-06|bgp_reconciler|FAIL|PASS|55000|55000|bgp_reconciler cannot apply governance command transition FAILED -> APPROVED
+LOCATION:  exec_stmt_raise, pl_exec.c:3897
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-07
+psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:179: NOTICE:  00000: SP-07_step1|bgp_reconciler|SUCCESS|PASS|||success
+LOCATION:  exec_stmt_raise, pl_exec.c:3897
+ assert_must_pass_as 
+---------------------
+ 
+(1 row)
+
+psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:181: NOTICE:  00000: SP-07|bgp_reconciler|FAIL|PASS|55000|55000|queued command with a pending cancellation request cannot enter signing
+LOCATION:  exec_stmt_raise, pl_exec.c:3897
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-08
+psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:190: NOTICE:  00000: SP-08|bgp_reconciler|FAIL|PASS|55000|55000|pending cancellation cannot be rejected while command remains cancellable
+LOCATION:  exec_stmt_raise, pl_exec.c:3897
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-09
+psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:198: NOTICE:  00000: SP-09|bgp_reconciler|SUCCESS|PASS|||success
+LOCATION:  exec_stmt_raise, pl_exec.c:3897
+ assert_must_pass_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-10
+psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:204: NOTICE:  00000: SP-10|bgp_reconciler|SUCCESS|PASS|||success
+LOCATION:  exec_stmt_raise, pl_exec.c:3897
+ assert_must_pass_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-11
+psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:233: NOTICE:  00000: SP-11|postgres|SUCCESS|PASS|||historical FAILED command does not contaminate publish binding
+LOCATION:  exec_stmt_raise, pl_exec.c:3897
+DO
+TEST: SP-12
+psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:241: NOTICE:  00000: SP-12|bgp_reconciler|FAIL|PASS|42501|42501|permission denied for table governance_commands
+LOCATION:  exec_stmt_raise, pl_exec.c:3897
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+--- CLEANUP ---
+SET
+DELETE 4
+DELETE 8
+DELETE 4
+DELETE 3
+DELETE 1
+DELETE 1
+DELETE 1
+RESET
+psql:/tmp/go-v2-sql/runtime-gate/rt01_sp_tests.sql:256: NOTICE:  00000: drop cascades to 4 other objects
+DETAIL:  drop cascades to function assert_must_fail(text,text,text)
+drop cascades to function assert_must_pass(text,text)
+drop cascades to function assert_must_fail_as(text,text,text,text)
+drop cascades to function assert_must_pass_as(text,text,text)
+LOCATION:  reportDependentObjects, dependency.c:1221
+DROP SCHEMA
+===== ALL STATE PROTECTION TESTS COMPLETE =====

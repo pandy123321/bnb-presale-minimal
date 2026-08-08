@@ -1,1 +1,204 @@
-﻿SET=== RT-GATE-01 PERMISSION TESTS ===--- bgp_api ---SETALLOW: SELECT environments count -------     0(1 row)DENIED: INSERT chain_raw_eventspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:11: NOTICE:  EXPECTED: permission denied for table chain_raw_eventsDOALLOW: INSERT admin_audit_logspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:13: NOTICE:  OKDOALLOW: DELETE admin_userspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:15: NOTICE:  OKDOALLOW: INSERT governance_commandspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:17: NOTICE:  OKDODENIED: INSERT signer_noncespsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:19: NOTICE:  EXPECTED: permission denied for table signer_noncesDORESET--- bgp_indexer ---SETALLOW: SELECT chain_streams count -------     0(1 row)ALLOW: INSERT chain_raw_eventspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:28: NOTICE:  OKDOALLOW: INSERT chain_blockspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:30: NOTICE:  OKDODENIED: DELETE chain_raw_eventspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:32: NOTICE:  EXPECTED: permission denied for table chain_raw_eventsDODENIED: INSERT token_balances_currentpsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:34: NOTICE:  EXPECTED: permission denied for table token_balances_currentDODENIED: INSERT admin_userspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:36: NOTICE:  EXPECTED: permission denied for table admin_usersDORESET--- bgp_projector ---SETALLOW: SELECT chain_raw_events (read-only) count -------     0(1 row)ALLOW: INSERT projection_receiptspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:45: NOTICE:  OKDOALLOW: INSERT token_balance_ledgerpsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:47: NOTICE:  OKDODENIED: UPDATE chain_raw_eventspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:49: NOTICE:  EXPECTED: permission denied for table chain_raw_eventsDODENIED: INSERT chain_raw_eventspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:51: NOTICE:  EXPECTED: permission denied for table chain_raw_eventsDODENIED: INSERT admin_userspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:53: NOTICE:  EXPECTED: permission denied for table admin_usersDORESET--- bgp_dividend ---SETALLOW: SELECT dividend_token_balance_history_v1 count -------     0(1 row)ALLOW: INSERT dividend_artifactspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:62: NOTICE:  OKDOALLOW: INSERT dividend_allocationspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:64: NOTICE:  OKDODENIED: SELECT token_balances_currentpsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:66: NOTICE:  EXPECTED: permission denied for table token_balances_currentDODENIED: SELECT tradespsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:68: NOTICE:  EXPECTED: permission denied for table tradesDODENIED: UPDATE dividend_epochs.merkle_rootpsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:70: NOTICE:  EXPECTED: permission denied for table dividend_epochsDODENIED: INSERT admin_userspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:72: NOTICE:  EXPECTED: permission denied for table admin_usersDORESET--- bgp_reconciler ---SETALLOW: SELECT governance_commands count -------     0(1 row)ALLOW: UPDATE governance_commands.statepsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:81: NOTICE:  OKDOVERY IMPORTANT 鈥?DENIED: INSERT governance_commands (API intake only)psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:83: NOTICE:  EXPECTED: permission denied for table governance_commandsDOALLOW: INSERT signer_noncespsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:85: NOTICE:  OKDOALLOW: INSERT governance_tx_attemptspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:87: NOTICE:  OKDODENIED: SELECT admin_userspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:89: NOTICE:  EXPECTED: permission denied for table admin_usersDODENIED: DELETE governance_commandspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:91: NOTICE:  EXPECTED: permission denied for table governance_commandsDORESET--- bgp_auditor ---SETALLOW: SELECT governance_commands count -------     0(1 row)ALLOW: SELECT dividend_epochs count -------     0(1 row)DENIED: INSERT governance_commandspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:102: NOTICE:  EXPECTED: permission denied for table governance_commandsDODENIED: UPDATE governance_commandspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:104: NOTICE:  EXPECTED: permission denied for table governance_commandsDODENIED: DELETE governance_commandspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:106: NOTICE:  EXPECTED: permission denied for table governance_commandsDODENIED: SELECT admin_userspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:108: NOTICE:  EXPECTED: permission denied for table admin_usersDODENIED: SELECT wallet_challengespsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:110: NOTICE:  EXPECTED: permission denied for table wallet_challengesDORESET--- bgp_readonly ---SETALLOW: SELECT token_balances_current count -------     0(1 row)ALLOW: SELECT trades count -------     0(1 row)ALLOW: SELECT dividend_epochs count -------     0(1 row)DENIED: INSERT any tablepsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:123: NOTICE:  EXPECTED: permission denied for table token_balances_currentDODENIED: UPDATE tradespsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:125: NOTICE:  EXPECTED: permission denied for table tradesDODENIED: DELETE dividend_epochspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:127: NOTICE:  EXPECTED: permission denied for table dividend_epochsDODENIED: SELECT admin_userspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:129: NOTICE:  EXPECTED: permission denied for table admin_usersDODENIED: SELECT governance_commandspsql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:131: NOTICE:  EXPECTED: permission denied for table governance_commandsDORESET--- bgp_migrator ---SETALLOW: SELECT environments (schema owner) count -------     0(1 row)RESET=== PERMISSION TESTS COMPLETE ===
+﻿SET
+=== RT-GATE-01 PERMISSION TESTS ===
+--- bgp_api ---
+SET
+ALLOW: SELECT environments
+ count 
+-------
+     0
+(1 row)
+
+DENIED: INSERT chain_raw_events
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:11: NOTICE:  EXPECTED: permission denied for table chain_raw_events
+DO
+ALLOW: INSERT admin_audit_logs
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:13: NOTICE:  OK
+DO
+ALLOW: DELETE admin_users
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:15: NOTICE:  OK
+DO
+ALLOW: INSERT governance_commands
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:17: NOTICE:  OK
+DO
+DENIED: INSERT signer_nonces
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:19: NOTICE:  EXPECTED: permission denied for table signer_nonces
+DO
+RESET
+--- bgp_indexer ---
+SET
+ALLOW: SELECT chain_streams
+ count 
+-------
+     0
+(1 row)
+
+ALLOW: INSERT chain_raw_events
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:28: NOTICE:  OK
+DO
+ALLOW: INSERT chain_blocks
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:30: NOTICE:  OK
+DO
+DENIED: DELETE chain_raw_events
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:32: NOTICE:  EXPECTED: permission denied for table chain_raw_events
+DO
+DENIED: INSERT token_balances_current
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:34: NOTICE:  EXPECTED: permission denied for table token_balances_current
+DO
+DENIED: INSERT admin_users
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:36: NOTICE:  EXPECTED: permission denied for table admin_users
+DO
+RESET
+--- bgp_projector ---
+SET
+ALLOW: SELECT chain_raw_events (read-only)
+ count 
+-------
+     0
+(1 row)
+
+ALLOW: INSERT projection_receipts
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:45: NOTICE:  OK
+DO
+ALLOW: INSERT token_balance_ledger
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:47: NOTICE:  OK
+DO
+DENIED: UPDATE chain_raw_events
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:49: NOTICE:  EXPECTED: permission denied for table chain_raw_events
+DO
+DENIED: INSERT chain_raw_events
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:51: NOTICE:  EXPECTED: permission denied for table chain_raw_events
+DO
+DENIED: INSERT admin_users
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:53: NOTICE:  EXPECTED: permission denied for table admin_users
+DO
+RESET
+--- bgp_dividend ---
+SET
+ALLOW: SELECT dividend_token_balance_history_v1
+ count 
+-------
+     0
+(1 row)
+
+ALLOW: INSERT dividend_artifacts
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:62: NOTICE:  OK
+DO
+ALLOW: INSERT dividend_allocations
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:64: NOTICE:  OK
+DO
+DENIED: SELECT token_balances_current
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:66: NOTICE:  EXPECTED: permission denied for table token_balances_current
+DO
+DENIED: SELECT trades
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:68: NOTICE:  EXPECTED: permission denied for table trades
+DO
+DENIED: UPDATE dividend_epochs.merkle_root
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:70: NOTICE:  EXPECTED: permission denied for table dividend_epochs
+DO
+DENIED: INSERT admin_users
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:72: NOTICE:  EXPECTED: permission denied for table admin_users
+DO
+RESET
+--- bgp_reconciler ---
+SET
+ALLOW: SELECT governance_commands
+ count 
+-------
+     0
+(1 row)
+
+ALLOW: UPDATE governance_commands.state
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:81: NOTICE:  OK
+DO
+VERY IMPORTANT 鈥?DENIED: INSERT governance_commands (API intake only)
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:83: NOTICE:  EXPECTED: permission denied for table governance_commands
+DO
+ALLOW: INSERT signer_nonces
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:85: NOTICE:  OK
+DO
+ALLOW: INSERT governance_tx_attempts
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:87: NOTICE:  OK
+DO
+DENIED: SELECT admin_users
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:89: NOTICE:  EXPECTED: permission denied for table admin_users
+DO
+DENIED: DELETE governance_commands
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:91: NOTICE:  EXPECTED: permission denied for table governance_commands
+DO
+RESET
+--- bgp_auditor ---
+SET
+ALLOW: SELECT governance_commands
+ count 
+-------
+     0
+(1 row)
+
+ALLOW: SELECT dividend_epochs
+ count 
+-------
+     0
+(1 row)
+
+DENIED: INSERT governance_commands
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:102: NOTICE:  EXPECTED: permission denied for table governance_commands
+DO
+DENIED: UPDATE governance_commands
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:104: NOTICE:  EXPECTED: permission denied for table governance_commands
+DO
+DENIED: DELETE governance_commands
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:106: NOTICE:  EXPECTED: permission denied for table governance_commands
+DO
+DENIED: SELECT admin_users
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:108: NOTICE:  EXPECTED: permission denied for table admin_users
+DO
+DENIED: SELECT wallet_challenges
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:110: NOTICE:  EXPECTED: permission denied for table wallet_challenges
+DO
+RESET
+--- bgp_readonly ---
+SET
+ALLOW: SELECT token_balances_current
+ count 
+-------
+     0
+(1 row)
+
+ALLOW: SELECT trades
+ count 
+-------
+     0
+(1 row)
+
+ALLOW: SELECT dividend_epochs
+ count 
+-------
+     0
+(1 row)
+
+DENIED: INSERT any table
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:123: NOTICE:  EXPECTED: permission denied for table token_balances_current
+DO
+DENIED: UPDATE trades
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:125: NOTICE:  EXPECTED: permission denied for table trades
+DO
+DENIED: DELETE dividend_epochs
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:127: NOTICE:  EXPECTED: permission denied for table dividend_epochs
+DO
+DENIED: SELECT admin_users
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:129: NOTICE:  EXPECTED: permission denied for table admin_users
+DO
+DENIED: SELECT governance_commands
+psql:/tmp/go-v2-sql/runtime-gate/rt01_permission_tests.sql:131: NOTICE:  EXPECTED: permission denied for table governance_commands
+DO
+RESET
+--- bgp_migrator ---
+SET
+ALLOW: SELECT environments (schema owner)
+ count 
+-------
+     0
+(1 row)
+
+RESET
+=== PERMISSION TESTS COMPLETE ===

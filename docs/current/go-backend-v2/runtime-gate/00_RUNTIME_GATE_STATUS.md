@@ -62,25 +62,25 @@ BSC_MAINNET = NO-GO
 All authoritative SHA-256 hashes are recorded in PAYLOAD_MANIFEST.csv.
 Verify integrity via PAYLOAD_MANIFEST.csv.sha256.
 
-| File |
-|------|
-| 00_RUNTIME_GATE_STATUS.md |
-| 01_POSTGRESQL_MIGRATION_EVIDENCE.md |
-| 02_ROLE_RUNTIME_MATRIX.md |
-| ../sql/0001_binggoplus_v2_schema.sql |
-| ../sql/0002_binggoplus_v2_runtime_privileges.sql |
-| rt01_setup_env.sql |
-| rt01_transfer_ownership.sql |
-| rt01_validate_objects.sql |
-| rt01_permission_tests.sql |
-| rt01_sp_tests.sql |
-| rt01_mutation_test.sql |
-| rt01_objects_evidence.txt |
-| rt01_permission_evidence.txt |
-| rt01_sp_evidence.txt |
-| rt01_mutation_evidence.txt |
-| PAYLOAD_MANIFEST.csv | (authoritative hash source) |
-| PAYLOAD_MANIFEST.csv.sha256 | (external manifest integrity) |
+| File | Role |
+|------|------|
+| 00_RUNTIME_GATE_STATUS.md | overall gate status |
+| 01_POSTGRESQL_MIGRATION_EVIDENCE.md | migration evidence |
+| 02_ROLE_RUNTIME_MATRIX.md | permission/SP matrix |
+| ../sql/0001_binggoplus_v2_schema.sql | DDL machine spec |
+| ../sql/0002_binggoplus_v2_runtime_privileges.sql | DCL machine spec |
+| rt01_setup_env.sql | env bootstrap |
+| rt01_transfer_ownership.sql | ownership transfer |
+| rt01_validate_objects.sql | object validation |
+| rt01_permission_tests.sql | permission test script |
+| rt01_sp_tests.sql | SP test script |
+| rt01_mutation_test.sql | mutation test script |
+| rt01_objects_evidence.txt | object raw evidence |
+| rt01_permission_evidence.txt | permission raw evidence |
+| rt01_sp_evidence.txt | SP raw evidence |
+| rt01_mutation_evidence.txt | mutation raw evidence |
+| PAYLOAD_MANIFEST.csv | authoritative hash source |
+| PAYLOAD_MANIFEST.csv.sha256 | external manifest integrity |
 
 ## Changes in this revision (Fix Cycle 5)
 
