@@ -1,26 +1,133 @@
+﻿HEADER|TEST_ID|ROLE|EXPECTED|SQLSTATE|ACTUAL|ERROR
+=====================================================================
+CREATE SCHEMA
 SET
-SET
-RESET
-SET
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 3
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
 INSERT 0 8
+--- Creating cancellation requests ---
+SET
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
 RESET
 SET
-SET
-DO
-DO
-DO
+UPDATE 1
 RESET
 SET
-DO
-DO
-DO
-DO
-DO
-DO
-DO
-DO
+UPDATE 1
 RESET
-DELETE 0
+TEST: SP-01
+psql:/tmp/rt01_sp_tests.sql:145: NOTICE:  SP-01|bgp_dividend|FAIL|PASS|55000|55000|bgp_dividend cannot apply dividend epoch transition CANCELLED -> DRAFT
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-02
+psql:/tmp/rt01_sp_tests.sql:150: NOTICE:  SP-02|bgp_dividend|FAIL|PASS|55000|55000|bgp_dividend cannot apply dividend epoch transition CLOSED -> DRAFT
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-03
+psql:/tmp/rt01_sp_tests.sql:155: NOTICE:  SP-03|bgp_dividend|FAIL|PASS|42501|42501|permission denied for table dividend_epochs
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-04
+psql:/tmp/rt01_sp_tests.sql:160: NOTICE:  SP-04|bgp_reconciler|FAIL|PASS|55000|55000|bgp_reconciler cannot apply governance command transition FINALIZED -> QUEUED
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-05
+psql:/tmp/rt01_sp_tests.sql:165: NOTICE:  SP-05|bgp_reconciler|FAIL|PASS|55000|55000|bgp_reconciler cannot apply governance command transition CANCELLED -> SIGNING
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-06
+psql:/tmp/rt01_sp_tests.sql:170: NOTICE:  SP-06|bgp_reconciler|FAIL|PASS|55000|55000|bgp_reconciler cannot apply governance command transition FAILED -> APPROVED
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-07
+psql:/tmp/rt01_sp_tests.sql:177: NOTICE:  SP-07_step1|bgp_reconciler|SUCCESS|PASS|||success
+ assert_must_pass_as 
+---------------------
+ 
+(1 row)
+
+psql:/tmp/rt01_sp_tests.sql:179: NOTICE:  SP-07|bgp_reconciler|FAIL|PASS|55000|55000|queued command with a pending cancellation request cannot enter signing
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-08
+psql:/tmp/rt01_sp_tests.sql:188: NOTICE:  SP-08|bgp_reconciler|FAIL|PASS|55000|55000|pending cancellation cannot be rejected while command remains cancellable
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-09
+psql:/tmp/rt01_sp_tests.sql:200: NOTICE:  SP-09|bgp_reconciler|FAIL|PASS|55000|55000|pending cancellation cannot be rejected while command remains cancellable
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-10
+psql:/tmp/rt01_sp_tests.sql:206: NOTICE:  SP-10|bgp_reconciler|SUCCESS|PASS|||success
+ assert_must_pass_as 
+---------------------
+ 
+(1 row)
+
+TEST: SP-11
+psql:/tmp/rt01_sp_tests.sql:235: NOTICE:  SP-11|postgres|SUCCESS|PASS|||historical FAILED command does not contaminate publish binding
+DO
+TEST: SP-12
+psql:/tmp/rt01_sp_tests.sql:243: NOTICE:  SP-12|bgp_reconciler|FAIL|PASS|42501|42501|permission denied for table governance_commands
+ assert_must_fail_as 
+---------------------
+ 
+(1 row)
+
+--- CLEANUP ---
+SET
+DELETE 4
 DELETE 8
-DELETE 0
-DELETE 0
+DELETE 4
+DELETE 3
+DELETE 1
+DELETE 1
+DELETE 1
+RESET
+psql:/tmp/rt01_sp_tests.sql:258: NOTICE:  drop cascades to 4 other objects
+DETAIL:  drop cascades to function assert_must_fail(text,text,text)
+drop cascades to function assert_must_pass(text,text)
+drop cascades to function assert_must_fail_as(text,text,text,text)
+drop cascades to function assert_must_pass_as(text,text,text)
+DROP SCHEMA
+===== ALL STATE PROTECTION TESTS COMPLETE =====

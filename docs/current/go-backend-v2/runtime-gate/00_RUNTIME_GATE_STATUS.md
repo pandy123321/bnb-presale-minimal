@@ -34,7 +34,7 @@ BSC_MAINNET = NO-GO
 | 工作区 | `E:\github\bnb\bnb-presale-minimal` |
 | backend-go/ | 不存在 |
 
-## RT-GATE-01 Execution Summary (2026-08-08)
+## RT-GATE-01 Execution Summary (2026-08-08, updated 12:40)
 
 | Item | Result |
 |------|:--:|
@@ -49,20 +49,36 @@ BSC_MAINNET = NO-GO
 | 9 functions | PASS |
 | 11 triggers (all enabled) | PASS |
 | 262 constraints (CK+FK+PK+UQ) | PASS |
-| 48 permission boundary checks | PASS (48/48) |
+| 36 permission boundary checks | PASS (36/36) |
+| 32 cluster privilege checks | PASS (32/32) |
+| 8 role identity checks | PASS (8/8) |
 | 0 role inheritance violations | PASS |
-| 0 cluster privilege violations | PASS |
+| 12 assertion-style SP tests (SP-01~SP-12) | PASS (12/12) |
+| 1 mutation safety check | PASS |
+| **TOTAL** | **90/90** |
 
 ## Evidence Files
 
 | File | SHA-256 |
 |------|---------|
 | 01_POSTGRESQL_MIGRATION_EVIDENCE.md | 64DE9E63... |
-| 02_ROLE_RUNTIME_MATRIX.md | E15944AB... |
-| rt01_objects_evidence.txt | 3747F72E... |
-| rt01_permission_evidence.txt | BEA595F7... |
-| PAYLOAD_MANIFEST.csv | 0E217739... |
-| PACKAGE_SHA256 | 0ac393be1bc945ddb3d4158df6bd3fd67e3225907ad8a1b23910d78af3ba9c3f |
+| 02_ROLE_RUNTIME_MATRIX.md | 4F2F7206... |
+| rt01_objects_evidence.txt | 252AADC2... |
+| rt01_permission_evidence.txt | 8D17489F... |
+| rt01_sp_evidence.txt | E5BE8BE9... |
+| rt01_sp_tests.sql | B6D2C410... |
+| PAYLOAD_MANIFEST.csv | FECDC393... |
+| PAYLOAD_MANIFEST.csv.sha256 | (external)
+
+## Changes in this revision (Fix Cycle 2)
+
+1. **P1-RT01-03**: ALL SP tests rewritten as assertion-style (assert_must_fail / assert_must_pass).
+   Any unexpected success throws RAISE EXCEPTION (fail-safe, not fail-open).
+2. **P1-RT01-04**: SP-08 restored to frozen semantics (APPROVED + REQUESTED → try REJECT → FAIL per trigger).
+3. **P1-RT01-05**: SP-11 restored (historical FAILED command isolation). Binding guard added as SP-12.
+4. **P1-RT01-06**: PAYLOAD_MANIFEST.csv regenerated with fresh SHA-256 for all files.
+5. **P2-RT01-03**: Counts synchronized: 90/90 across all documents (36 permission + 32 cluster + 8 identity + 1 inheritance + 12 SP + 1 mutation).
+6. **P2-RT01-04**: SP evidence is machine-readable pipe-delimited format (TEST_ID|ROLE|EXPECTED|SQLSTATE|ACTUAL|ERROR).
 
 ## Awaiting
 

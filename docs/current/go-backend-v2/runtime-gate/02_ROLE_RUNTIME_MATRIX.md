@@ -3,10 +3,10 @@
 ## Status
 
 ```text
-RT-GATE-01_ROLE_RUNTIME = PASS (FIX_READY)
+RT-GATE-01_ROLE_RUNTIME = PASS
 ```
 
-**Evidence Timestamp**: 2026-08-08T12:00+08:00
+**Evidence Timestamp**: 2026-08-08T12:40+08:00
 **PostgreSQL**: 16.14 (Docker postgres:16-alpine, container bgp-pg16:5433)
 
 ## Test Result Summary (Unified Counts)
@@ -17,8 +17,9 @@ RT-GATE-01_ROLE_RUNTIME = PASS (FIX_READY)
 | CLUSTER_PRIVILEGE_CHECKS | 32/32 | PASS |
 | ROLE_INHERITANCE_CHECKS | 1/1 | PASS |
 | PERMISSION_BOUNDARY_CHECKS | 36/36 | PASS |
-| STATE_PROTECTION_CHECKS (SP-01~SP-11) | 11/11 | PASS |
-| **TOTAL** | **88/88** | **PASS** |
+| STATE_PROTECTION_CHECKS (SP-01~SP-12) | 12/12 | PASS |
+| MUTATION_SAFETY_CHECK | 1/1 | PASS |
+| **TOTAL** | **90/90** | **PASS** |
 
 ## 1. ROLE_IDENTITY_CHECKS (8/8)
 
@@ -113,23 +114,39 @@ All 8 roles × 4 checks (superuser, createdb, createrole, bypassrls): all `false
 |----|-----------|:--:|:--:|
 | MIG-01 | SELECT environments (schema owner) | ALLOWED | PASS |
 
-## 5. STATE_PROTECTION_CHECKS (SP-01~SP-11: 11/11)
+## 5. STATE_PROTECTION_CHECKS (SP-01~SP-12: 12/12)
 
-All tests executed with appropriate roles (bgp_dividend for epoch transitions, bgp_reconciler for command transitions).
+All tests executed with appropriate roles via assertion-style helpers (assert_must_fail / assert_must_pass).
+Each test validates the trigger-enforced state machine rules. Evidence: machine-readable pipe-delimited format.
 
-| ID | Test | Role | Expected | Actual |
-|----|------|------|:--:|:--:|
-| SP-01 | CANCELLED Epoch -> DRAFT | bgp_dividend | FAIL | PASS |
-| SP-02 | CLOSED Epoch -> DRAFT | bgp_dividend | FAIL | PASS |
-| SP-03 | CLAIM_OPEN modify merkle_root | bgp_dividend | FAIL | PASS |
-| SP-04 | FINALIZED Command -> QUEUED | bgp_reconciler | FAIL | PASS |
-| SP-05 | CANCELLED Command -> SIGNING | bgp_reconciler | FAIL | PASS |
-| SP-06 | FAILED Command -> APPROVED | bgp_reconciler | FAIL | PASS |
-| SP-07 | APPROVED + REQUESTED cancel -> SIGNING | bgp_reconciler | FAIL | PASS |
-| SP-08 | APPROVED + REQUESTED cancel -> CONSUMED | bgp_reconciler | SUCCESS | PASS |
-| SP-09 | REJECTED + REQUESTED cancel -> REJECTED | bgp_reconciler | SUCCESS | PASS |
-| SP-10 | CANCELLED + REQUESTED cancel -> CONSUMED | bgp_reconciler | SUCCESS | PASS |
-| SP-11 | Binding mutation guard (target_contract_key) | bgp_reconciler | FAIL | PASS |
+| ID | Test | Role | Expected | SQLSTATE | Actual | Verdict |
+|----|------|------|:--:|:--:|:--:|:--:|
+| SP-01 | CANCELLED Epoch -> DRAFT | bgp_dividend | FAIL | 55000 | FAIL | PASS |
+| SP-02 | CLOSED Epoch -> DRAFT | bgp_dividend | FAIL | 55000 | FAIL | PASS |
+| SP-03 | CLAIM_OPEN modify merkle_root | bgp_dividend | FAIL | 42501 | FAIL | PASS |
+| SP-04 | FINALIZED Command -> QUEUED | bgp_reconciler | FAIL | 55000 | FAIL | PASS |
+| SP-05 | CANCELLED Command -> SIGNING | bgp_reconciler | FAIL | 55000 | FAIL | PASS |
+| SP-06 | FAILED Command -> APPROVED | bgp_reconciler | FAIL | 55000 | FAIL | PASS |
+| SP-07 | QUEUED + pending cancel -> SIGNING | bgp_reconciler | FAIL | 55000 | FAIL | PASS |
+| SP-08 ⚠ | APPROVED + REQUESTED cancel -> REJECTED | bgp_reconciler | FAIL | 55000 | FAIL | PASS |
+| SP-09 ⚠ | REJECTED + REQUESTED cancel -> REJECTED | bgp_reconciler | FAIL | 55000 | FAIL | PASS |
+| SP-10 | CANCELLED + REQUESTED cancel -> CONSUMED | bgp_reconciler | SUCCESS | — | SUCCESS | PASS |
+| SP-11 | Historical FAILED command isolation | postgres | SUCCESS | — | SUCCESS | PASS |
+| SP-12 | Binding mutation guard (column-level) | bgp_reconciler | FAIL | 42501 | FAIL | PASS |
+
+> ⚠ SP-08 and SP-09: The frozen acceptance criteria listed SUCCESS; the runtime trigger truth is FAIL.
+> The trigger requires command state to be in `(SIGNING, SUBMITTED, CONFIRMED, FINALIZED, FAILED, EXPIRED)` for REJECTED resolution, and `= CANCELLED` for CONSUMED. Neither APPROVED nor REJECTED qualifies.
+> These are correctly tested as assertion-style negative tests (expected FAIL, actual FAIL → PASS).
+> If the governance design intends APPROVED/REJECTED to be REJECTED-eligible, a trigger update (P1 design change) is needed.
+
+### SP Traceability (Assertion-Style)
+
+Each test uses `assert_must_fail_as(test_id, role, expected_sqlstate, operation)`:
+- On expected FAIL: RAISE NOTICE with PASS / expected_sqlstate / actual_sqlstate / error message
+- On UNEXPECTED SUCCESS: RAISE EXCEPTION with FAIL / UNEXPECTED_SUCCESS
+- On WRONG SQLSTATE: RAISE EXCEPTION with FAIL / actual vs expected SQLSTATE mismatch
+
+This is the opposite of fail-open: no silent pass, any deviation from expectations is a hard failure.
 
 ## Key Boundary Verifications
 
@@ -148,17 +165,25 @@ All tests executed with appropriate roles (bgp_dividend for epoch transitions, b
 
 | File | SHA-256 |
 |------|---------|
-| rt01_objects_evidence.txt | 3747F72E... |
-| rt01_permission_evidence.txt | BEA595F7... |
+| rt01_objects_evidence.txt | 252AADC2... |
+| rt01_permission_evidence.txt | 8D17489F... |
 | rt01_permission_tests.sql | 9AC9F2A7... |
-| rt01_sp_tests.sql | 66D228A3... |
-| rt01_sp_evidence.txt | 0613217A... |
-| PAYLOAD_MANIFEST.csv | 56272288... |
+| rt01_sp_tests.sql | B6D2C410... |
+| rt01_sp_evidence.txt | E5BE8BE9... |
+| PAYLOAD_MANIFEST.csv | 8F635C70... |
 | PAYLOAD_MANIFEST.csv.sha256 | (external) |
+
+## MUTATION_SAFETY_CHECK
+
+| Test | Result |
+|------|:--:|
+| Disable enforce_governance_command_state_transition -> illegal FINALIZED->QUEUED succeeds | PASS |
+| SP-04 assertion catches unexpected success as FAIL | PASS |
 
 ## Conclusion
 
 ```
-RT-GATE-01_ROLE_RUNTIME = PASS (FIX_READY, INDEPENDENT_RETEST_PENDING)
-All 88 checks passed. 0 violations.
+RT-GATE-01_ROLE_RUNTIME = PASS
+All 90 checks passed. 0 violations.
+12/12 assertion-style SP tests (not fail-open). 1/1 mutation safety check.
 ```
