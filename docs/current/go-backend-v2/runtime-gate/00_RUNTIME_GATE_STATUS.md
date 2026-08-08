@@ -59,18 +59,28 @@ BSC_MAINNET = NO-GO
 
 ## Evidence Files
 
-| File | SHA-256 |
-|------|---------|
-| 01_POSTGRESQL_MIGRATION_EVIDENCE.md | 64DE9E63... |
-| 02_ROLE_RUNTIME_MATRIX.md | (see latest commit) |
-| rt01_objects_evidence.txt | 252AADC2... |
-| rt01_permission_evidence.txt | 833C2FF5... |
-| rt01_sp_evidence.txt | 9B06E45D... |
-| rt01_sp_tests.sql | CCF4721A... |
-| rt01_mutation_test.sql | 0B4ADD57... |
-| rt01_mutation_evidence.txt | A0D7D4EB... |
-| PAYLOAD_MANIFEST.csv | A481BA12... |
-| PAYLOAD_MANIFEST.csv.sha256 | (external)
+All authoritative SHA-256 hashes are recorded in PAYLOAD_MANIFEST.csv.
+Verify integrity via PAYLOAD_MANIFEST.csv.sha256.
+
+| File |
+|------|
+| 00_RUNTIME_GATE_STATUS.md |
+| 01_POSTGRESQL_MIGRATION_EVIDENCE.md |
+| 02_ROLE_RUNTIME_MATRIX.md |
+| ../sql/0001_binggoplus_v2_schema.sql |
+| ../sql/0002_binggoplus_v2_runtime_privileges.sql |
+| rt01_setup_env.sql |
+| rt01_transfer_ownership.sql |
+| rt01_validate_objects.sql |
+| rt01_permission_tests.sql |
+| rt01_sp_tests.sql |
+| rt01_mutation_test.sql |
+| rt01_objects_evidence.txt |
+| rt01_permission_evidence.txt |
+| rt01_sp_evidence.txt |
+| rt01_mutation_evidence.txt |
+| PAYLOAD_MANIFEST.csv | (authoritative hash source) |
+| PAYLOAD_MANIFEST.csv.sha256 | (external manifest integrity) |
 
 ## Changes in this revision (Fix Cycle 5)
 
