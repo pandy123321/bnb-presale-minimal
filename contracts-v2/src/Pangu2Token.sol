@@ -336,11 +336,13 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
         if (grossAmount == 0 || costWbnbWei == 0) revert InvalidAmount();
         if (tradingOpenAt == 0) revert TradingNotOpen();
         (taxAmount, netAmount) = previewBuyTaxFor(buyer, grossAmount);
-        _update(msg.sender, address(feeVault), taxAmount);
+        if (taxAmount != 0) {
+            _update(msg.sender, address(feeVault), taxAmount);
+            feeVault.credit(IFeeVault.Bucket.DIVIDEND, taxAmount);
+        }
         _beginContext(msg.sender, TransferContext.Kind.BUY_SETTLEMENT);
         _update(msg.sender, buyer, netAmount);
         _endContext();
-        feeVault.credit(IFeeVault.Bucket.DIVIDEND, taxAmount);
         costBasisManager.recordBuy(buyer, costWbnbWei, netAmount);
         emit TokensPurchased(buyer, costWbnbWei, grossAmount, taxAmount, netAmount);
     }
@@ -358,12 +360,39 @@ contract Pangu2Token is ERC20, AccessControl, Pausable {
         if (sellAmount == 0) revert InvalidAmount();
         if (tradingOpenAt == 0) revert TradingNotOpen();
         (supportAmount, burnAmount, swapAmount) = previewSellTaxFor(seller, sellAmount, taxBps);
-        _update(msg.sender, address(feeVault), supportAmount);
+        if (supportAmount != 0) {
+            _update(msg.sender, address(feeVault), supportAmount);
+            feeVault.credit(IFeeVault.Bucket.SUPPORT, supportAmount);
+        }
         if (burnAmount != 0) {
             _burn(msg.sender, burnAmount);
             emit ProtocolBurn(msg.sender, burnAmount);
         }
-        feeVault.credit(IFeeVault.Bucket.SUPPORT, supportAmount);
+    }
+
+    /// @notice Mixed-sell settlement with pre-computed amounts (S2 P1-CB-01 part 2/2).
+    ///         Router splits sellAmount into knownSold + unknownSold, computes
+    ///         tax per component, and passes exact support/burn/swap amounts here.
+    function settleSellExact(address seller, uint256 sellAmount, uint256 supportAmount, uint256 burnAmount)
+        external
+        onlyRole(SETTLEMENT_ROLE)
+        whenNotPaused
+        returns (uint256 swapAmount)
+    {
+        if (!coreConfigured) revert CoreNotConfigured();
+        if (seller == address(0)) revert ZeroAddress();
+        if (sellAmount == 0) revert InvalidAmount();
+        if (tradingOpenAt == 0) revert TradingNotOpen();
+        if (supportAmount + burnAmount > sellAmount) revert InvalidAmount();
+        swapAmount = sellAmount - supportAmount - burnAmount;
+        if (supportAmount != 0) {
+            _update(msg.sender, address(feeVault), supportAmount);
+            feeVault.credit(IFeeVault.Bucket.SUPPORT, supportAmount);
+        }
+        if (burnAmount != 0) {
+            _burn(msg.sender, burnAmount);
+            emit ProtocolBurn(msg.sender, burnAmount);
+        }
     }
 
     function emitSellSettlementAmountOut(address seller, uint256 tokenIn, uint16 taxBps, uint256 amountOut)

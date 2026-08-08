@@ -25,6 +25,9 @@ contract MockCostBasis is ICostBasisManager {
     function proportionalCost(address, uint256) external view returns (uint256, PositionStatus) {
         return (0, PositionStatus.NONE);
     }
+    function proportionalCostCeil(address, uint256) external view returns (uint256, PositionStatus) {
+        return (0, PositionStatus.NONE);
+    }
     function recordBuy(address, uint256, uint256) external { }
     function recordZeroCost(address, uint256) external { }
     function markUnknown(address, uint256, bytes32) external { }
@@ -91,7 +94,7 @@ contract StakingSecurityTest is Test {
         token = new Pangu2Token(HOLDER, GOVERNANCE, EMERGENCY);
         costBasis = new MockCostBasis();
         feeVault = new MockFeeVault();
-        staking = new Pangu2Staking(address(token), GOVERNANCE);
+        staking = new Pangu2Staking(address(token), GOVERNANCE, EMERGENCY);
 
         // Configure core + register staking
         vm.startPrank(GOVERNANCE);

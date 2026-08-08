@@ -38,6 +38,10 @@ interface IPangu2Token is IERC20 {
         external
         returns (uint256 supportAmount, uint256 burnAmount, uint256 swapAmount);
 
+    function settleSellExact(address seller, uint256 sellAmount, uint256 supportAmount, uint256 burnAmount)
+        external
+        returns (uint256 swapAmount);
+
     function systemTransfer(address to, uint256 amount, TransferContext.Kind kind) external returns (bool);
     function stakingDeposit(address from, uint256 amount) external returns (bool);
     function emitSellSettlementAmountOut(address seller, uint256 tokenIn, uint16 taxBps, uint256 amountOut) external;

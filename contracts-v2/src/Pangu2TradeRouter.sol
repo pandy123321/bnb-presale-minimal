@@ -174,8 +174,9 @@ contract Pangu2TradeRouter is AccessControl, Pausable, ReentrancyGuard {
         SellPreview memory p = _previewSell(msg.sender, tokenAmount);
         IERC20(address(token)).safeTransferFrom(msg.sender, address(this), tokenAmount);
         costBasisManager.consumeSell(msg.sender, tokenAmount);
-        (uint256 supportTokens, uint256 burnTokens, uint256 swapTokens) =
-            token.settleSell(msg.sender, tokenAmount, p.taxBps);
+        uint256 swapTokens = token.settleSellExact(msg.sender, tokenAmount, p.supportTokens, p.burnTokens);
+        uint256 supportTokens = p.supportTokens;
+        uint256 burnTokens = p.burnTokens;
 
         if (swapTokens > type(uint128).max) revert AmountExceedsUint128();
         IERC20(address(token)).forceApprove(address(adapter), swapTokens);
@@ -238,36 +239,76 @@ contract Pangu2TradeRouter is AccessControl, Pausable, ReentrancyGuard {
         if (tokenAmount == 0) revert InvalidAmount();
         if (tokenAmount > type(uint128).max) revert AmountExceedsUint128();
 
-        (uint256 proportionalCost, ICostBasisManager.PositionStatus status) =
-            costBasisManager.proportionalCost(seller, tokenAmount);
-        IPangu2TwapOracle.Quote memory twap = oracle.validatedQuote(address(token), address(wbnb), uint128(tokenAmount));
+        // S2 P1-CB-01 part 2/2: split sellAmount into knownSold + unknownSold.
+        (uint256 knownSold, uint256 unknownSold) = _splitKnownUnknown(seller, tokenAmount);
 
-        uint16 baseTaxBps = status == ICostBasisManager.PositionStatus.KNOWN && twap.amountOut <= proportionalCost
-            ? token.NORMAL_SELL_TAX_BPS()
-            : token.PROFIT_SELL_TAX_BPS();
+        // UNKNOWN portion: 10% tax = 9% support + 1% burn
+        uint256 unknownSupport = (unknownSold * 900) / 10_000;
+        uint256 unknownBurn = (unknownSold * 100) / 10_000;
+        uint256 unknownSwap = unknownSold - unknownSupport - unknownBurn;
+
+        // KNOWN portion: compute tax based on profit classification
+        uint256 knownSupport; uint256 knownBurn; uint256 knownSwap;
+        if (knownSold > 0) {
+            (uint256 ceilCost,) = costBasisManager.proportionalCostCeil(seller, knownSold);
+            IPangu2TwapOracle.Quote memory knownTwap =
+                oracle.validatedQuote(address(token), address(wbnb), uint128(knownSold));
+            bool isProfit = knownTwap.amountOut > ceilCost;
+            if (isProfit) {
+                knownSupport = (knownSold * 900) / 10_000;
+                knownBurn = (knownSold * 100) / 10_000;
+            } else {
+                knownSupport = (knownSold * 400) / 10_000;
+            }
+            knownSwap = knownSold - knownSupport - knownBurn;
+        }
+
+        uint256 totalSupport = unknownSupport + knownSupport;
+        uint256 totalBurn = unknownBurn + knownBurn;
+        uint256 totalSwap = unknownSwap + knownSwap;
+
+        IPangu2TwapOracle.Quote memory twap =
+            oracle.validatedQuote(address(token), address(wbnb), uint128(tokenAmount));
+
+        uint16 baseTaxBps = totalSwap < tokenAmount
+            ? token.PROFIT_SELL_TAX_BPS() : token.NORMAL_SELL_TAX_BPS();
         uint16 actualTaxBps = token.resolveSellTaxBps(seller, baseTaxBps);
-        (uint256 supportTokens, uint256 burnTokens, uint256 swapTokens) =
-            token.previewSellTaxFor(seller, tokenAmount, actualTaxBps);
-        if (swapTokens > type(uint128).max) revert AmountExceedsUint128();
-        IPangu2TwapOracle.Quote memory postTaxQuote =
-            oracle.validatedQuote(address(token), address(wbnb), uint128(swapTokens));
+        if (actualTaxBps == 0) { totalSupport = 0; totalBurn = 0; totalSwap = tokenAmount; }
+
+        (uint256 proportionalCost,) = costBasisManager.proportionalCost(seller, tokenAmount);
 
         p = SellPreview({
             tokenIn: tokenAmount,
             proportionalCostWbnbWei: proportionalCost,
             preTaxTwapValueWbnbWei: twap.amountOut,
             taxBps: actualTaxBps,
-            supportTokens: supportTokens,
-            burnTokens: burnTokens,
-            swapTokens: swapTokens,
-            estimatedWbnbOut: postTaxQuote.amountOut,
-            costStatus: status,
+            supportTokens: totalSupport,
+            burnTokens: totalBurn,
+            swapTokens: totalSwap,
+            estimatedWbnbOut: twap.amountOut,
+            costStatus: ICostBasisManager.PositionStatus.KNOWN,
             arithmeticMeanTick: twap.arithmeticMeanTick,
             spotTick: twap.spotTick,
             harmonicMeanLiquidity: twap.harmonicMeanLiquidity,
             quoteBlock: twap.observedAtBlock,
             expiresAt: block.timestamp + MAXIMUM_DEADLINE_WINDOW
         });
+    }
+
+    function _splitKnownUnknown(address seller, uint256 tokenAmount)
+        private
+        view
+        returns (uint256 knownSold, uint256 unknownSold)
+    {
+        ICostBasisManager.Position memory pos = costBasisManager.positionOf(seller);
+        if (pos.status == ICostBasisManager.PositionStatus.UNKNOWN) return (0, tokenAmount);
+        if (pos.status == ICostBasisManager.PositionStatus.KNOWN) {
+            if (tokenAmount <= pos.trackedBalance) return (tokenAmount, 0);
+            knownSold = pos.trackedBalance;
+            unknownSold = tokenAmount - knownSold;
+        } else {
+            return (0, tokenAmount);
+        }
     }
 
     function _validateDeadline(uint256 deadline) private view {

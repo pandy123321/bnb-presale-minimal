@@ -166,6 +166,7 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
     }
 
     /// 按比例计算卖出的成本。UNKNOWN 状态返回 (0, UNKNOWN)，Router 会固定使用 10% 税率。
+    /// floor 版本——用于实际成本扣除（不会多扣）。
     function proportionalCost(address account, uint256 tokenAmount)
         external
         view
@@ -178,6 +179,20 @@ contract CostBasisManager is AccessControl, ICostBasisManager {
         if (status == PositionStatus.UNKNOWN || tokenAmount > p.trackedBalance) return (0, PositionStatus.UNKNOWN);
         if (tokenAmount == p.trackedBalance) return (p.costWbnbWei, status);
         return (CostMath.proportionalFloor(p.costWbnbWei, tokenAmount, p.trackedBalance), status);
+    }
+
+    /// ceil 版本——用于利润判断（防止 floor 导致的错误 4%/10% 分类 P1-TAX-02）
+    function proportionalCostCeil(address account, uint256 tokenAmount)
+        external
+        view
+        returns (uint256 costWbnbWei, PositionStatus status)
+    {
+        Position memory p = _effectiveUserPosition(account, _positions[account]);
+        status = p.status;
+        if (tokenAmount == 0 || p.trackedBalance == 0 || status == PositionStatus.NONE) return (0, status);
+        if (status == PositionStatus.UNKNOWN || tokenAmount > p.trackedBalance) return (0, PositionStatus.UNKNOWN);
+        if (tokenAmount == p.trackedBalance) return (p.costWbnbWei, status);
+        return (CostMath.proportionalCeil(p.costWbnbWei, tokenAmount, p.trackedBalance), status);
     }
 
     // ─────────────────── 用户仓位钩子 ───────────────────

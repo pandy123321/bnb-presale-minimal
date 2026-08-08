@@ -22,6 +22,11 @@ interface ICostBasisManager {
         view
         returns (uint256 costWbnbWei, PositionStatus status);
 
+    function proportionalCostCeil(address account, uint256 tokenAmount)
+        external
+        view
+        returns (uint256 costWbnbWei, PositionStatus status);
+
     function recordBuy(address account, uint256 costWbnbWei, uint256 netTokenAmount) external;
     function recordZeroCost(address account, uint256 tokenAmount) external;
     function markUnknown(address account, uint256 tokenAmount, bytes32 reason) external;
