@@ -26,7 +26,7 @@
 | Finding | Status | Description |
 |---|---|---|
 | P1-RT02-14 | BLOCKED_EVIDENCE | Approved independent Primary/Backup RPCs unreachable; runtime retest not completed. Requires machine with direct Binance RPC access. |
-| P2-RT02-MANIFEST-03 | FIX_READY | Manifest frozen as RT02_FINAL_PAYLOAD_MANIFEST.csv |
+| P2-RT02-MANIFEST-03 | FIX_REQUIRED | Manifest byte-exact hash generation in progress; requires git blob raw bytes (not text-normalized). |
 | P2-RT02-OWNER-HASH | FIX_READY | Self-hash removed from OWNER_SECURITY_DECISION.md |
 
 These three findings require Independent Review closure. P1-RT02-14 is blocked on environmental RPC access.
@@ -51,6 +51,10 @@ Owner signoff RT02-OWNER-2026-001 recorded in OWNER_SECURITY_DECISION.md (FROZEN
 | MANIFEST | RT03_PAYLOAD_MANIFEST.csv (3 files) |
 | G0_STATUS | INCOMPLETE (awaiting RT02 Independent Review) |
 | G1_STATUS | BOOTSTRAPPED — FIX_READY for Independent Review |
+
+### Build/Vet Evidence
+
+See `rt03_build_evidence.txt` for machine-readable raw evidence recorded from `backend-go/` working directory.
 
 ### G1 合规检查
 
