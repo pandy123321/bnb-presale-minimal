@@ -94,7 +94,7 @@ contract StakingSecurityTest is Test {
         token = new Pangu2Token(HOLDER, GOVERNANCE, EMERGENCY);
         costBasis = new MockCostBasis();
         feeVault = new MockFeeVault();
-        staking = new Pangu2Staking(address(token), GOVERNANCE, EMERGENCY);
+        staking = new Pangu2Staking(address(token), GOVERNANCE);
 
         // Configure core + register staking
         vm.startPrank(GOVERNANCE);

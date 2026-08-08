@@ -141,7 +141,7 @@ contract BootstrapRoleSeparationTest is Test {
         tradeRouter = new Pangu2TradeRouter(
             address(token), WBNB, address(costBasis), address(adapter), address(oracle), governance, emergency
         );
-        staking = new Pangu2Staking(address(token), governance, emergency);
+        staking = new Pangu2Staking(address(token), governance);
 
         vm.startPrank(governance);
         token.configureCore(address(costBasis), address(feeVault));
