@@ -211,12 +211,7 @@ contract BootstrapPangu2 is Script {
                 revert("retry: LpProxy artifact is empty -- cannot resume");
             }
             if (bytes(oldArtifact).length > 0) {
-                uint256 parsed = vm.parseUint(oldArtifact);
-                require(
-                    parsed <= type(uint160).max,
-                    "LpProxy artifact exceeds address range"
-                );
-                address oldProxy = address(uint160(parsed));
+                address oldProxy = _parseArtifact(oldArtifact);
                 if (pairAlreadyRegistered) {
                     require(
                         oldProxy != address(0),
@@ -367,7 +362,10 @@ contract BootstrapPangu2 is Script {
 
     function _parseArtifact(string memory raw) private pure returns (address) {
         uint256 parsed = vm.parseUint(raw);
-        if (parsed > type(uint160).max) return address(0);
+        require(
+            parsed <= type(uint160).max,
+            "LpProxy artifact exceeds address range"
+        );
         return address(uint160(parsed));
     }
 }
