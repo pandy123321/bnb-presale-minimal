@@ -52,6 +52,8 @@ REVOKE EXECUTE ON FUNCTION binggoplus_v2.reject_projection_receipt_identity_muta
 REVOKE EXECUTE ON FUNCTION binggoplus_v2.reject_dividend_evidence_mutation() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION binggoplus_v2.reject_governance_command_binding_mutation() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION binggoplus_v2.enforce_governance_command_state_transition() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION binggoplus_v2.enforce_governance_command_cancellation_request_boundary() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION binggoplus_v2.bind_current_dividend_publish_command(uuid, uuid, timestamptz) FROM PUBLIC;
 
 REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA binggoplus_v2
   FROM bgp_api, bgp_indexer, bgp_projector, bgp_dividend,
@@ -104,6 +106,11 @@ TO bgp_api;
 
 GRANT UPDATE (state, updated_at)
 ON binggoplus_v2.governance_commands TO bgp_api;
+
+GRANT EXECUTE ON FUNCTION binggoplus_v2.bind_current_dividend_publish_command(uuid, uuid, timestamptz)
+TO bgp_api;
+
+GRANT SELECT, INSERT ON binggoplus_v2.governance_command_cancellation_requests TO bgp_api;
 
 GRANT SELECT, INSERT ON
   binggoplus_v2.governance_approvals,
@@ -229,6 +236,7 @@ GRANT UPDATE (
   state,
   claim_start,
   claim_end,
+  current_publish_command_id,
   updated_at
 ) ON binggoplus_v2.dividend_epochs TO bgp_dividend;
 
@@ -267,6 +275,12 @@ TO bgp_reconciler;
 
 GRANT UPDATE (state, updated_at)
 ON binggoplus_v2.governance_commands TO bgp_reconciler;
+
+GRANT SELECT, UPDATE (state, resolved_at)
+ON binggoplus_v2.governance_command_cancellation_requests TO bgp_reconciler;
+
+GRANT UPDATE (state, updated_at)
+ON binggoplus_v2.dividend_epochs TO bgp_reconciler;
 
 GRANT SELECT, INSERT, UPDATE ON
   binggoplus_v2.signer_nonces,

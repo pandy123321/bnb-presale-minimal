@@ -402,9 +402,9 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              properties: {reason: {type: string, maxLength: 2000}}
+              properties: {reason: {type: string, minLength: 1, maxLength: 2000}}
       responses:
-        '202': {$ref: '#/components/responses/CommandResponse'}
+        '202': {$ref: '#/components/responses/GovernanceDecisionResponse'}
         default: {$ref: '#/components/responses/ErrorResponse'}
   /admin-api/v2/projects/binggoplus/governance/actions/{action}:
     post:
@@ -903,6 +903,19 @@ components:
         requested_by: {$ref: '#/components/schemas/Uuid'}
         tx_hash: {oneOf: [{$ref: '#/components/schemas/Hash'}, {type: 'null'}]}
         created_at: {$ref: '#/components/schemas/Timestamp'}
+    GovernanceCommandCancellationRequest:
+      type: object
+      additionalProperties: false
+      required: [id, command_id, requested_by, request_hash, state, created_at]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        command_id: {$ref: '#/components/schemas/Uuid'}
+        requested_by: {$ref: '#/components/schemas/Uuid'}
+        reason: {type: string, minLength: 1, maxLength: 2000}
+        request_hash: {type: string, pattern: '^[0-9a-f]{64}$'}
+        state: {type: string, enum: [REQUESTED, CONSUMED, REJECTED]}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+        resolved_at: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
     BingGoPlusConfig:
       type: object
       additionalProperties: false
@@ -1200,6 +1213,9 @@ components:
     CommandResponse:
       description: Governance command.
       content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/GovernanceCommand'}}}]}}}
+    GovernanceDecisionResponse:
+      description: Approve/reject returns a Command; cancel returns its immutable cancellation request and is completed asynchronously by the Reconciler.
+      content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {oneOf: [{$ref: '#/components/schemas/GovernanceCommand'}, {$ref: '#/components/schemas/GovernanceCommandCancellationRequest'}]}}}]}}}
     CommandListResponse:
       description: Governance commands.
       content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/BaseEnvelope'}, {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/GovernanceCommand'}}}}]}}}

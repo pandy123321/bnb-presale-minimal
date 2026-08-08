@@ -457,6 +457,7 @@ CREATE TABLE dividend_epochs (
   merkle_root evm_hash,
   claim_start timestamptz,
   claim_end timestamptz,
+  current_publish_command_id uuid,
   carry_raw uint256_numeric NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
@@ -529,6 +530,14 @@ BEGIN
       OR NEW.claim_start IS DISTINCT FROM OLD.claim_start
       OR NEW.claim_end IS DISTINCT FROM OLD.claim_end
       OR NEW.carry_raw IS DISTINCT FROM OLD.carry_raw
+      OR (
+        NEW.current_publish_command_id IS DISTINCT FROM OLD.current_publish_command_id
+        AND NOT (
+          OLD.state = 'FAILED'
+          AND NEW.state = 'SNAPSHOT_BUILDING'
+          AND NEW.current_publish_command_id IS NULL
+        )
+      )
     THEN
       RAISE EXCEPTION 'bgp_dividend cannot write projector-owned dividend epoch fields'
         USING ERRCODE = '55000';
@@ -544,16 +553,15 @@ BEGIN
       OR (OLD.state = 'SNAPSHOT_READY' AND NEW.state IN ('APPROVAL_PENDING', 'SNAPSHOT_BUILDING', 'CANCELLED'))
       OR (OLD.state = 'APPROVAL_PENDING' AND NEW.state IN ('APPROVED', 'SNAPSHOT_BUILDING', 'CANCELLED'))
       OR (OLD.state = 'APPROVED' AND NEW.state IN ('PUBLISH_QUEUED', 'SNAPSHOT_BUILDING', 'CANCELLED'))
-      OR (OLD.state = 'FAILED' AND NEW.state IN ('SNAPSHOT_BUILDING', 'PUBLISH_QUEUED', 'CLOSE_QUEUED', 'CANCELLED'))
+      OR (OLD.state = 'FAILED' AND NEW.state IN ('SNAPSHOT_BUILDING', 'CLOSE_QUEUED', 'CANCELLED'))
       OR (OLD.state = 'CLAIM_OPEN' AND NEW.state = 'CLOSE_QUEUED')
     ) THEN
       RAISE EXCEPTION 'bgp_dividend cannot apply dividend epoch transition % -> %', OLD.state, NEW.state
         USING ERRCODE = '55000';
     END IF;
 
-    IF OLD.state = 'FAILED' AND NEW.state = 'PUBLISH_QUEUED'
-      AND OLD.merkle_root IS NOT NULL THEN
-      RAISE EXCEPTION 'published dividend epoch may not return to publish queue'
+    IF NEW.state = 'PUBLISH_QUEUED' AND NEW.current_publish_command_id IS NULL THEN
+      RAISE EXCEPTION 'publish queue requires an immutable current publish command binding'
         USING ERRCODE = '55000';
     END IF;
 
@@ -565,6 +573,7 @@ BEGIN
       IF NEW.merkle_root IS DISTINCT FROM OLD.merkle_root
         OR NEW.claim_start IS DISTINCT FROM OLD.claim_start
         OR NEW.claim_end IS DISTINCT FROM OLD.claim_end
+        OR NEW.current_publish_command_id IS DISTINCT FROM OLD.current_publish_command_id
       THEN
         RAISE EXCEPTION 'published dividend root and claim window are immutable'
           USING ERRCODE = '55000';
@@ -603,6 +612,41 @@ BEGIN
     RETURN NEW;
   END IF;
 
+  -- A publish Command failure is an off-chain execution fact, not a projected
+  -- contract event.  The Reconciler may record exactly this one failure edge,
+  -- and only after the bound DIVIDEND_PUBLISH Command has reached a terminal
+  -- non-success state in the same transaction.
+  IF current_user = 'bgp_reconciler' THEN
+    IF OLD.state <> 'PUBLISH_QUEUED' OR NEW.state <> 'FAILED' THEN
+      RAISE EXCEPTION 'bgp_reconciler cannot apply dividend epoch transition % -> %', OLD.state, NEW.state
+        USING ERRCODE = '55000';
+    END IF;
+
+    IF NEW.merkle_root IS DISTINCT FROM OLD.merkle_root
+      OR NEW.claim_start IS DISTINCT FROM OLD.claim_start
+      OR NEW.claim_end IS DISTINCT FROM OLD.claim_end
+      OR NEW.carry_raw IS DISTINCT FROM OLD.carry_raw
+      OR NEW.current_publish_command_id IS DISTINCT FROM OLD.current_publish_command_id THEN
+      RAISE EXCEPTION 'bgp_reconciler cannot change dividend epoch evidence fields'
+        USING ERRCODE = '55000';
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1
+      FROM governance_commands command
+      JOIN dividend_publish_preflights preflight
+        ON preflight.id = command.dividend_publish_preflight_id
+      WHERE command.id = OLD.current_publish_command_id
+        AND command.action = 'DIVIDEND_PUBLISH'
+        AND preflight.dividend_epoch_id = OLD.id
+        AND command.state IN ('FAILED', 'CANCELLED', 'EXPIRED')
+    ) THEN
+      RAISE EXCEPTION 'publish failure requires a terminal failed, cancelled, or expired bound command'
+        USING ERRCODE = '55000';
+    END IF;
+    RETURN NEW;
+  END IF;
+
   RAISE EXCEPTION 'role % cannot update dividend_epochs', current_user
     USING ERRCODE = '42501';
 END;
@@ -614,6 +658,7 @@ BEFORE UPDATE OF
   merkle_root,
   claim_start,
   claim_end,
+  current_publish_command_id,
   carry_raw,
   updated_at
 ON dividend_epochs
@@ -988,6 +1033,62 @@ CREATE TABLE governance_commands (
     )
   )
 );
+
+ALTER TABLE dividend_epochs
+  ADD CONSTRAINT dividend_epochs_current_publish_command_fk
+  FOREIGN KEY (current_publish_command_id) REFERENCES governance_commands(id);
+
+CREATE OR REPLACE FUNCTION bind_current_dividend_publish_command(
+  p_epoch_id uuid,
+  p_command_id uuid,
+  p_updated_at timestamptz
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = binggoplus_v2, pg_temp
+AS $$
+DECLARE
+  epoch_state text;
+  existing_command_id uuid;
+BEGIN
+  IF session_user <> 'bgp_api' THEN
+    RAISE EXCEPTION 'only bgp_api may bind a current dividend publish command'
+      USING ERRCODE = '42501';
+  END IF;
+
+  SELECT state, current_publish_command_id
+    INTO epoch_state, existing_command_id
+  FROM dividend_epochs
+  WHERE id = p_epoch_id
+  FOR UPDATE;
+
+  IF NOT FOUND OR epoch_state <> 'APPROVED' OR existing_command_id IS NOT NULL THEN
+    RAISE EXCEPTION 'publish command binding requires an approved epoch without a current attempt'
+      USING ERRCODE = '55000';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM governance_commands command
+    JOIN dividend_publish_preflights preflight
+      ON preflight.id = command.dividend_publish_preflight_id
+    WHERE command.id = p_command_id
+      AND command.action = 'DIVIDEND_PUBLISH'
+      AND command.state IN ('CREATED', 'VALIDATED', 'PENDING_APPROVAL', 'APPROVED')
+      AND preflight.dividend_epoch_id = p_epoch_id
+  ) THEN
+    RAISE EXCEPTION 'current publish command must be an unsigned command bound to this epoch'
+      USING ERRCODE = '55000';
+  END IF;
+
+  UPDATE dividend_epochs
+  SET current_publish_command_id = p_command_id,
+      updated_at = p_updated_at
+  WHERE id = p_epoch_id;
+END;
+$$;
+
 CREATE UNIQUE INDEX one_dividend_publish_command_per_preflight
   ON governance_commands(dividend_publish_preflight_id)
   WHERE action = 'DIVIDEND_PUBLISH'
@@ -1062,6 +1163,18 @@ ON governance_commands
 FOR EACH ROW
 EXECUTE FUNCTION reject_governance_command_binding_mutation();
 
+CREATE TABLE governance_command_cancellation_requests (
+  id uuid PRIMARY KEY,
+  command_id uuid NOT NULL UNIQUE REFERENCES governance_commands(id),
+  requested_by uuid NOT NULL REFERENCES admin_users(id),
+  reason text NOT NULL CHECK (length(reason) BETWEEN 1 AND 2000),
+  request_hash varchar(64) NOT NULL CHECK (request_hash ~ '^[0-9a-f]{64}$'),
+  state text NOT NULL CHECK (state IN ('REQUESTED', 'CONSUMED', 'REJECTED')),
+  created_at timestamptz NOT NULL,
+  resolved_at timestamptz,
+  CHECK ((state = 'REQUESTED' AND resolved_at IS NULL) OR (state IN ('CONSUMED', 'REJECTED') AND resolved_at IS NOT NULL))
+);
+
 CREATE OR REPLACE FUNCTION enforce_governance_command_state_transition()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -1077,9 +1190,9 @@ BEGIN
 
   IF current_user = 'bgp_api' THEN
     IF NOT (
-      (OLD.state = 'CREATED' AND NEW.state IN ('VALIDATED', 'REJECTED', 'CANCELLED', 'EXPIRED'))
-      OR (OLD.state = 'VALIDATED' AND NEW.state IN ('PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'CANCELLED', 'EXPIRED'))
-      OR (OLD.state = 'PENDING_APPROVAL' AND NEW.state IN ('APPROVED', 'REJECTED', 'CANCELLED', 'EXPIRED'))
+      (OLD.state = 'CREATED' AND NEW.state IN ('VALIDATED', 'REJECTED', 'EXPIRED'))
+      OR (OLD.state = 'VALIDATED' AND NEW.state IN ('PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'EXPIRED'))
+      OR (OLD.state = 'PENDING_APPROVAL' AND NEW.state IN ('APPROVED', 'REJECTED', 'EXPIRED'))
     ) THEN
       RAISE EXCEPTION 'bgp_api cannot apply governance command transition % -> %', OLD.state, NEW.state
         USING ERRCODE = '55000';
@@ -1089,13 +1202,30 @@ BEGIN
 
   IF current_user = 'bgp_reconciler' THEN
     IF NOT (
-      (OLD.state = 'APPROVED' AND NEW.state IN ('QUEUED', 'CANCELLED', 'EXPIRED'))
+      (OLD.state = 'CREATED' AND NEW.state = 'CANCELLED')
+      OR (OLD.state = 'VALIDATED' AND NEW.state = 'CANCELLED')
+      OR (OLD.state = 'PENDING_APPROVAL' AND NEW.state = 'CANCELLED')
+      OR (OLD.state = 'APPROVED' AND NEW.state IN ('QUEUED', 'CANCELLED', 'EXPIRED'))
       OR (OLD.state = 'QUEUED' AND NEW.state IN ('SIGNING', 'CANCELLED', 'FAILED', 'EXPIRED'))
       OR (OLD.state = 'SIGNING' AND NEW.state IN ('SUBMITTED', 'FAILED'))
       OR (OLD.state = 'SUBMITTED' AND NEW.state IN ('CONFIRMED', 'FAILED'))
       OR (OLD.state = 'CONFIRMED' AND NEW.state IN ('FINALIZED', 'FAILED'))
     ) THEN
       RAISE EXCEPTION 'bgp_reconciler cannot apply governance command transition % -> %', OLD.state, NEW.state
+        USING ERRCODE = '55000';
+    END IF;
+    IF NEW.state = 'CANCELLED' AND NOT EXISTS (
+      SELECT 1 FROM governance_command_cancellation_requests request
+      WHERE request.command_id = OLD.id AND request.state = 'REQUESTED'
+    ) THEN
+      RAISE EXCEPTION 'reconciler cancellation requires a pending immutable cancellation request'
+        USING ERRCODE = '55000';
+    END IF;
+    IF OLD.state = 'QUEUED' AND NEW.state = 'SIGNING' AND EXISTS (
+      SELECT 1 FROM governance_command_cancellation_requests request
+      WHERE request.command_id = OLD.id AND request.state = 'REQUESTED'
+    ) THEN
+      RAISE EXCEPTION 'queued command with a pending cancellation request cannot enter signing'
         USING ERRCODE = '55000';
     END IF;
     RETURN NEW;
@@ -1110,6 +1240,69 @@ CREATE TRIGGER governance_commands_state_transition_guard
 BEFORE UPDATE OF state ON governance_commands
 FOR EACH ROW
 EXECUTE FUNCTION enforce_governance_command_state_transition();
+
+CREATE OR REPLACE FUNCTION enforce_governance_command_cancellation_request_boundary()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  command_state text;
+BEGIN
+  IF current_user = 'bgp_migrator' THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    IF current_user <> 'bgp_api' OR NEW.state <> 'REQUESTED' OR NEW.resolved_at IS NOT NULL THEN
+      RAISE EXCEPTION 'only bgp_api may create a pending cancellation request'
+        USING ERRCODE = '42501';
+    END IF;
+    SELECT state INTO command_state FROM governance_commands WHERE id = NEW.command_id FOR SHARE;
+    IF command_state NOT IN ('CREATED', 'VALIDATED', 'PENDING_APPROVAL', 'APPROVED', 'QUEUED') THEN
+      RAISE EXCEPTION 'cancellation request requires an unsigned cancellable command'
+        USING ERRCODE = '55000';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'UPDATE' THEN
+    IF current_user <> 'bgp_reconciler'
+      OR ROW(NEW.command_id, NEW.requested_by, NEW.reason, NEW.request_hash, NEW.created_at)
+         IS DISTINCT FROM ROW(OLD.command_id, OLD.requested_by, OLD.reason, OLD.request_hash, OLD.created_at)
+      OR OLD.state <> 'REQUESTED'
+      OR NEW.state NOT IN ('CONSUMED', 'REJECTED')
+      OR NEW.resolved_at IS NULL THEN
+      RAISE EXCEPTION 'cancellation intent is immutable and only bgp_reconciler may resolve it'
+        USING ERRCODE = '55000';
+    END IF;
+
+    SELECT state INTO command_state
+    FROM governance_commands
+    WHERE id = NEW.command_id
+    FOR SHARE;
+
+    IF NEW.state = 'CONSUMED' AND command_state <> 'CANCELLED' THEN
+      RAISE EXCEPTION 'cancellation request may be consumed only with a cancelled command'
+        USING ERRCODE = '55000';
+    END IF;
+
+    IF NEW.state = 'REJECTED' AND command_state NOT IN (
+      'SIGNING', 'SUBMITTED', 'CONFIRMED', 'FINALIZED', 'FAILED', 'EXPIRED'
+    ) THEN
+      RAISE EXCEPTION 'pending cancellation cannot be rejected while command remains cancellable'
+        USING ERRCODE = '55000';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  RAISE EXCEPTION 'cancellation requests are append-only' USING ERRCODE = '55000';
+END;
+$$;
+
+CREATE TRIGGER governance_command_cancellation_requests_boundary
+BEFORE INSERT OR UPDATE OR DELETE ON governance_command_cancellation_requests
+FOR EACH ROW
+EXECUTE FUNCTION enforce_governance_command_cancellation_request_boundary();
 
 CREATE TABLE governance_approvals (
   id uuid PRIMARY KEY,

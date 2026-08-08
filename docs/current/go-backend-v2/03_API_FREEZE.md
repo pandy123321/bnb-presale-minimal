@@ -193,7 +193,7 @@ Proof 只能在 artifact checksum、root 与链上 commitment 一致时返回 `L
 |---|---|---|
 | POST | `/governance/commands/{id}/approve` | 独立审批 |
 | POST | `/governance/commands/{id}/reject` | 拒绝并记录原因 |
-| POST | `/governance/commands/{id}/cancel` | 未签名前取消 |
+| POST | `/governance/commands/{id}/cancel` | 仅创建不可变取消意图；Reconciler 在未签名前消费并取消 |
 
 ### 6.2 明确的合约动作
 
@@ -234,10 +234,11 @@ Builder 禁止使用不断前进的 `token_balances_current/staking_positions` �
 1. API 校验 Session、RBAC、CSRF、Idempotency、ACTIVE deployment、参数上限和当前链上状态。
 2. 生成规范化参数和 request hash，固定 target/selector，创建 `CREATED/VALIDATED` Command。
 3. 高风险动作进入 `PENDING_APPROVAL`；批准后才可 `QUEUED`。
-4. Reconciler 独占 signer nonce，签名、广播、跟踪替换和回执。
+4. Reconciler 独占 signer nonce，签名、广播、跟踪替换和回执。`cancel` 不直接改写 Command：API 仅 INSERT 一条不可变的 cancellation request；Reconciler 锁定 Command 与 request 后，优先消费 request，并仅在 `CREATED/VALIDATED/PENDING_APPROVAL/APPROVED/QUEUED` 取消。已有 request 的 `QUEUED` Command 不得进入 `SIGNING`。request 只有在 Command 已进入 `SIGNING/SUBMITTED/CONFIRMED/FINALIZED/FAILED/EXPIRED` 等不可取消状态时才可标为 `REJECTED`；在可取消状态不得以 `REJECTED` 绕过 intent 后继续签名。一旦进入 `SIGNING/SUBMITTED`，API 不能再创建取消意图，链上交易继续按回执跟踪。
 5. 只有成功 receipt 达到确认深度后为 `FINALIZED`；revert 为 `FAILED`。
 6. 相同 Idempotency-Key + 相同请求返回原 Command；相同 Key + 不同请求返回 `409 IDEMPOTENCY_CONFLICT`。
 7. 交易已广播后 HTTP 重试不得创建第二笔业务动作。
+8. API 创建 `DIVIDEND_PUBLISH` Command 时，必须在 Epoch 仍为 `APPROVED` 的同一数据库事务调用受控 `bind_current_dividend_publish_command(...)` 绑定不可替换的 `current_publish_command_id`；API 没有 `dividend_epochs` 直接 UPDATE。Builder 仅可将已绑定 Command 的 Epoch 送入 `PUBLISH_QUEUED`。该 Command 在 `FAILED/CANCELLED/EXPIRED` 后，由 Reconciler 在同一数据库事务中把**当前绑定** Epoch 从 `PUBLISH_QUEUED` 推进到 `FAILED`；该边不写 root、claim window 或 carry。失败尝试必须重建到 `SNAPSHOT_BUILDING`，不能用历史失败 Command 或旧绑定直接排队新的发布。
 
 ## 8. 限流与缓存
 

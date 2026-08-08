@@ -86,6 +86,10 @@ Generated Code License
 Alternatives Considered
 POC Scope and Result
 Benchmark Result
+Maintenance Cost Estimate
+Operational Complexity
+Security / Compliance Delta
+Exit / Replacement Cost
 DIRECT_ADOPT_TCO
 WRAP_AND_USE_TCO
 OPTIMIZED_FORK_TCO
@@ -100,7 +104,7 @@ Decision: APPROVED | REJECTED
 APPROVE_DOWNLOAD Reference
 ```
 
-四种 TCO 必须分别填写；不适用项填写 `N/A` 并说明原因。`Lifecycle Status` 描述项目内准入进度，`Upper-Rule Classification` 描述最终采用方式，二者不得互相替代。任何候选在 `APPROVE_DOWNLOAD` 前仍为 `REFERENCE_PROJECT` 或 `ADOPTION_CANDIDATE`，不得下载、加入 `go.mod` 或进入工具镜像。
+四项通用 TCO（维护成本估算、运行复杂度、安全/合规差异、退出/替换成本）与四种采用方式的 TCO 必须分别填写；不适用项填写 `N/A` 并说明原因。`Lifecycle Status` 描述项目内准入进度，`Upper-Rule Classification` 描述最终采用方式，二者不得互相替代。任何候选在 `APPROVE_DOWNLOAD` 前仍为 `REFERENCE_PROJECT` 或 `ADOPTION_CANDIDATE`，不得下载、加入 `go.mod` 或进入工具镜像。
 
 任何字段为空都不能进入 `go.mod` 或工具镜像。
 

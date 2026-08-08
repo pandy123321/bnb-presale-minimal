@@ -2,7 +2,7 @@
 
 自审日期：2026-08-07  
 自审范围：`docs/current/go-backend-v2/**`  
-结论：`ROUND6_CHANGES_REQUIRED_ACCEPTED__ROUND7_FIX_READY_FOR_INDEPENDENT_RETEST`
+结论：`ROUND10_APPROVED_FOR_RESPONSIBLE_OWNER_FREEZE__OWNER_SIGNOFF_PENDING`
 Mainnet：`NO-GO`
 
 ## 1. 结论说明
@@ -18,9 +18,9 @@ Mainnet：`NO-GO`
 | 品牌 | PASS | 新系统统一 BingGoPlus；`Pangu2* / PANGU2` 只作为不可变链上身份 |
 | 业务继承 | PASS_WITH_GATE | 税费、成本、资金路径、回购、Locker、Dividend、Staking、Oracle、权限完整；有效持币量仍待签署 |
 | 部署继承 | PASS_WITH_GATE | 地址、部署交易、区块、区块 Hash、source commit 已固化；runtime/role/getter live readback 待做 |
-| 数据库 | ROUND7_FIX_READY_FOR_REVIEW | 独立 `binggoplus_go.binggoplus_v2`、43 张表 + 4 个 Dividend 窄化历史视图；Preflight 只引用 Artifact 权威 manifest、Command/Epoch 精确状态边、终态和已发布 root 不可回写已进入候选 |
-| API | ROUND7_FIX_READY_FOR_REVIEW | 43 paths / 44 operations，Dividend action 使用独立 required closed schema，无 Mock 成功源，无任意 calldata |
-| Event/State | ROUND7_FIX_READY_FOR_REVIEW | 11 streams、8 state machines；Receipt 允许首次直接 FAILED；SQL Trigger 与 Governance/Dividend 状态机精确边已进入候选 |
+| 数据库 | APPROVED_FOR_RESPONSIBLE_OWNER_FREEZE | 独立 `binggoplus_go.binggoplus_v2`、44 张表 + 4 个 Dividend 窄化历史视图；Round9 已独立复验当前 Publish Command identity 和取消意图 fail-closed 路径 |
+| API | APPROVED_FOR_RESPONSIBLE_OWNER_FREEZE | 43 paths / 44 operations，Governance cancel 返回不可变意图并异步消费；Publish Command 创建时绑定当前 Attempt，无 Mock 成功源，无任意 calldata |
+| Event/State | APPROVED_FOR_RESPONSIBLE_OWNER_FREEZE | 11 streams、8 state machines；Receipt 允许首次直接 FAILED；失败 Attempt 必须重建后才可再次排队 |
 | 部署环境 | PASS_AS_CANDIDATE | 旁路、单写者、独立 DB、Signer 隔离、分域切换与回滚 |
 | 开源准入 | PASS_WITH_GATE | 只列 Reference/Candidate；未下载、未批准、未写浮动版本 |
 | 合约安全规范 | PASS_WITH_GATE | 资产/权限/会计/Oracle/事件响应/Mainnet Gate 已继承；测试由独立 Agent 后续接管 |
@@ -84,7 +84,7 @@ Mainnet：`NO-GO`
 
 ## 4. 阻止冻结的剩余项
 
-第三轮云端报告的 `P1-R3-01..03` 与 `P2-DOC-01` 已由第四轮独立审核关闭；第五轮材料完整性问题已由第六轮关闭。第六轮独立审核确认 `P1-R4-01/03/04/05`、`P2-R4-01/02/03` 和 `P2-R5-01` 已关闭，同时正确发现 `P1-R4-02`、`P1-R6-01`、`P1-R6-02`、`P2-R6-01`、`P2-R6-02`。这些项目已修订为 `FIX_READY / INDEPENDENT_RETEST_PENDING`，在第七轮独立复验前不得关闭；相应的 `P1-R3-04` / `P1-DB-02` / `P1-DB-PRIV-02` 仍保持 OPEN。
+第三轮云端报告的 `P1-R3-01..03` 与 `P2-DOC-01` 已由第四轮独立审核关闭；第五轮材料完整性问题已由第六轮关闭。Round8 修复复核指出历史失败 Command 不得授权当前 Publish Attempt，且 pending cancel 不得被拒绝后继续签名；第九轮独立复验已关闭 `P1-R8-01` 与 `P1-R8-02`。Round10 独立复验进一步关闭 `P2-R9-01`，确认 `Command=REJECTED -> Cancellation Request=REJECTED` 已收敛，且未破坏既有 Fail Closed 约束。
 
 ### GATE-01：Dividend 有效持币量
 
@@ -119,7 +119,7 @@ DB、OpenAPI、Event/State、环境、RBAC/Signer 仍需各责任人签署；标
 ## 5. 自审 Verdict
 
 ```text
-PLANNING_DELIVERABLE = ROUND6_CHANGES_REQUIRED_ACCEPTED__ROUND7_FIX_READY_FOR_INDEPENDENT_RETEST
+PLANNING_DELIVERABLE = ROUND10_APPROVED_FOR_RESPONSIBLE_OWNER_FREEZE__OWNER_SIGNOFF_PENDING
 FROZEN_FOR_DEVELOPMENT = NO
 DEVELOPMENT_START = NO
 BSC_TESTNET_CONTRACT_REDEPLOY = FORBIDDEN

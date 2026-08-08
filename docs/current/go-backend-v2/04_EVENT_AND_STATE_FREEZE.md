@@ -171,11 +171,11 @@ Indexer/Projector 必须生成但不自动“修正”的异常：
 
 ### 6.4 Governance Command
 
-`CREATED -> VALIDATED -> PENDING_APPROVAL -> APPROVED -> QUEUED -> SIGNING -> SUBMITTED -> CONFIRMED -> FINALIZED`。可按规范进入 `REJECTED/CANCELLED/FAILED/EXPIRED`。`SUBMITTED` 后取消不撤销链上交易，只能停止替换并继续跟踪结果。
+`CREATED -> VALIDATED -> PENDING_APPROVAL -> APPROVED -> QUEUED -> SIGNING -> SUBMITTED -> CONFIRMED -> FINALIZED`。可按规范进入 `REJECTED/CANCELLED/FAILED/EXPIRED`。HTTP cancel 只创建不可变 cancellation intent；Reconciler 在锁定 Command 与 intent 后，才可消费 intent 并在 `CREATED/VALIDATED/PENDING_APPROVAL/APPROVED/QUEUED` 写入 `CANCELLED`。存在未消费 intent 的 `QUEUED` Command 不得进入 `SIGNING`；intent 只能在 Command 已处于不可取消状态时解析为 `REJECTED`，不得出现 `REQUESTED -> REJECTED -> SIGNING`。`SUBMITTED` 后取消不撤销链上交易，只能停止替换并继续跟踪结果。
 
 ### 6.5 Dividend Epoch
 
-`DRAFT -> SNAPSHOT_BUILDING -> SNAPSHOT_READY -> APPROVAL_PENDING -> APPROVED -> PUBLISH_QUEUED -> CLAIM_OPEN -> CLOSE_QUEUED -> CLOSED`。重建 artifact 会回到审批前并撤销旧批准。合约允许时可 `CANCELLED`；任何构建/发布错误为 `FAILED`，不得跳过 checksum/root 校验继续。
+`DRAFT -> SNAPSHOT_BUILDING -> SNAPSHOT_READY -> APPROVAL_PENDING -> APPROVED -> PUBLISH_QUEUED -> CLAIM_OPEN -> CLOSE_QUEUED -> CLOSED`。重建 artifact 会回到审批前并撤销旧批准。合约允许时可 `CANCELLED`；任何构建错误为 `FAILED`。API 在 `APPROVED` 绑定当前 Publish Command 后，Builder 才可进入 `PUBLISH_QUEUED`。若该**当前绑定** Command 被 Reconciler 判定为 `FAILED/CANCELLED/EXPIRED`，Reconciler 在同一事务把 Epoch 写为 `FAILED`；失败后必须经 `SNAPSHOT_BUILDING` 重建，不能直接回到 `PUBLISH_QUEUED` 复用旧 Command。
 
 ### 6.6 Job
 
@@ -203,5 +203,5 @@ Dividend Epoch 生命周期写者边界：
 
 - `bgp_dividend` 只驱动发布前状态，以及 `CLAIM_OPEN -> CLOSE_QUEUED`，不能写 `merkle_root`；
 - `bgp_projector` 消费 `DividendRootPublished / EpochClosed`，对 event-derived 字段做列级更新：`state/merkle_root/claim_start/claim_end/carry_raw/updated_at`；`EpochCancelled` 只允许在 State YAML 明确的发布前 Builder 路径发生，不能由 Projector扩大成发布后取消。
-- 数据库 Trigger 必须逐边匹配 State YAML：Builder 只走发布前边与 `CLAIM_OPEN -> CLOSE_QUEUED`；Projector 只走 `PUBLISH_QUEUED -> CLAIM_OPEN`、`CLOSE_QUEUED -> CLOSED/FAILED`；`CLOSED/CANCELLED` 不可离开。
+- 数据库 Trigger 必须逐边匹配 State YAML：Builder 只走发布前边与 `CLAIM_OPEN -> CLOSE_QUEUED`；Projector 只走 `PUBLISH_QUEUED -> CLAIM_OPEN`、`CLOSE_QUEUED -> CLOSED/FAILED`；API 仅通过受控 bind function 在 `APPROVED` 绑定不可替换的当前 Publish Command，不拥有 Epoch 直接 UPDATE；Reconciler 只在该当前 `DIVIDEND_PUBLISH` Command 终止失败、取消或过期时走 `PUBLISH_QUEUED -> FAILED`；`CLOSED/CANCELLED` 不可离开。
 - `PUBLISH_QUEUED -> CLAIM_OPEN` 是首次写入 root/claim window 的唯一边。进入 `CLAIM_OPEN` 后 `merkle_root/claim_start/claim_end` 不可原地改写；same-state 更新只允许角色拥有的非冻结字段与 `updated_at`。

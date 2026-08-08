@@ -1,4 +1,4 @@
-# PANGU2 — Coding Rules
+# BingGoPlus — Coding Rules
 
 ## 通用
 - BSC_MAINNET deployment NO-GO, all scripts revert on chain 56
@@ -41,12 +41,34 @@
 - Raw Event 禁止重新引入物理 `PROJECTED`；Dividend Artifact 禁止读 current 表
 - 本轮默认不新增依赖；不改 Solidity/已部署地址；Mainnet NO-GO
 
-## Go Backend V2 (冻结中，未实施)
+## Go Backend V2（设计冻结完成，代码未开始）
+
+### G0 阶段约束（当前）
+- 不得创建 `backend-go/` 业务代码
+- 不得下载未经批准的 Go 依赖
+- 不得在无 PostgreSQL 16+ 实例时声称 Migration 通过
+- 不得自行寻找公共 RPC 冒充批准输入
+
+### G1 阶段约束（Freeze 完成后允许）
 - 单一 Go Module，模块化单体
 - 金额: DB `NUMERIC(78,0)`, Go `big.Int`, JSON 十进制整数字符串
 - 前端类型只从 OpenAPI 生成
 - `chain_id=56` 永久拒绝启动写进程
 - 单写者原则: 每个环境只有一个 Indexer Writer
+- G1 仅允许：`cmd/` skeleton、config bootstrap、health endpoint、DB connection bootstrap、generated-code placeholders
+- G1 严禁：Trade/Dividend/Governance 业务逻辑、Indexer 扫描、Projector 投影、Signer 签名、链上写入
+
+### Go V2 数据库角色隔离
+- 运行进程以同名 LOGIN Role 直接连接（`bgp_api`、`bgp_indexer` 等），`current_user` exact role model
+- 不得依赖 INHERIT Group Role 或 `SET ROLE`
+- `bgp_migrator` 不与任何运行角色共享或继承
+- 角色密码/Secret 由平台托管，不在仓库内
+
+### Go V2 依赖准入
+- 所有依赖当前状态：`NO_DOWNLOAD_AUTHORIZED`
+- 必须完成 Decision Record（license、POC、benchmark、TCO、SBOM）并获 `APPROVE_DOWNLOAD` 后才能加入 `go.mod`
+- 特别注意 go-ethereum（LGPL 风险）和 River（MPL-2.0 文件级义务）
+- 禁止 `go get ...@latest`、浮动 branch、pseudo-version 指向未批准 commit
 
 ## Chain Worker
 - All config from config.ts (single source)
@@ -71,4 +93,6 @@
 - backend/routes/web.php, backend/app/Modules/
 - apps/dapp/src/views/, apps/dapp/src/router/index.ts
 - docs/current/go-backend-v2/contracts/remediation/README.md
+- docs/current/go-backend-v2/runtime-gate/05_GO_BUILD_STAGE_DECISION.md
+- docs/current/go-backend-v2/07_FRAMEWORK_AND_DEPENDENCIES.md
 - packages/ui/tokens.css

@@ -66,6 +66,10 @@ Go V2 是实现与数据模型的重建，不是业务规则重写，也不是�
 - [17_ROUND6_CLOUD_REVIEW_PROMPT.md](./17_ROUND6_CLOUD_REVIEW_PROMPT.md)：第六轮完整包独立云端复验提示词；
 - [18_INDEPENDENT_CLOUD_ROUND6_REMEDIATION.md](./18_INDEPENDENT_CLOUD_ROUND6_REMEDIATION.md)：第六轮云端复审核查、状态机/manifest/角色身份修订；
 - [19_ROUND7_CLOUD_REVIEW_PROMPT.md](./19_ROUND7_CLOUD_REVIEW_PROMPT.md)：第七轮完整包独立云端复验提示词；
+- [20_INDEPENDENT_CLOUD_ROUND7_REMEDIATION.md](./20_INDEPENDENT_CLOUD_ROUND7_REMEDIATION.md)：第七轮云端复审核查、发布失败 writer 与取消意图交接修订；
+- [21_ROUND8_CLOUD_REVIEW_PROMPT.md](./21_ROUND8_CLOUD_REVIEW_PROMPT.md)：第八轮完整包独立云端复验提示词；
+- [22_INDEPENDENT_CLOUD_ROUND9_REVIEW.md](./22_INDEPENDENT_CLOUD_ROUND9_REVIEW.md)：第九轮独立复验通过结论、范围及责任人 Freeze 前的非阻断跟进项；
+- [23_RESPONSIBLE_OWNER_FREEZE_SIGNOFF.md](./23_RESPONSIBLE_OWNER_FREEZE_SIGNOFF.md)：`pd123` 的 GATE-01～05 条件性 Freeze 签署、P2-R9-01 处置与开发冻结前提；
 - [contracts/BSC_TESTNET_DEPLOYMENT_BASELINE.md](./contracts/BSC_TESTNET_DEPLOYMENT_BASELINE.md)：昨天实测部署的静态证据台账；
 - [openapi/binggoplus-api-v2.yaml](./openapi/binggoplus-api-v2.yaml)：机器可读 API 冻结候选；
 - [sql/0001_binggoplus_v2_schema.sql](./sql/0001_binggoplus_v2_schema.sql)：机器可读 PostgreSQL DDL 冻结候选；
@@ -96,3 +100,4 @@ Go V2 是实现与数据模型的重建，不是业务规则重写，也不是�
 - 不部署、补发、重放或签名链上交易；
 - 不迁移旧 Mock、旧 Session 或旧队列状态；
 - 不开放 BSC Mainnet。
+阶段执行与外部审核自动门禁：见 [24_AI_CODE_REVIEW_AUTOMATION_PROTOCOL.md](24_AI_CODE_REVIEW_AUTOMATION_PROTOCOL.md)。每个 G0-G9 阶段必须通过 `Ai-Code-Review` 独立审核后，才可授权进入下一阶段。
