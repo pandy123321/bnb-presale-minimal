@@ -1,5 +1,9 @@
 # BingGoPlus · 产品策划文档
 
+状态：`LEGACY_PANGU2_PRODUCT_PLAN / SUPERSEDED_FOR_CURRENT_PRODUCT_BY_FLAP_F0`
+
+> 本文保留 PANGU2 产品阶段的真实需求，不改写历史。2026-08-09 起，当前产品主线改为 Flap 发币平台；新范围、参数和退役矩阵见 [27_FLAP_PRODUCT_PIVOT_DECISION.md](./go-backend-v2/27_FLAP_PRODUCT_PIVOT_DECISION.md)、[28_FLAP_PRODUCT_SCOPE_AND_PARAMETER_CATALOG.md](./go-backend-v2/28_FLAP_PRODUCT_SCOPE_AND_PARAMETER_CATALOG.md) 与 [31_FLAP_LEGACY_RETIREMENT_MATRIX.md](./go-backend-v2/31_FLAP_LEGACY_RETIREMENT_MATRIX.md)。
+
 ## 产品概述
 
 BingGoPlus 是一个链上代币交易、持有者分红与治理产品。用户用 BNB 买卖链上名称和符号均为 `PANGU2` 的代币，系统通过 PancakeSwap V2 提供流动性。

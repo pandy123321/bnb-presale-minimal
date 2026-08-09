@@ -1,98 +1,60 @@
-# BingGoPlus — Coding Rules
+# BingGoPlus — CROSS-STAGE MANDATORY RULES
 
-## 通用
-- BSC_MAINNET deployment NO-GO, all scripts revert on chain 56
-- No auto merge/auto push/auto deploy
-- .env never committed; keys never logged
-- All admin-api write routes MUST have `['auth:web', 'rbac:xxx']`
-- OpenTrading must NEVER be called by CI, deployment scripts, or startup scripts
+> 以下 26 条规则对所有阶段（历史 G0-G9、当前 Flap F0-F11、RT-GATE、合约修复）全局生效。完整 61 条规则见 `docs/current/RULES_MASTER.md`。Agent 违反任一规则 = 审核直接 BLOCKED。
 
-## Solidity (contracts-v2/)
-- OpenZeppelin AccessControl + Pausable + ReentrancyGuard
-- All amounts uint256 wei/BigInt, no float
-- nonReentrant on all state-changing external functions
-- Checks-Effects-Interactions pattern
-- Stage 1→2→3→4→OpenTrading strict order
-- Bootstrap Factory must match Deploy Factory
-- `forge test --no-match-path "*/fork/*"` for unit tests
+## 执行边界
 
-### 合约修复阶段规则 (S0-S9)
-- 一次只执行一个阶段，不得提前做下一阶段
-- 修改代码前必须先提交只读审核 → 校对确认 → 才能实现
-- 实现 Agent 不得自行签发独立批准
-- P0/P1/P2 不得用"后续再处理"关闭
-- P3 只有用户书面批准 ACCEPTED_DEVIATION 才能不改代码
-- 禁止改变冻结税率、供应量、Launch 时间、回购金额、冷却、Claim 窗口
+1. **一次一个阶段** — 实现完成后必须先停止开发，生成提审包并交付用户手动提交；用户回传独立审核报告后，完成外部结论二次裁决和证据登记。全部推进条件满足后，才可自动进入已冻结的下一阶段。范围外、证据不足或结论无法判断时必须暂停并请求人工确认。
+2. **阶段独立 Commit** — 一个阶段 = 一个 git commit。不同阶段不合并。
+3. **Commit 范围受控** — 仅含本阶段允许的文件。Flap F0-F2 不可含业务实现，RT-GATE 不可含 Solidity。
+4. **每阶段结束 = 外部审核闸门** — 等待 APPROVED 后才允许下一阶段。CHANGES_REQUIRED = 修后重提。
 
-## Backend (Laravel)
-- ApiEnvelope::success() / error() format
-- BC Math for amounts, no PHP float
-- strict_types=1
-- RBAC via RbacMatrix + auth:web guard (must coexist)
-- CSRF on all POST endpoints — unless explicitly justified
-- Job Retry: Idempotency-Key + RetryTokenJob
-- ChainOperatorService: private key from config only, never in code/response/log
+## 证据规则
 
-## 文档与规划修订（Freeze / SQL / OpenAPI / State / Governance）
-- 权威顺序遵循 `docs/current/go-backend-v2/README.md`；低权威 Markdown 不得覆盖 SQL/OpenAPI/YAML/已部署事实
-- 机器规范与说明文档必须同 revision；提审包须含 SUBMISSION_MANIFEST（path/size/sha256）
-- Finding 作者侧仅 `FIX_READY / INDEPENDENT_RETEST_PENDING`；不得自标独立审核 `CLOSED`
-- 团队/推荐/佣金保持 `OUT_OF_SCOPE / ROADMAP_NOT_APPROVED`
-- Raw Event 禁止重新引入物理 `PROJECTED`；Dividend Artifact 禁止读 current 表
-- 本轮默认不新增依赖；不改 Solidity/已部署地址；Mainnet NO-GO
+5. **Commit SHA 可独立验证** — 完整 40 位，远程可解析。
+6. **Diff 完整可读** — 不截断、不 Binary。Evidence UTF-8 纯文本。
+7. **Commit message 不是证据** — 声称 ≠ 内容验证。
+8. **Payload 完整性** — Manifest Hash 与文件内容一致。外置，不 self-hash。
 
-## Go Backend V2（设计冻结完成，代码未开始）
+## 角色与权限
 
-### G0 阶段约束（当前）
-- 不得创建 `backend-go/` 业务代码
-- 不得下载未经批准的 Go 依赖
-- 不得在无 PostgreSQL 16+ 实例时声称 Migration 通过
-- 不得自行寻找公共 RPC 冒充批准输入
+9. **实现 Agent ≠ 独立批准** — 只能标 `FIX_READY`/`INDEPENDENT_RETEST_PENDING`。不可标 `CLOSED`/`APPROVED`/`PASS`。
+10. **Design ≠ Review ≠ Adjudication Agent** — 三者必须不同 session/identity。
+11. **仅修改 Allowed Paths** — 范围外问题只记录，不顺手扩展。
 
-### G1 阶段约束（仅 FROZEN_FOR_DEVELOPMENT = YES 后允许；Responsible Owner Freeze 或 Design Freeze 单独完成不能授权 G1）
-- 单一 Go Module，模块化单体
-- 金额: DB `NUMERIC(78,0)`, Go `big.Int`, JSON 十进制整数字符串
-- 前端类型只从 OpenAPI 生成
-- `chain_id=56` 永久拒绝启动写进程
-- 单写者原则: 每个环境只有一个 Indexer Writer
-- G1 仅允许：`cmd/` skeleton、config bootstrap、health endpoint、DB connection bootstrap、generated-code placeholders
-- G1 严禁：Trade/Dividend/Governance 业务逻辑、Indexer 扫描、Projector 投影、Signer 签名、链上写入
+## 安全红线
 
-### Go V2 数据库角色隔离
-- 运行进程以同名 LOGIN Role 直接连接（`bgp_api`、`bgp_indexer` 等），`current_user` exact role model
-- 不得依赖 INHERIT Group Role 或 `SET ROLE`
-- `bgp_migrator` 不与任何运行角色共享或继承
-- 角色密码/Secret 由平台托管，不在仓库内
+12. **Mainnet NO-GO** — chain 56 永久禁止。
+13. **PANGU2 OpenTrading 不得重复** — 现有部署只读。Flap Launch 必须独立审批和钱包/批准 Signer 签名，不能由 CI、启动脚本或定时任务触发。
+14. **合约不得重部署未经批准** — 源码修改是候选，不可标"已链上生效"。当前合约 admin 已 renounce（预期行为）。
+15. **经济参数按版本和生命周期冻结** — PANGU2 已部署参数不可改；Flap 参数只允许按文档 28 的目录、边界和生命周期设置，禁止链上确认后改写不可变字段。
+16. **私钥/Secret 不外泄** — 不入代码、日志、Commit、文档、测试。
+17. **不得伪造测试** — 未运行写 `NOT_RUN`。Expected≠Actual 时不可改 Expected 后标 PASS。
+18. **不得吞错误** — 不用 `|| true`/`continue-on-error`/空 catch。
 
-### Go V2 依赖准入
-- 所有依赖当前状态：`NO_DOWNLOAD_AUTHORIZED`
-- 必须完成 Decision Record（license、POC、benchmark、TCO、SBOM）并获 `APPROVE_DOWNLOAD` 后才能加入 `go.mod`
-- 特别注意 go-ethereum（LGPL 风险）和 River（MPL-2.0 文件级义务）
-- 禁止 `go get ...@latest`、浮动 branch、pseudo-version 指向未批准 commit
+## 与旧系统的关系
 
-## Chain Worker
-- All config from config.ts (single source)
-- BigInt → decimal string before JSON
-- DEPLOYMENT_BLOCK must match actual deploy block
-- 6 event streams must be defined centrally, used by scanner/cursor/health/reorg
+19. **Laravel 代码冻结** — 不修不补不新增；Go 是唯一目标后端。旧运行时退役只允许在 Flap F11 独立 Cutover Gate 处理，不得把“停止开发”误写成“已经完成运行时下线”。
+20. **旧合约地址组永久废弃** — `0xaf2bD8...` 系列永不激活。
 
-## Frontend (DApp)
-- TypeScript strict mode, types from @pangu2/api-types
-- DApp V7.1 3-page architecture
-- CSS tokens from packages/ui/tokens.css — all variables defined there
-- Contract addresses from deployed.ts — MUST match deployment broadcast
-- All `<button>` elements MUST have `type="button"`
-- Trading-disabled: no countdown, no auto-activate, Admin manual control
+## Flap 当前主线
 
-## Admin
-- CSRF before login; write ops via adminFetch; 419 retried once
-- Frontend field names MUST match backend response field names
+21. **新 Token 必须从 Flap 发出** — 只允许 F1 固定并验证过的 Portal/VaultPortal；禁止私有 Factory 或 PANGU2 脚本冒充 Flap。
+22. **PANGU2 是只读遗产** — 不改、不重部署；CostBasis、动态盈利税、专用 Router/Settlement、Launch Tax、Whitelist、Top100 四档和原 Staking 不得进入新产品。
+23. **禁止任意链上调用** — 只能使用固定 Chain、target、selector、ABI、参数 schema、value 上限和 request hash；不接受任意 calldata。
+24. **Guardian 最小权限** — 只允许触发固定规则动作，不得改 BPS、收款地址、管理员、Merkle Root 或任意提款。
+25. **当前阶段是 Flap F0** — F0 只改文档、规则和上下文；独立审核与 Owner Freeze 前不得写 Go/SQL/OpenAPI/前端/Solidity。
+26. **外部审核由用户手动提交** — 执行 Agent生成提审包、Hash 和提示词，不寻找审核工具、不伪造任务 ID；收到报告后仍必须二次裁决。该规则适用于当前及后续阶段，直至责任人书面修改。
 
-## 信息来源
-- contracts-v2/src/*.sol, contracts-v2/broadcast/
-- backend/routes/web.php, backend/app/Modules/
-- apps/dapp/src/views/, apps/dapp/src/router/index.ts
-- docs/current/go-backend-v2/contracts/remediation/README.md
-- docs/current/go-backend-v2/runtime-gate/05_GO_BUILD_STAGE_DECISION.md
-- docs/current/go-backend-v2/07_FRAMEWORK_AND_DEPENDENCIES.md
-- packages/ui/tokens.css
+## 错误示例（Agent 常见违规，直接 BLOCKED）
+
+```
+❌ 一次提交 126 个文件 → BLOCKED
+❌ Commit message 写 "P2-01~P2-05 final"，Diff 截断 → BLOCKED
+❌ 测试失败后把 Expected 改成 FAIL 报 PASS → BLOCKED + P1
+❌ SP Evidence 编码为 Binary → BLOCKED
+❌ 实现 Agent 自标 "INDEPENDENT_REVIEW = APPROVED" → BLOCKED
+❌ Manifest Hash 过期 → 不计入 PASS
+❌ 一个 Commit 同时改 S0 Evidence + 权威 baseline → BLOCKED
+❌ "先通过以后再查" → BLOCKED
+```

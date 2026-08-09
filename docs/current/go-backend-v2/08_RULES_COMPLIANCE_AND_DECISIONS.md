@@ -1,6 +1,8 @@
 # BingGoPlus V2 通用规则继承与开发门禁
 
-状态：`MANDATORY / FREEZE_CANDIDATE`
+状态：`MANDATORY_RULES / LEGACY_V2_DECISION_REFERENCE`
+
+> 两份通用规则继续完整适用于 Flap F0-F11；本文中仅针对 PANGU2 V2 的历史决策不得覆盖文档 27～31 的新产品边界。
 
 适用规则：
 

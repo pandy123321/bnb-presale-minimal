@@ -1,10 +1,14 @@
 # PANGU2 Economic Model
 
-- **Version:** 2.0.0
-- **Status:** AUTHORITATIVE — supersedes all previous economic documents
+- **Version:** 2.0.1
+- **Status:** LEGACY AUTHORITATIVE — deployed PANGU2 contracts only; not current Flap product economics
 - **Network:** BSC Testnet (chain 97) only; Mainnet (chain 56) permanently blocked
-- **Source Commit:** `a155e3e` (HEAD, local only — 7 commits ahead of `origin/main` at `cd7bde9`)
-- **Last Updated:** 2026-08-06
+- **Deployed Source Commit:** `3ef50b6d77a31c092e9353e255e672836f36ece8`
+- **Last Updated:** 2026-08-08
+
+> **NOTE:** This document reflects the economic model of the deployed BSC Testnet contracts (commit `3ef50b6`). Launch Tax and Whitelist have been implemented since commits `187f59a` and `26ec240` (post-dated the original authoring of this document). All "NOT_IMPLEMENTED" labels below referring to Launch Tax and Whitelist are **expired**. See `go-backend-v2/05_BUSINESS_AND_CONTRACT_INHERITANCE.md` for the authoritative inheritance rules. **Laravel backend has been deprecated** — Go V2 is the sole backend going forward.
+
+> **CURRENT PRODUCT NOTICE (2026-08-09):** BingGoPlus 新产品主线已转为 Flap。本文继续真实描述已部署 PANGU2，并作为历史审计证据保留；新 Flap 产品经济结构、可配置参数和永久退役项以 `go-backend-v2/27_FLAP_PRODUCT_PIVOT_DECISION.md`、`28_FLAP_PRODUCT_SCOPE_AND_PARAMETER_CATALOG.md` 和 `31_FLAP_LEGACY_RETIREMENT_MATRIX.md` 为准。
 
 ---
 
@@ -12,7 +16,7 @@
 
 ### 1.1 Launch Period — First 15 Minutes After Trading Opens
 
-> **STATUS: NOT_IMPLEMENTED** — no `tradingOpenAt` timestamp or launch-tax logic exists in current contracts.
+> **STATUS: IMPLEMENTED** — `LAUNCH_PROTECTION_DURATION = 15 minutes`, `LAUNCH_BUY_TAX_BPS = 3000`, `LAUNCH_SELL_TAX_BPS = 3000` (`Pangu2Token.sol:28-32`). Commit `187f59a`. Economic model verified by `test(economics): verify complete launch and whitelist tax matrix` (`f3ad1cb`).
 
 | Direction | Tax Rate | Tax Destination | Rationale |
 |-----------|----------|-----------------|-----------|
@@ -52,9 +56,9 @@ Implementation requirement:
 | `previewSellTax()` preview function | **IMPLEMENTED** | `Pangu2Token.sol:199` |
 | `settleBuy()` settlement function | **IMPLEMENTED** | `Pangu2Token.sol:222` |
 | `settleSell()` settlement function | **IMPLEMENTED** | `Pangu2Token.sol:238` |
-| Launch tax (30%) | **NOT_IMPLEMENTED** | No code exists |
-| Whitelist (0%) | **NOT_IMPLEMENTED** | No code exists |
-| `tradingOpenAt` timestamp | **NOT_IMPLEMENTED** | No code exists |
+| Launch tax (30%) | **IMPLEMENTED** | `Pangu2Token.sol:28-32`; commit `187f59a` |
+| Whitelist (0%) | **IMPLEMENTED** | `Pangu2Token.sol:46` (`feeWhitelist`), `previewBuyTaxFor`/`previewSellTaxFor`; commit `26ec240` |
+| `tradingOpenAt` timestamp | **IMPLEMENTED** | `Pangu2Token.sol:127-131` (`setTradingOpenAt()`); `OpenTradingPangu2.s.sol` broadcast |
 
 ---
 
@@ -136,12 +140,12 @@ Seller → PANGU2
 
 ## 7. Verification Checklist
 
-- [ ] Launch tax 30% implemented in contracts
-- [ ] Whitelist 0% implemented in contracts
-- [ ] Whitelist priority overrides launch tax
-- [ ] `previewBuyTax()` returns correct whitelist/launch/normal rates
-- [ ] `previewSellTax()` returns correct whitelist/launch/normal rates
-- [ ] `tradingOpenAt` enforced in buy/sell paths
-- [ ] 15-minute launch window enforced by `block.timestamp >= tradingOpenAt + 15 minutes`
-- [ ] Backend QuoteService uses real contract `previewBuy`/`previewSell` (currently mock→UNAVAILABLE)
-- [ ] DApp displays correct tax rate based on current phase
+- [x] Launch tax 30% implemented in contracts (commit `187f59a`)
+- [x] Whitelist 0% implemented in contracts (commit `26ec240`)
+- [x] Whitelist priority overrides launch tax
+- [x] `previewBuyTax()` returns correct whitelist/launch/normal rates
+- [x] `previewSellTax()` returns correct whitelist/launch/normal rates
+- [x] `setTradingOpenAt()` enforced in buy/sell paths
+- [x] 15-minute launch window enforced by `LAUNCH_PROTECTION_DURATION` constant
+- [ ] Backend QuoteService uses real contract `previewBuy`/`previewSell` (Go V2 G4-G5 phase)
+- [x] DApp displays correct tax rate based on current phase

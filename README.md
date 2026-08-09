@@ -1,10 +1,14 @@
-# PANGU2 — BNB Presale Platform
+# BingGoPlus — Flap Token Launch 与经济扩展平台
 
-链上代币发行与分红治理平台。智能合约 + Laravel API + Chain Worker + 用户 DApp + 运营 Admin。
+项目正在从单一 PANGU2 产品转为以 Flap Portal/VaultPortal 为唯一发币入口的多 Token 平台。保留 Go、PostgreSQL、Vue Admin/DApp 技术地基；现有 PANGU2 合约和测试网历史转为只读 Legacy。
 
-**当前阶段：** 核心模块实现完成，Fork CI Gate 待 RPC 就位。
+**当前阶段：** `FLAP-F0_V4_REVIEW_BLOCKED / V5_REMEDIATION_FIX_READY / REMOTE_PUSH_PENDING / IMPLEMENTATION_PAUSED`
 
-**支持网络：** BSC Testnet (Chain 97) / BSC Mainnet (Chain 56, Fork 测试)
+**支持网络：** BSC Testnet (Chain 97)；BSC Mainnet 继续 `NO-GO`。
+
+**当前权威文档：** [Flap 产品转向决策](docs/current/go-backend-v2/27_FLAP_PRODUCT_PIVOT_DECISION.md)、[参数目录](docs/current/go-backend-v2/28_FLAP_PRODUCT_SCOPE_AND_PARAMETER_CATALOG.md)、[目标架构](docs/current/go-backend-v2/29_FLAP_TARGET_ARCHITECTURE.md)、[F0-F11 执行计划](docs/current/go-backend-v2/30_FLAP_F0_F11_EXECUTION_PLAN.md)。
+
+> 下方现有目录、旧启动方式和 PANGU2 技术说明保留为仓库现状参考，不代表 Flap 新基线已经实现或获部署授权。
 
 ```
 BSC_MAINNET_DEPLOYMENT: NO-GO
@@ -54,6 +58,7 @@ bnb-presale-minimal/
 ## 开发入口
 
 - **核心文档:** [docs/current/](docs/current/)
+- **Flap F0:** [docs/current/go-backend-v2/27_FLAP_PRODUCT_PIVOT_DECISION.md](docs/current/go-backend-v2/27_FLAP_PRODUCT_PIVOT_DECISION.md)
 - **模块状态:** [docs/current/MODULE_STATUS.md](docs/current/MODULE_STATUS.md)
 - **开发环境:** [docs/current/DEVELOPMENT_GUIDE.md](docs/current/DEVELOPMENT_GUIDE.md)
 - **API 契约:** [docs/schemas/openapi/pangu2-api-v1.yaml](docs/schemas/openapi/pangu2-api-v1.yaml)

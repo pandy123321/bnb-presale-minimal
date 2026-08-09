@@ -1,6 +1,9 @@
 # BingGoPlus Go Backend V2 API 冻结候选
 
-状态：`FREEZE_CANDIDATE`  
+状态：`LEGACY_PANGU2_API / REFERENCE_FOR_FLAP_F2`
+
+> `/api/v2` 与 `/admin-api/v2` 是 Legacy PANGU2 契约。Flap 使用候选 `/api/v3/flap` 与 `/admin-api/v3/flap`，必须在 F2 同步 OpenAPI 冻结后才能实现。
+
 机器规范：[openapi/binggoplus-api-v2.yaml](./openapi/binggoplus-api-v2.yaml)
 
 ## 1. 版本与边界

@@ -1,6 +1,8 @@
 # BingGoPlus Go Backend V2 框架与依赖准入
 
-状态：`FREEZE_CANDIDATE / NO_DOWNLOAD_AUTHORIZED`
+状态：`LEGACY_DEPENDENCY_CANDIDATE / FLAP_F1_REASSESSMENT_REQUIRED / NO_DOWNLOAD_AUTHORIZED`
+
+> Go 技术栈候选继续作为输入，但 Flap ABI/RPC、Vault 示例、SDK 与新依赖必须在 F1 重新完成开源准入。既有条件许可证批准不得自动扩展到新使用边界。
 
 ## 1. 结论
 

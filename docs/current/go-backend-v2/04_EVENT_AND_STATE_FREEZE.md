@@ -1,6 +1,9 @@
 # BingGoPlus Go Backend V2 事件与状态机冻结候选
 
-状态：`FREEZE_CANDIDATE`  
+状态：`LEGACY_PANGU2_EVENT_STATE / REFERENCE_FOR_FLAP_F2`
+
+> 当前 YAML 只描述 Legacy PANGU2。Flap Launch/Curve/Migration/Vault 状态和事件必须在 F2 新建同 Revision 机器规范，不能修改旧图后宣称兼容。
+
 事件规范：[events/binggoplus-events-v2.yaml](./events/binggoplus-events-v2.yaml)  
 状态规范：[states/binggoplus-state-machines-v2.yaml](./states/binggoplus-state-machines-v2.yaml)
 

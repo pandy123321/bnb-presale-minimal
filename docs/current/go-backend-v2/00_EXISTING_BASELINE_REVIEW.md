@@ -1,5 +1,9 @@
 # 原 API / 数据库基线审核与 V2 继承决策
 
+状态：`LEGACY_PANGU2_BASELINE_REVIEW / REFERENCE_ONLY_FOR_FLAP_F0`
+
+> 当前产品主线为 Flap。本文件保留旧 API、数据库和 Worker 的事实审核，只用于识别可复用技术能力与历史数据，不授权把 PANGU2 业务模型迁入新 Flap Schema。
+
 审核模式：开发前契约审核（只读代码审查，不运行测试、服务、Migration 或 RPC）。
 
 审核范围：

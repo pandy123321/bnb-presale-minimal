@@ -1,6 +1,8 @@
 # BingGoPlus Go Backend V2 部署环境冻结候选
 
-状态：`FREEZE_CANDIDATE`
+状态：`LEGACY_PANGU2_ENVIRONMENT / REFERENCE_FOR_FLAP_F2`
+
+> 进程隔离、Mainnet NO-GO、Secret 和角色原则继续适用；具体 Schema、命令、Portal/VaultPortal、Signer 与部署模型必须在 Flap F2/F5/F7-F10 重新冻结；F11 Cutover 另走独立 Runtime/Deployment/Rollback Gate。
 
 ## 1. 部署原则
 

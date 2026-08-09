@@ -1,5 +1,9 @@
 # BingGoPlus Go Backend V2 架构与旁路替换计划
 
+状态：`HISTORICAL_PANGU2_G0_G9_PLAN / SUPERSEDED_BY_FLAP_F0_F11`
+
+> Go 模块化单体与旁路思路继续复用，但本文的 PANGU2 G2-G9 业务顺序已被 [30_FLAP_F0_F11_EXECUTION_PLAN.md](./30_FLAP_F0_F11_EXECUTION_PLAN.md) 取代。正文保留历史，不授权继续旧主线。
+
 ## 1. 决策
 
 采用 Greenfield Go 模块化单体：一个仓库、一个 Go Module、一个独立 PostgreSQL Database、一个 OpenAPI、一个 ABI 生成流程，构建多个可独立运行的进程。
@@ -165,13 +169,22 @@ backend-go/
 ### G2：部署基线导入与 Indexer 旁路重扫
 
 - 导入实测 deployment set；
+- 在 G2 实现链身份、Head、区块、日志、确认和 Reorg 所需的真实只读链访问能力，并强制验证观察到的 Chain ID 为 `97`；
+- 底层库和具体 JSON-RPC 方法由 G2 实现设计决定，但不得把 Chain Acquisition 整体推迟到 G3；
 - 从每个合约的 deployment block 扫描到固定目标块，再追最新块；
 - 写 `chain_blocks`、`chain_raw_events`、`chain_cursors`；
 - 旧 Worker 继续服务旧系统，但不能访问新 Database。
+- Public API、Quote、Wallet/Admin Auth、Projector 领域逻辑和 Signer/Reconciler 广播不得进入 G2 Commit。
 
 ### G3：Projector 与读模型
 
 按顺序落地 Token ledger、Trade、Cost Basis、Staking、Dividend、Fee Vault、Buyback、Locker、Oracle、Role/Control。所有读模型可从 canonical raw event 重建。
+
+G3 消费 G2 已写入的 canonical raw event；不得把 G2 尚未完成的 RPC、Block/Log Scanner、Cursor 或 Reorg 基础能力延后到 G3。
+
+### Flap 设计支线
+
+Flap 集成不属于原 G2 实现范围。允许按 [25_FLAP_INTEGRATION_EXECUTION_PLAN.md](./25_FLAP_INTEGRATION_EXECUTION_PLAN.md) 在独立任务、独立 Commit 和独立提审包中并行准备 `FLAP-D0` 设计，但在其独立审核和责任人签署前不得修改 Go、SQL Migration、OpenAPI 机器规范、Admin、Signer 或 Solidity。
 
 ### G4：Public API 影子运行
 

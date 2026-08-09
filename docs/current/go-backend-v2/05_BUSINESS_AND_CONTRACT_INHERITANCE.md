@@ -1,6 +1,8 @@
 # 业务、经济与合约控制逻辑继承冻结候选
 
-状态：`FREEZE_CANDIDATE`
+状态：`LEGACY_PANGU2_FREEZE / REFERENCE_FOR_FLAP_STRUCTURE_ONLY`
+
+> 本文继续约束已部署 PANGU2 的历史读取和证据解释，但不再是新 Flap Token 的业务合同。Flap 产品只继承其中适用的资金桶、回购锁仓、Merkle、质押偿付和安全控制结构；永久退役项与参数生命周期以 [27_FLAP_PRODUCT_PIVOT_DECISION.md](./27_FLAP_PRODUCT_PIVOT_DECISION.md)、[28_FLAP_PRODUCT_SCOPE_AND_PARAMETER_CATALOG.md](./28_FLAP_PRODUCT_SCOPE_AND_PARAMETER_CATALOG.md) 和 [31_FLAP_LEGACY_RETIREMENT_MATRIX.md](./31_FLAP_LEGACY_RETIREMENT_MATRIX.md) 为准。
 
 本文件不创造新的经济模型。已部署 source commit `3ef50b6` 的运行语义高于旧经济文档。后端只负责读取、投影、构造经过批准的交易和 fail-closed，不得替代合约判税或结算。
 

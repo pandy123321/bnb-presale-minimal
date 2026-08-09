@@ -1,6 +1,9 @@
 # BingGoPlus Go Backend V2 数据库冻结候选
 
-状态：`FREEZE_CANDIDATE`  
+状态：`LEGACY_PANGU2_SCHEMA / REFERENCE_FOR_FLAP_F2`
+
+> `binggoplus_v2` 不再承载新 Flap 多 Launch 产品；新 Schema 必须在 F2 独立冻结。本文和 SQL 继续作为 Legacy PANGU2、权限分离与不变量参考，不得直接扩表冒充 Flap Freeze。
+
 数据库：`binggoplus_go`  
 应用 Schema：`binggoplus_v2`  
 机器规范：
