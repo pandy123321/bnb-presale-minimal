@@ -1,6 +1,6 @@
 ﻿# Runtime Gate Status
 
-> `HISTORICAL_PANGU2_GO_V2_RUNTIME_GATE`：本文件保留原 G0/G1/G2 Runtime Gate 证据和未关闭项，不得改写为已通过。2026-08-09 后当前产品阶段为 `FLAP-F0`，以 [../27_FLAP_PRODUCT_PIVOT_DECISION.md](../27_FLAP_PRODUCT_PIVOT_DECISION.md) 和 [../30_FLAP_F0_F10_EXECUTION_PLAN.md](../30_FLAP_F0_F10_EXECUTION_PLAN.md) 为准。本文件不授权旧 G2 继续开发，也不阻止读取其风险作为新架构输入。
+> 状态：`HISTORICAL_PANGU2_RUNTIME_GATE / NOT_CURRENT_FLAP_STAGE_AUTHORITY`。本文件保留 PANGU2 Go V2 Runtime Gate 的原始状态和证据，不授权恢复旧 G2-G9 主线。当前产品与阶段权威为 `27_FLAP_PRODUCT_PIVOT_DECISION.md` 和 `30_FLAP_F0_F10_EXECUTION_PLAN.md`：`PRODUCT_MAINLINE = FLAP`、`CURRENT_STAGE = FLAP-F0`、`F1_ENTRY_AUTHORIZED = NO`。
 
 | Gate | Status |
 |---|---|
@@ -29,7 +29,8 @@
 
 RT02-OWNER-2026-002 (`OWNER_DECISION_P1_RT02_14.md`) records Owner acceptance of P1-RT02-14 as an environmental limitation. This acceptance:
 
-- DOES authorize closing P1-RT02-14 as a code defect
+- CODE_CHANGE_REQUIRED = NO (script logic is correct)
+- FINDING_STATUS = BLOCKED_EVIDENCE (Runtime Evidence still EXIT_CODE=1)
 - DOES NOT replace Runtime Evidence with PASS
 - DOES NOT claim the new PRIMARY!=BACKUP script has been executed and passed in the sandbox
 - DOES NOT supersede the requirement for dual-RPC Runtime Retest in an environment that can reach approved Binance RPCs
@@ -113,10 +114,12 @@ G2 entry conditions (all required):
 ## Current Execution Hold
 
 ```
-CURRENT_STAGE = G0 → G1 transition
+G0_COMPLETE = YES
 G1_ENTRY_AUTHORIZED = YES (skeleton only)
+G1_BOOTSTRAPPED = YES (go build/vet PASS)
+G1_COMPLETE = NO (Independent Review + negative tests + license gates pending)
 G2_ENTRY_AUTHORIZED = NO
 AUTO_ADVANCE = PAUSED
 ```
 
-G0/G1 通过结论保持不变。G2 的实现开发在 license gates、Independent Review、和 RT02 Runtime Retest 关闭之前不会开始。
+G0 Freeze 与 G1 Entry Authorization 保持有效。G1 Skeleton 已完成构建，但 G1 Completion / Independent Review 尚未完成。G2 的实现开发在 license gates、Independent Review、和 RT02 Runtime Retest 关闭之前不会开始。

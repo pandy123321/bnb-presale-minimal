@@ -35,7 +35,9 @@
 ## Binding
 
 This decision authorizes:
-- Closing P1-RT02-14 as a code defect (code is correct, environment blocks execution)
+- CODE_CHANGE_REQUIRED = NO (script logic is correct, environment blocks execution)
+- FINDING_STATUS = BLOCKED_EVIDENCE (not CLOSED — Runtime Evidence still EXIT_CODE=1)
+- OWNER_RISK_ACCEPTANCE = YES
 - Considering the rt02_readback.ps1 script logic as reviewed and complete
 
 This decision does NOT authorize:
