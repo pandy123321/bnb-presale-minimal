@@ -1,0 +1,135 @@
+---
+description: 人工项目负责人指引。用于重大业务/范围/权限确认、合并与发布决策、暂停取消豁免。不是 Agent；只在需要人工确认时引用。
+alwaysApply: false
+---
+
+# 人工项目负责人
+
+> 适用架构：GITHUB_REVIEW_ONLY  
+> 文档版本：V3.0  
+> 角色名称：Human Project Owner / 人工项目负责人
+
+## 1. 角色定位
+
+人工项目负责人不是 Agent，是项目最终业务、权限和治理责任人。
+
+负责批准会改变业务结果、项目范围、权限边界、合并状态或发布状态的事项。
+
+## 2. 核心职责
+
+1. 确认项目目标和优先级；
+2. 确认项目阶段计划；
+3. 批准 Project Execution Profile；
+4. 批准重大 Decision Record；
+5. 确认重大不确定事项；
+6. 批准 Task Spec 的重大范围变化；
+7. 批准 Forbidden Paths 变化；
+8. 决定是否合并；
+9. 决定是否部署；
+10. 批准生产、Secret、签名、资金和写链权限；
+11. 批准项目暂停、取消、豁免和回滚；
+12. 对生产结果和业务结果承担最终责任。
+
+## 3. 必须人工确认的事项
+
+- 多个方案会产生不同业务结果；
+- 用户可见行为变化；
+- 数据删除或兼容策略变化；
+- API、错误码或状态机变化；
+- 权限、资金、签名或合约行为变化；
+- 任务核心目标或关闭条件变化；
+- Allowed Paths 需要实质扩大；
+- 需要修改生产环境；
+- 需要访问 Secret；
+- 需要部署、回滚或写链；
+- 需要取消、暂停或替代项目阶段；
+- 需要批准豁免。
+
+## 4. 不应人工重复确认的事项
+
+已经在有效配置或 Decision Record 中确认的内容，不需要每轮重复批准，例如：
+
+- GitHub Repository；
+- 默认 Base Branch；
+- 执行 Agent 和审核 Agent；
+- 既定 Push Policy；
+- Automatic Merge: FORBIDDEN；
+- Automatic Deployment: FORBIDDEN；
+- 已确认的代码风格和治理规则；
+- 同一 Task ID 的正常返修和复审。
+
+## 5. 合并决策
+
+人工项目负责人只能在以下条件满足后决定合并：
+
+- 审核 Agent 已完成 Closeout；
+- Review Verdict 为 `APPROVED`；
+- Lifecycle Recommendation 为 `MERGE_READY`；
+- Final Head SHA 与审核对象一致；
+- Required Checks 全部通过；
+- Blocking Findings 全部关闭；
+- 没有未确认的范围、权限或安全问题。
+
+即使满足以上条件，也只是“可以决定合并”，不是自动合并。
+
+## 6. 发布决策
+
+合并不等于部署。
+
+部署前必须独立确认：
+
+- Source Commit SHA；
+- Artifact Digest；
+- 发布环境；
+- 配置版本；
+- 数据库迁移计划；
+- 回滚方案；
+- 监控窗口；
+- 操作人；
+- Secret 和生产权限。
+
+## 7. 标准人工确认格式
+
+```text
+Decision ID:
+Project ID:
+Stage ID:
+Task ID:
+Decision Title:
+Decision:
+Scope:
+Reason:
+Effective From:
+Expires At:
+Supersedes:
+Approved By:
+Status: ACTIVE / SUPERSEDED / EXPIRED
+```
+
+## 8. 标准审批结论
+
+只使用：
+
+```text
+APPROVED
+REJECTED
+NEEDS_REVISION
+PAUSED
+CANCELLED
+```
+
+不得使用模糊表达，例如：
+
+- 看起来可以；
+- 应该没问题；
+- 先做着；
+- 大概同意。
+
+## 9. 执行方式
+
+1. 接收项目协调 Agent 提交的阶段确认事项。
+2. 只对重大业务、范围、权限和阶段事项做决定。
+3. 不介入普通代码 Finding 和返修细节。
+4. 收到 `MERGE_READY` 后决定是否合并。
+5. 合并后根据发布治理独立决定是否部署。
+6. 所有重大决定保存为 Decision Record。

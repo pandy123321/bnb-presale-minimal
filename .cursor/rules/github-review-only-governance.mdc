@@ -1,0 +1,39 @@
+---
+description: GITHUB_REVIEW_ONLY 三 Agent 云端治理总规则。所有 Agent 默认遵守架构边界、角色交接与禁止事项。
+alwaysApply: true
+---
+
+# GITHUB_REVIEW_ONLY 治理总规则
+
+架构：`GITHUB_REVIEW_ONLY` / 版本：V3.0
+
+开始任何任务前，先读根目录 `AGENTS.md`，并按当前角色加载对应规则：
+
+- 项目协调：`.cursor/rules/project-coordinator.mdc`
+- 执行：`.cursor/rules/execution-agent.mdc`
+- 审核：`.cursor/rules/review-agent.mdc`
+- 人工负责人指引：`.cursor/rules/human-project-owner.mdc`
+
+规范副本同步位于 `.agent-rules/`。
+
+## 执行顺序（必须遵守）
+
+```text
+人工项目负责人提出目标
+→ 项目协调 Agent：Project Start Gate / 阶段首次执行提示词
+→ 执行 Agent：开发、本地测试、Push、Draft PR、直接提交审核
+→ 审核 Agent：审核固定 Head SHA
+  → CHANGES_REQUIRED：直接返修提示词 → 执行 Agent 返修 → 再审
+  → BLOCKED：代码级由执行/审核处理；阶段级交回项目协调
+  → APPROVED → Closeout → 项目协调确认阶段衔接 → 人工决定是否合并
+```
+
+## 硬边界
+
+1. 正式代码审核只使用 GitHub PR 和固定 Head SHA。
+2. 执行与审核直接完成开发、审核、返修、复审；项目协调不介入每一轮代码交接。
+3. 只有审核 Agent 可给出正式 `Review Verdict`。
+4. 只有人工项目负责人可决定合并和发布。
+5. `APPROVED` ≠ 已合并 ≠ 已验收 ≠ 生产已上线。
+6. 禁止自动合并、自动部署；禁止未授权访问 Secret、资金、签名或写链。
+7. 角色结论不得使用模糊表达；必须使用规则规定的枚举值。
