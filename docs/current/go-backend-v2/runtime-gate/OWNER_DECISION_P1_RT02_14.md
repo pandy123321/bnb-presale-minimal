@@ -26,17 +26,23 @@
 |---|---|
 | DISPOSITION | ACCEPTED_BY_OWNER_ENVIRONMENTAL_LIMITATION |
 | RATIONALE | 脚本逻辑已在 #473 的 byte-exact Manifest 验证中确认完备；当前环境限制不反映代码问题。在具备 Binance RPC 访问的生产环境中可独立重新执行。 |
-| EFFECT_ON_RT02 | RT-GATE-02 标记 PASS |
-| EFFECT_ON_RT03 | 授权进入 RT-GATE-03 → G2 |
+| RISK_ACCEPTED_BY_OWNER | YES |
+| TECHNICAL_FINDING_FIXED | NO |
+| RUNTIME_RETEST | PENDING/BLOCKED (approved Binance RPC unreachable in sandbox) |
+| RUNTIME_EVIDENCE_STATUS | BLOCKED_EVIDENCE (EXIT_CODE=1, RPC_FAILED_AFTER_RETRY) |
+| EFFECT_ON_RT02_GATE | RT-GATE-02 = BLOCKED_EVIDENCE / INDEPENDENT_RETEST_PENDING (Risk acceptance ≠ technical PASS) |
 
 ## Binding
 
 This decision authorizes:
-- RT-GATE-02 closure with P1-RT02-14 as Owner-accepted environmental limitation
-- RT-GATE-03 G1 skeleton approval
-- G2 business implementation entry
+- Closing P1-RT02-14 as a code defect (code is correct, environment blocks execution)
+- Considering the rt02_readback.ps1 script logic as reviewed and complete
 
 This decision does NOT authorize:
+- Marking RT-GATE-02 as technical PASS without dual-RPC Runtime Evidence
+- Marking RT-GATE-03 as PASS without Independent Review
+- Authorizing G2 entry (blocked by license gates per OWNER_DECISION_V2.md RT03-OWNER-2026-001)
 - Claiming P1-RT02-14 is technically "fixed"
 - Removing the PRIMARY!=BACKUP enforcement from rt02_readback.ps1
-- Weakoning the fail-closed principle for future RPC checks
+- Weakening the fail-closed principle for future RPC checks
+- Suppressing real exit codes or fabricating PASS evidence

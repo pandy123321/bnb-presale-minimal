@@ -32,20 +32,14 @@ func main() {
 	}
 	defer pool.Close()
 
-	// Rate limiter: 100 requests per second per IP.
-	rateLimiter := httptransport.NewRateLimiter(100, time.Second)
-	stopCleanup := make(chan struct{})
-	go rateLimiter.CleanupStaleVisitors(5*time.Minute, stopCleanup)
-	defer close(stopCleanup)
-
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(httptransport.LoggerMiddleware)
+	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(30 * time.Second))
 
-	httptransport.RegisterRoutes(r, pool, rateLimiter)
+	httptransport.RegisterHealthRoutes(r, pool)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%s", cfg.Port),
