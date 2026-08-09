@@ -1,6 +1,6 @@
 # BingGoPlus Flap 产品范围与参数目录
 
-状态：`V4_REVIEW_BLOCKED / V5_REMEDIATION_FIX_READY / INDEPENDENT_RETEST_PENDING / IMPLEMENTATION_NOT_AUTHORIZED`
+状态：`V5_CONTENT_APPROVAL_SUPERSEDED / V6_ECONOMIC_CHANGE_FIX_READY / INDEPENDENT_RETEST_PENDING / IMPLEMENTATION_NOT_AUTHORIZED`
 
 ## 1. 产品能力范围
 
@@ -18,17 +18,21 @@
 
 - Tax Revenue 独立资金桶；
 - 回购资金积累与 DEX Migration 后的受控回购；
-- 回购 Token 锁仓或按批准比例销毁；
-- 所有符合条件持有人按快照余额同比例 Merkle 分红；
-- 通用 ERC-20 质押与预充值奖励；
+- 回购 Token 默认销毁，也允许 Launch 前配置固定锁仓/销毁比例；
+- 所有符合条件持有人基础分红 + Top 100 持有人额外奖励，均使用确定性快照和 Merkle 领取；
+- 通用 ERC-20 质押，主要由税收 Staking Bucket 在 DEX Migration 后受控兑换奖励 Token，并允许额外预充值；
+- 团队、投资人和项目储备的独立预充值 Vesting；
+- 尽量保留旧开盘保护的业务目的；候选默认是旧模型真实值 `15 minutes / 3000 bps`，实现能力待 F1/独立 Solidity Gate；
 - Admin 审批、任务、审计、余额和状态监控。
+
+上述 BGPlus 扩展不是 F1～F6 Native MVP 已实现能力。`FLAP_TAX_SPLIT` 只能使用 F1 实际证明的官方分账能力；完整五桶自动执行、Top100、Staking、Vesting 和开盘保护必须等 `FLAP_TAX_BGPLUS` F7～F10 关闭各自 Gate。
 
 ### 1.3 明确不做
 
 - 成本基础、盈利判定、4%/10% 动态卖出税；
 - PANGU2 Router/settlement/systemTransfer 兼容；
-- PANGU2 Launch Protection、Fee Whitelist；
-- 前 100 名 35/25/25/15；
+- PANGU2 Launch Protection 的专用实现和 Fee Whitelist；允许在兼容性验证后重做通用开盘保护；
+- 前 100 名 35/25/25/15 四档；允许重做 Top 100 额外奖励，但不得恢复四档占比；
 - 自动部署或重部署整套 PANGU2；
 - 任意 target/selector/calldata；
 - BSC Mainnet。
@@ -66,7 +70,9 @@ F1 未完成前，它们可以用于产品候选设计，不能被后台声明�
 | `creator` | `LAUNCH_IMMUTABLE` | 必须与批准签名主体/Flap 事件一致 |
 | `payer` | `OPERATION_INPUT` | 明确谁支付 BNB 和 Gas |
 | `token_version` | `LAUNCH_IMMUTABLE` | 只允许 F1 allowlist |
-| `tax_rate_bps` | `LAUNCH_IMMUTABLE` | 只允许 Flap 支持范围；UI 同时展示 Curve 与 DEX 阶段有效费用差异 |
+| `tax_rate_bps` | `LAUNCH_IMMUTABLE` | 建议默认 500；只允许 Flap 支持范围；UI 同时展示 Curve 与 DEX 阶段有效费用差异 |
+| `launch_protection_duration` | `LAUNCH_IMMUTABLE` | 候选默认 15 分钟；只有 F1/扩展 Gate 证明实际可执行时才允许启用 |
+| `launch_protection_tax_bps` | `LAUNCH_IMMUTABLE` | 候选默认 3000；不是 15%；必须验证 Flap/Token/Vault 在 Curve 与 DEX 两阶段的真实征税位置 |
 | `curve_type/curve_parameters` | `LAUNCH_IMMUTABLE` | 以 Portal 能力和当前默认值为准，不硬编码过期参数 |
 | `quote_token` | `LAUNCH_IMMUTABLE` | BGPlus Vault V1 默认只支持原生 BNB `address(0)` |
 | `migrator_type` | `LAUNCH_IMMUTABLE` | F1 allowlist |
@@ -79,14 +85,18 @@ F1 未完成前，它们可以用于产品候选设计，不能被后台声明�
 | `vault_factory` | `LAUNCH_IMMUTABLE` | 只允许固定地址和 bytecode hash allowlist |
 | `vault_data` | `LAUNCH_IMMUTABLE` | 由 `vaultDataSchema()` 和本地强校验双重生成 |
 
-建议默认 Tax 参数为产品候选，不在 F0 锁死：
+建议默认 Tax 与开盘保护参数为产品候选；它们在 Draft 阶段可调，Launch 确认后冻结：
 
 ```text
-RECOMMENDED_FLAP_TAX_BPS = 300
-STATUS = NOT_FROZEN
+RECOMMENDED_FLAP_TAX_BPS = 500
+RECOMMENDED_LAUNCH_PROTECTION_DURATION = 15 minutes
+RECOMMENDED_LAUNCH_PROTECTION_TAX_BPS = 3000
+STATUS = ADJUSTABLE_BEFORE_LAUNCH / PENDING_F1_SUPPORTED_RANGE
 ```
 
-原因：若 Flap Curve 基础费为 1%，3% Tax 的 Curve 阶段总费用约为 4%，但迁移 DEX 后 Token Tax 仍可能为 3%。后台必须分别显示两阶段费用，禁止宣传“全生命周期始终 4%”。
+`15 minutes / 3000 bps` 来自旧 PANGU2 的真实开盘保护，不是“15% 开盘税”。BGPlus 只保留该机制的业务目的，不复用 PANGU2 Router、Whitelist 或 settlement hook。后台必须分别展示 Flap Curve fee、Token Tax、开盘保护有效状态和迁移后 DEX 费用；未由 F1/链上能力证明的字段必须隐藏或显示 `UNSUPPORTED`，禁止宣传“全生命周期始终 5%”或“已支持开盘保护”。
+
+若开盘保护最终被证明可用，税率选择必须唯一：保护窗口内使用 `launch_protection_tax_bps` 替代普通 `tax_rate_bps`，不得把 30% 与 5% 叠加。实际收到的税收资产仍按同一组五桶 BPS 分配，不恢复旧 PANGU2 的 29% Support + 1% immediate burn 路径。若 Flap 原生税机制无法满足这一单一结算规则，则 V1 开盘保护必须标记 `UNSUPPORTED`。
 
 ## 4. Split Vault 参数
 
@@ -112,26 +122,25 @@ SUM(recipient.bps) = 10000
 | Bucket | BPS 参数 | Destination | Authorized Action | Who Can Trigger | 配置冻结 | Accounting Outflow |
 |---|---|---|---|---|---|---|
 | Dividend | `dividend_bps` | `dividend_distributor` | 只向绑定 Distributor 为已批准 Epoch 充值 | 已批准 Dividend Job；不得任意提款 | 地址/BPS 在 Launch 确认后不可变 | `funded_to_dividend_bnb` |
-| Buyback | `buyback_bps` | 绑定 Token 的 DEX Swap，所得只到 Locker/Burn | 受 minOut/deadline/滑点/价格影响/间隔限制的固定回购 | 最小权限 Operator；Guardian 只作同规则备援触发 | BPS、Token、Locker/Burn 路径不可变；运行上限按治理边界 | `spent_on_buyback_bnb` |
-| Treasury | `treasury_bps` | `treasury_recipient` | 仅向固定 Recipient 支付/领取 | Recipient pull 或 permissionless dispatch；触发者不得改收款人 | 地址/BPS 在 Launch 确认后不可变 | `paid_to_treasury_bnb` |
+| Buyback/Burn | `buyback_bps` | 绑定 Token 的 DEX Swap，所得只到 Burn/Locker | 受 minOut/deadline/滑点/价格影响/间隔限制的固定回购 | 最小权限 Operator；Guardian 只作同规则备援触发 | BPS、Token、Burn/Locker 路径不可变；运行上限按治理边界 | `spent_on_buyback_bnb` |
+| Staking | `staking_bps` | 绑定 Token 的 DEX Swap，所得只进 Staking Reward Reserve | 仅 MIGRATED/ACTIVE；受 minOut/deadline/滑点/价格影响/间隔限制 | 最小权限 Operator；不得直接提款 | BPS、Token、Pool 不可变；运行上限按治理边界 | `spent_on_staking_reward_swap_bnb` |
+| Marketing | `marketing_bps` | `marketing_recipient` | 仅向固定 Recipient 支付/领取 | Recipient pull 或 permissionless dispatch；触发者不得改收款人 | 地址/BPS 在 Launch 确认后不可变 | `paid_to_marketing_bnb` |
 | Operations | `operations_bps` | `operations_recipient` | 仅向固定 Recipient 支付/领取 | Recipient pull 或 permissionless dispatch；触发者不得改收款人 | 地址/BPS 在 Launch 确认后不可变 | `paid_to_operations_bnb` |
-| Reserve | `reserve_bps` | Vault 内保留，最终只允许 `reserve_recipient` | `HOLD_UNTIL_APPROVED_RELEASE`；不得挪作其他 Bucket | 经审批并受 Timelock/上限控制的治理 Command | 地址/BPS/释放策略在 Launch 确认后不可变 | `released_reserve_bnb` |
 
 创建参数必须完整包含：
 
 ```text
 dividend_bps
 buyback_bps
-treasury_bps
+staking_bps
+marketing_bps
 operations_bps
-reserve_bps
 
 dividend_distributor
 buyback_locker
-treasury_recipient
+staking_pool
+marketing_recipient
 operations_recipient
-reserve_recipient
-reserve_release_policy
 ```
 
 当某个 Bucket BPS 为 0 时，其 Destination 可以按 F2 规则使用零地址；BPS 大于 0 时对应 Destination 必须非零、属于正确 Chain 且通过合约/EOA 类型校验。所有非零地址必须进入批准参数快照和 request hash。
@@ -147,10 +156,13 @@ rounding_carry_bnb
 
 funded_to_dividend_bnb
 spent_on_buyback_bnb
-paid_to_treasury_bnb
+spent_on_staking_reward_swap_bnb
+paid_to_marketing_bnb
 paid_to_operations_bnb
-released_reserve_bnb
+staking_reward_token_received_raw
 ```
+
+`staking_reward_token_received_raw` 是兑换所得 Token 的跨资产累计量，只用于奖励储备对账，不得加入 BNB 的 `total_executed_outflow_bnb` 等式。
 
 必须满足：
 
@@ -161,9 +173,9 @@ total_current_liability_bnb + total_executed_outflow_bnb + rounding_carry_bnb = 
 total_executed_outflow_bnb =
     funded_to_dividend_bnb
   + spent_on_buyback_bnb
-  + paid_to_treasury_bnb
+  + spent_on_staking_reward_swap_bnb
+  + paid_to_marketing_bnb
   + paid_to_operations_bnb
-  + released_reserve_bnb
 actual_vault_bnb_balance >= total_current_liability_bnb + rounding_carry_bnb
 ```
 
@@ -190,11 +202,11 @@ UNACCOUNTED_SURPLUS_BNB = NON_DISTRIBUTABLE_UNTIL_RECONCILED
 建议默认值仅为创建表单候选：
 
 ```text
-dividend_bps = 4000
-buyback_bps = 4000
-treasury_bps = 1000
+dividend_bps = 3000
+buyback_bps = 2500
+staking_bps = 2000
+marketing_bps = 1500
 operations_bps = 1000
-reserve_bps = 0
 STATUS = ADJUSTABLE_BEFORE_LAUNCH
 ```
 
@@ -210,8 +222,8 @@ STATUS = ADJUSTABLE_BEFORE_LAUNCH
 | `max_price_impact_bps` | 待 F2 冻结 | `GOVERNANCE_ADJUSTABLE` | 超限 fail closed |
 | `minimum_execution_balance` | 待 F2 冻结 | `GOVERNANCE_ADJUSTABLE` | 防止碎片操作 |
 | `lock_duration` | `365 days` | 新批次创建参数 | 已存在批次不可修改 |
-| `buyback_lock_bps` | `10000` | `LAUNCH_IMMUTABLE` | 与 burn BPS 合计 10000 |
-| `buyback_burn_bps` | `0` | `LAUNCH_IMMUTABLE` | 只有真实买回 Token 后才能 burn |
+| `buyback_lock_bps` | `0` | `LAUNCH_IMMUTABLE` | 与 burn BPS 合计 10000；非零时只到绑定 Locker |
+| `buyback_burn_bps` | `10000` | `LAUNCH_IMMUTABLE` | 只有真实买回 Token 后才能 burn |
 
 第一版只允许 `MIGRATED/ACTIVE` Token 执行回购。Curve 阶段只积累资金，不实现双交易路径。
 
@@ -224,15 +236,23 @@ STATUS = ADJUSTABLE_BEFORE_LAUNCH
 | `minimum_eligible_balance` | 可配置 | Epoch 创建时固定 |
 | `excluded_addresses` | 系统地址自动排除 + 审批列表 | Snapshot 固定 |
 | `unclaimed_policy` | `CARRY_FORWARD` | Epoch 创建时固定 |
+| `top100_bonus_share_bps` | `2000` | Launch 确认后不可变；与基础份额合计 10000 |
 
 新分红规则：
 
 ```text
 eligible_amount = wallet_balance + active_staked_principal
-allocation = epoch_total * eligible_amount / total_eligible_amount
+base_pool = epoch_total * (10000 - top100_bonus_share_bps) / 10000
+top100_bonus_pool = epoch_total - base_pool
+base_allocation = base_pool * eligible_amount / total_eligible_amount
+top100_bonus_allocation =
+  top100_bonus_pool * eligible_amount / total_top100_eligible_amount
+final_allocation = base_allocation + top100_bonus_allocation_if_ranked
 ```
 
-不排名、不设前 100、不设 35/25/25/15。快照、投影版本、取整、Merkle、一次领取、关闭与 carry 继续采用 Evidence First 和确定性规则。
+Top 100 按 `eligible_amount DESC, normalized_address ASC` 确定；系统、Pair、Vault、Locker、Burn 和批准排除地址不得入榜。Top 100 奖励按榜内有效持币量同比例分配，不按名次等分，也不恢复 35/25/25/15 四档。榜内地址同时领取基础分红和 Top 100 额外奖励。快照区块/Hash、投影版本、取整、Merkle、一次领取、关闭与 carry 继续采用 Evidence First 和确定性规则。
+
+入榜数量为 `min(100, eligible_holder_count)`。`total_eligible_amount = 0` 时 Epoch 不得发布；计算取整余数进入同一 Epoch 的 carry 规则，不得由最后一个地址或 Builder 任意吸收。
 
 ### 5.4 通用质押
 
@@ -243,23 +263,41 @@ allocation = epoch_total * eligible_amount / total_eligible_amount
 | `lock_options` | `30/90/180/365 days` | UI 默认，可允许范围内自定义 |
 | `early_exit_penalty_bps` | `1000` | Position 创建时固定 |
 | `reward_rate` | 由奖励储备约束 | 治理可调 |
-| `reward_budget` | 预充值 | 只能增加或按偿付规则回收剩余 |
+| `reward_budget` | 税收兑换 + 可选预充值 | 只能在实际 Token 到账后增加；剩余按偿付规则回收 |
 
 Staking 奖励资金模型冻结为：
 
 ```text
-STAKING_REWARD_FUNDING_MODEL = EXTERNAL_PREFUND_ONLY
+STAKING_REWARD_FUNDING_MODEL = TAX_BNB_SWAP_TO_BOUND_TOKEN + OPTIONAL_EXTERNAL_PREFUND
 REWARD_ASSET = BOUND_FLAP_TOKEN
-REVENUE_VAULT_LIABILITY_USED_FOR_STAKING = NO
+TAX_STAKING_BNB_BUCKET_DEFAULT_BPS = 2000
+TAX_SWAP_ALLOWED_STATE = MIGRATED_AND_ACTIVE_ONLY
 STAKING_PRINCIPAL_USED_FOR_REWARD = NEVER
 PREFUND_ACTOR = APPROVED_PROJECT_OR_ADMIN_FUNDING_PATH
 PREFUND_EVIDENCE = CONFIRMED_ON_CHAIN_RECEIPT
 REWARD_LIABILITY <= CONFIRMED_REWARD_RESERVE
 ```
 
-RevenueVault 的 Dividend/Buyback/Treasury/Operations/Reserve BNB 不得被实现方隐式挪给 Staking，也不得自动执行 BNB→Token 兑换。若责任人未来决定用 Tax Revenue 支付 Staking，必须新增独立经济变更、资金 Bucket、兑换路径、滑点/Oracle/失败会计和 Owner Freeze，不能作为 F10 普通参数调整。
+只有 Staking Bucket 的已登记 BNB liability 可以被用于奖励兑换；Dividend、Buyback、Marketing、Operations Bucket 不得被挪用。Curve 阶段只累计，不兑换。DEX Migration 且状态为 ACTIVE 后，兑换必须绑定固定 Router/Pool、`minOut`、`deadline`、滑点、价格影响、最大单次金额、执行间隔和唯一 execution identity；失败不得减少 Staking BNB liability。确认 Token 到达绑定 Pool 的 Reward Reserve 后，才记录 `staking_reward_token_received_raw` 并增加可分配奖励储备。
 
-不变量：本金不能支付奖励；奖励负债不得超过已确认奖励储备；Prefund 到账前不得增加可领取奖励；剩余奖励回收必须在所有负债结清后按冻结权限执行。Fee-on-Transfer Token 兼容性必须在 F8/F10 单独决定。
+不变量：本金不能支付奖励；奖励负债不得超过已确认奖励储备；税收兑换或 Prefund 到账前不得增加可领取奖励；剩余奖励回收必须在所有负债结清后按冻结权限执行。Fee-on-Transfer Token 兼容性必须在 F8/F10 单独决定。
+
+### 5.5 团队、投资人和项目储备 Vesting
+
+Vesting 与回购 Locker 是两个独立资金域。V1 只能锁定已实际转入的绑定 Flap Token，不得铸币，不得获得 Token 管理权限，也不得从 Staking principal 或 Reward Reserve 抽取资产。
+
+| 参数 | 建议默认 | 生命周期 |
+|---|---:|---|
+| `vesting_category` | `TEAM / INVESTOR / PROJECT_RESERVE` | Schedule 创建时固定 |
+| `beneficiary` | 必填非零地址 | Schedule 创建后不可变 |
+| `amount_raw` | 以实际到帐为准 | Funding 确认后不可增加原 Schedule |
+| `start_at` | Launch/迁移后的批准时间 | Schedule 创建后不可变 |
+| `cliff_duration` | 分类参数 | Schedule 创建后不可变 |
+| `vesting_duration` | 分类参数 | Schedule 创建后不可变 |
+| `release_interval` | 分类参数 | Schedule 创建后不可变 |
+| `revocable` | `false` | V1 固定不可撤销 |
+
+F1 必须先确认 Flap Token 的 creator allocation、初始购买和普通转账语义。只有项目控制地址真实持有并成功转入 Vesting 合约的 Token 才能创建 `ACTIVE` Schedule；否则该能力必须 Fail Closed 为 `UNSUPPORTED`。任何以供应量 BPS 直接承诺但没有实际 Token 到账的锁仓都不得显示为成功。
 
 ## 6. 后台系统参数
 

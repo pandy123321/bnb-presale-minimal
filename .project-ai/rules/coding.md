@@ -1,6 +1,6 @@
 # BingGoPlus — CROSS-STAGE MANDATORY RULES
 
-> 以下 26 条规则对所有阶段（历史 G0-G9、当前 Flap F0-F11、RT-GATE、合约修复）全局生效。完整 61 条规则见 `docs/current/RULES_MASTER.md`。Agent 违反任一规则 = 审核直接 BLOCKED。
+> 以下 26 条规则对所有阶段（历史 G0-G9、当前 Flap F0-F11、RT-GATE、合约修复）全局生效。完整 65 条规则见 `docs/current/RULES_MASTER.md`。Agent 违反任一规则 = 审核直接 BLOCKED。
 
 ## 执行边界
 
@@ -40,7 +40,7 @@
 ## Flap 当前主线
 
 21. **新 Token 必须从 Flap 发出** — 只允许 F1 固定并验证过的 Portal/VaultPortal；禁止私有 Factory 或 PANGU2 脚本冒充 Flap。
-22. **PANGU2 是只读遗产** — 不改、不重部署；CostBasis、动态盈利税、专用 Router/Settlement、Launch Tax、Whitelist、Top100 四档和原 Staking 不得进入新产品。
+22. **PANGU2 是只读遗产** — 不改、不重部署；CostBasis、动态盈利税、专用 Router/Settlement、Whitelist、Top100 35/25/25/15 四档和专用 Staking 实现不得进入新产品。开盘保护、Top100 奖励、Staking 只能按文档 28 的 Flap 兼容模型重做。
 23. **禁止任意链上调用** — 只能使用固定 Chain、target、selector、ABI、参数 schema、value 上限和 request hash；不接受任意 calldata。
 24. **Guardian 最小权限** — 只允许触发固定规则动作，不得改 BPS、收款地址、管理员、Merkle Root 或任意提款。
 25. **当前阶段是 Flap F0** — F0 只改文档、规则和上下文；独立审核与 Owner Freeze 前不得写 Go/SQL/OpenAPI/前端/Solidity。

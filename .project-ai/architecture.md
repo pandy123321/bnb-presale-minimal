@@ -6,7 +6,7 @@
 apps/dapp (Vue 3) ──→ Flap Token 列表/详情/交易入口（F6 重做）
 apps/admin (Vue 3) ──→ Go Flap API (v3) ──→ PostgreSQL binggoplus_go.binggoplus_flap_v1
 Flap Portal/VaultPortal ──→ BSC Testnet 新 Token + 官方/自建 Vault
-contracts-flap (规划) ──→ BGPlus Factory/Vault/Buyback/Locker/Dividend/Staking
+contracts-flap (规划) ──→ BGPlus Factory/Vault/Buyback-Burn/Locker/Dividend-Top100/Staking/Vesting
 contracts-v2 ──→ Legacy PANGU2 已部署合约，只读保留
 packages/ui/ ──→ apps/dapp (shared Vue components + CSS)
 ```
@@ -54,7 +54,7 @@ backend-go/ — 复用工程地基，PANGU2 候选业务代码不等于 Flap 能
 
 | Gate | 状态 |
 |------|:--:|
-| FLAP-F0 | `V4_REVIEW_BLOCKED / V5_REMEDIATION_FIX_READY / REMOTE_PUSH_PENDING` |
+| FLAP-F0 | `V5_CONTENT_APPROVAL_SUPERSEDED / V6_ECONOMIC_CHANGE_FIX_READY / INDEPENDENT_RETEST_PENDING` |
 | F1 | `NOT_AUTHORIZED` |
 | Flap 实现 | `NOT_STARTED` |
 | BSC Mainnet | `NO-GO` |
@@ -90,14 +90,19 @@ F7_ENTRY_AUTHORIZED = NO_BY_DEFAULT
 Admin → Go Launch Draft/Validation/Approval → Transaction Intent → Admin Wallet → Flap Portal/VaultPortal
 Flap/BSC Events → Go Indexer → canonical raw events → Projector → Token/Curve/Migration/Vault Read Models
 Public API/DApp → Flap Token 状态与交易入口
-BGPlus Tax Revenue → BGPlus Vault → Dividend/Buyback/Treasury → Locker/Distributor
+BGPlus Tax Revenue → BGPlus Vault → Dividend 30% / Buyback-Burn 25% / Staking 20% / Marketing 15% / Operations 10%
+Dividend → all-holder base pool + deterministic Top100 bonus pool → Merkle Distributor
+Buyback → DEX migrated token → Burn by default / optional Locker
+Staking Bucket → post-migration controlled swap → Reward Reserve; principal remains isolated
+Project-held Token → independent prefunded Vesting → Team/Investor/Project beneficiary
 ```
 
 ## 禁止事项
 
 - Mainnet 永久 NO-GO
 - PANGU2 OpenTrading 已退役且不得重复；Flap Launch 必须单独审批和钱包签名
-- PANGU2 参数不可修改；Flap 参数只能在目录和生命周期内设置
+- PANGU2 参数不可修改；Flap 参数只能在目录和生命周期内设置，Launch 前可调、确认后冻结
+- 通用开盘保护候选默认 15 分钟/30% 税；F1 或独立 Solidity Gate 未证明兼容前不得宣称支持
 - 旧 Worker 与 Go V2 不得写同一 Database/Schema
 - F0/F2 未完成独立审核和责任人签署前不得进入 Flap 代码
 - 新 Solidity、测试网签名/广播和平台 Signer 均需独立 Gate

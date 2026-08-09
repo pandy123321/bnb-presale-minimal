@@ -24,7 +24,7 @@ BPS: Basis Points, 10000 BPS = 100%
 | Pair | PANGU2/WBNB 交易对 |
 | Admin Renounce | 8 合约 DEFAULT_ADMIN_ROLE → 0x0（Finalize 预期） |
 
-## 税收优先级
+## Legacy PANGU2 税收优先级（历史）
 
 ```text
 Trading Gate → Fee Whitelist → Launch Protection (15min 30%) → Normal Cost-Basis (4%/10%)
@@ -54,8 +54,11 @@ Trading Gate → Fee Whitelist → Launch Protection (15min 30%) → Normal Cost
 | FLAP_STANDARD | Portal 普通 Token 候选；`CANDIDATE_PENDING_F1_BASELINE` |
 | FLAP_TAX_SPLIT | VaultPortal + 官方 Split Vault 候选；`MVP_CANDIDATE_PENDING_F1_BASELINE` |
 | FLAP_TAX_BGPLUS | VaultPortal + 自建 BGPlus Factory/Vault；`REQUIRED_EXTENSION_PENDING_F1_AND_SOLIDITY_GATES` |
-| BGPlusRevenueVault | 接收 Flap Tax BNB 并按冻结资金桶会计分配 |
-| Staking Reward Funding | `EXTERNAL_PREFUND_ONLY`；奖励资产为绑定 Flap Token，不使用 RevenueVault BNB 或质押本金 |
+| BGPlusRevenueVault | 接收 Flap Tax BNB，并按 Launch 前确定的五桶 BPS 分配；候选默认 Dividend/Buyback-Burn/Staking/Marketing/Operations = 30/25/20/15/10 |
+| Top100 Bonus Pool | Dividend 桶内的额外奖励池；候选默认占 Dividend 桶 20%，按固定快照的榜内有效持币量同比例分配；不是旧 35/25/25/15 四档 |
+| Staking Reward Funding | `TAX_BNB_SWAP_TO_BOUND_TOKEN + OPTIONAL_EXTERNAL_PREFUND`；只用 Staking Bucket，迁移后受控兑换；不使用其他 Bucket 或质押本金 |
+| BGPlusTokenVesting | 团队、投资人、项目储备的独立预充值锁仓；不铸币、不复用回购 Locker |
+| Launch Protection Candidate | 旧模型真实基线为开盘后 15 分钟/30% 税，不是 15% 税；仅在 F1/独立 Solidity Gate 证明兼容时启用 |
 | Legacy PANGU2 | 现有合约和数据只读保留，不重部署、不新增功能 |
 | TokenCreated | Flap 创建交易核心事件；必须结合 Version/Curve/Tax/Migrator/DEX/Extension/Vault 等同交易事件 |
 

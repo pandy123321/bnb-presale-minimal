@@ -1,6 +1,6 @@
 # BingGoPlus — Global Rules (Distilled from 12 source documents)
 
-> 以下 61 条规则整理自 `.project-ai/rules/`、`go-backend-v2/README.md`、`remediation/`、`24_AI_PROTOCOL.md`、`RT-GATE`、Phase/GE 提示词及 Flap F0 决策。每一条标注原始来源。Agent 违反任一规则 = 审核直接 BLOCKED。
+> 以下 65 条规则整理自 `.project-ai/rules/`、`go-backend-v2/README.md`、`remediation/`、`24_AI_PROTOCOL.md`、`RT-GATE`、Phase/GE 提示词及 Flap F0 决策。每一条标注原始来源。Agent 违反任一规则 = 审核直接 BLOCKED。
 
 ---
 
@@ -117,18 +117,22 @@
 | G-1 | **backend-go/ 不存在时不可声称 Build 通过。Go 依赖当前 NO_DOWNLOAD_AUTHORIZED。不可用 latest/浮动 branch/未批准 pseudo-version** | Go V2 README / RT-GATE-03 |
 | G-2 | **G1 仅允许 skeleton** — cmd/config/health/DB bootstrap。严禁任何业务逻辑 | coding.md |
 
-## 十三、Flap 产品主线（8 条）
+## 十三、Flap 产品主线（12 条）
 
 | # | 规则 | 来源 |
 |---|---|---|
 | F-1 | **新 Token 必须通过 Flap 发币** — 只允许已固定 Chain ID、地址、ABI 和 runtime hash 的 Portal/VaultPortal；普通 Factory 或 PANGU2 脚本不得冒充 Flap Launch | 27_FLAP_PRODUCT_PIVOT_DECISION.md |
-| F-2 | **PANGU2 只读遗产** — 已部署合约、历史和 Evidence 保留且不可重部署；CostBasis、动态盈利税、专用 Router/Settlement、Launch Tax、Whitelist、Top100 四档和原 Staking 不得进入新产品 | 27/31 Flap F0 |
+| F-2 | **PANGU2 只读遗产** — 已部署合约、历史和 Evidence 保留且不可重部署；CostBasis、动态盈利税、专用 Router/Settlement、Whitelist、Top100 35/25/25/15 四档和 PANGU2 专用 Staking 实现不得进入新产品；开盘保护、Top100 奖励与 Staking 业务目的只能按 Flap 兼容模型重做 | 27/31 Flap F0 |
 | F-3 | **Flap 参数必须来自目录和生命周期** — 创建前可编辑；链上不可变项确认后只读；治理可调项需 Command/审批/事件；禁止任意 target/selector/calldata | 28_FLAP_PRODUCT_SCOPE_AND_PARAMETER_CATALOG.md |
 | F-4 | **经济结构尽量继承但语义不得伪造** — 保留资金桶、回购锁仓、Merkle、质押偿付和安全控制；单一 Flap Tax 不得宣传成 PANGU2 买卖/盈利税 | 27/28/31 Flap F0 |
 | F-5 | **Guardian 最小权限** — 可触发固定规则动作，不得改 BPS、收款地址、管理员、Root 或任意提款；新 Factory/Vault 必须独立 Solidity Gate | 27/29 Flap F0 / 合约安全规范 V1.0 |
 | F-6 | **当前阶段为 Flap F0-F11** — 旧 G2-G9 对当前执行已被取代；F10 只做通用 Staking，F11 单独做 Legacy Cutover；每阶段独立 Commit/Manifest/审核/裁决，F0/F2、Signer、Migration、测试网链写和新 Solidity 部署保持人工 Gate | 30_FLAP_F0_F11_EXECUTION_PLAN.md |
 | F-7 | **独立审核统一由用户手动提交** — 执行 Agent 只生成完整提审包、Manifest、Hash 和提示词，不寻找、不调用、不轮询外部审核工具；用户回传完整报告后再进行二次裁决 | 24_AI_CODE_REVIEW_AUTOMATION_PROTOCOL.md / 用户明确决策 |
 | F-8 | **F6 不得自动进入 F7** — F6 Native MVP 审核通过后必须暂停；F7 虽是必做路线，但首次进入自建金融 Solidity 和 RevenueVault 资金域，必须通过 Extension Entry Review 与 Responsible Owner/Security Scope Authorization 后显式设置 `F7_ENTRY_AUTHORIZED=YES` | 24/30 Flap F0 |
+| F-9 | **V6 默认经济模型必须唯一** — Token Tax 候选默认 500 BPS；Revenue 五桶默认 Dividend/Buyback-Burn/Staking/Marketing/Operations = 3000/2500/2000/1500/1000，Launch 前可调、总和必须 10000、确认后冻结 | 28 Flap F0 / Owner V6 Decision |
+| F-10 | **Top100 是额外池而非旧四档** — 所有有效持有人领取基础分红；Top100 由固定快照、有效余额降序和地址升序确定，并按榜内有效余额同比例分配额外池；禁止恢复 35/25/25/15 | 28/31 Flap F0 / Owner V6 Decision |
+| F-11 | **Staking 税收奖励与本金隔离** — 只有 Staking Bucket 可在 MIGRATED/ACTIVE 后受控兑换绑定 Token；可外部预充值；其他 Bucket 和质押本金永远不得支付奖励 | 28/29/30 Flap F0 / Owner V6 Decision |
+| F-12 | **开盘保护和 Vesting 必须 Fail Closed** — 旧保护真实基线是 15 分钟/30% 税而非 15% 税；只在 F1/独立 Solidity Gate 证明兼容时启用，保护税替代普通税且仍走五桶，不得叠加或恢复 29%+1% 旧路径。Vesting 仅锁定真实预充值 Token，不铸币、不复用回购 Locker | 27/28/31 Flap F0 / Owner V6 Decision |
 
 ---
 
@@ -160,4 +164,4 @@
 4. 原始审核 Verdict 仅使用 `APPROVED / CHANGES_REQUIRED / BLOCKED`；`APPROVED_FOR_RESPONSIBLE_OWNER_FREEZE` 和 `APPROVED_FOR_NEXT_STAGE` 是阶段授权状态，不代表部署、主网或合约操作批准。
 5. 一个阶段原则上对应一个实现 Commit；仅包含上下文、审核记录或状态同步且不含实现变更的记录 Commit，不视为跨阶段实现。
 6. 审核报告必须提供文件路径、行号/函数或对象、证据、根因、影响、具体修复步骤、约束、验收标准和回归检查。只报问题而不给可执行修复方案时，`REVIEW_COMPLETENESS = INCOMPLETE`，不得推进。
-7. 本文件当前分组数量合计为 61 条；后续新增或删除规则必须同步更新总数。
+7. 本文件当前分组数量合计为 65 条；后续新增或删除规则必须同步更新总数。

@@ -4,7 +4,7 @@
 
 项目：`BNB合约` / BingGoPlus。当前产品阶段：`FLAP-F0`。默认只读审核。
 
-当前 Flap 产品证据优先级：**已签署产品转向 Decision > F1 固定的 Flap 链上事实/ABI/runtime > F2 机器规范 > 阶段文档 > 口头材料**。解释 Legacy PANGU2 时仍使用：**PANGU2 链上事实 > 部署 Commit/ABI > Legacy 机器规范 > 历史文档**。
+当前 Flap 产品证据优先级：**最新 Owner 经济模型变更 Decision > 已签署产品转向 Decision > F1 固定的 Flap 链上事实/ABI/runtime > F2 机器规范 > 阶段文档 > 口头材料**。解释 Legacy PANGU2 时仍使用：**PANGU2 链上事实 > 部署 Commit/ABI > Legacy 机器规范 > 历史文档**。旧审核通过结论在后续 Owner 变更触及其内容时自动降为历史证据，不能授权新 Revision Freeze。
 
 ---
 
@@ -85,7 +85,7 @@ RESPONSIBLE_OWNER_FREEZE = SIGNED
 - 实现 Agent 只能标记 `FIX_READY`，不得标记 `CLOSED`
 - Flap 新合约审核必须覆盖 `contracts-flap/src/**`、接口、库、Flap Vault/Factory 规范和直接交互合约
 - Guardian 只能触发固定规则动作；不得修改资金配置或任意提款
-- 不得通过新 Vault 恢复 CostBasis、动态盈利税、Top100 四档或 PANGU2 专用 Settlement
+- 不得通过新 Vault 恢复 CostBasis、动态盈利税、Top100 35/25/25/15 四档或 PANGU2 专用 Settlement；V6 Top100 额外池按新确定性规则审核
 
 ## Flap F0 文档审核
 
@@ -96,6 +96,12 @@ RESPONSIBLE_OWNER_FREEZE = SIGNED
 - 新 Solidity、测试网签名/广播、平台 Signer、Migration 和 Mainnet 不得由 F0 授权
 - Admin Wallet 是当前责任人冻结候选，不得由审核 Agent擅自改成 User Wallet；F1 必须核对 creator/payer/msg.sender/initial buyer 语义
 - F10 通用 Staking 与 F11 Legacy Cutover 必须是不同 Commit、审核包和回滚单元
+- V6 候选默认值必须一致：Tax 500 BPS；五桶 3000/2500/2000/1500/1000 且和为 10000；Launch 前可调、确认后冻结
+- Dividend 必须是所有有效持有人基础池 + Top100 额外池；Top100 排名和同额打破必须确定性，不得恢复 35/25/25/15
+- Staking 只能用 Staking Bucket 迁移后受控兑换和可选预充值；其他 Bucket 与 principal 不得支付奖励
+- 回购默认 100% Burn，任何非零 Locker 比例必须在 Launch 前固定；回购 Token 不得给触发者
+- 开盘保护旧真实基线为 15 分钟/30% 税而非 15% 税；F1/独立 Solidity Gate 未证明时必须 `UNSUPPORTED`
+- Vesting 必须是独立预充值、不可铸币、不可复用回购 Locker；没有实际 Token 到账不得进入 ACTIVE
 - 审核 Finding 必须包含具体修改位置、步骤、约束、验收和回归检查；只报问题不提供解决方案时审核不完整
 
 ## 前端审核

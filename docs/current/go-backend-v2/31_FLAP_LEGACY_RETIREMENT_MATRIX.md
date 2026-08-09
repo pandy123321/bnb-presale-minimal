@@ -1,19 +1,20 @@
 # BingGoPlus Flap 继承、重做与退役矩阵
 
-状态：`V4_REVIEW_BLOCKED / V5_REMEDIATION_FIX_READY / INDEPENDENT_RETEST_PENDING`
+状态：`V5_CONTENT_APPROVAL_SUPERSEDED / V6_ECONOMIC_CHANGE_FIX_READY / INDEPENDENT_RETEST_PENDING`
 
 ## 1. 模块矩阵
 
 | 现有能力 | 新产品处置 | 保留的结构 | 不再保留的语义 |
 |---|---|---|---|
-| Pangu2Token | `LEGACY_READ_ONLY` | 10 亿/18 位精度参考、供应守恒、真实 burn 证据 | PANGU2 专用接口、Launch Tax、Whitelist |
+| Pangu2Token | `LEGACY_READ_ONLY` | 10 亿/18 位精度参考、供应守恒、真实 burn、开盘保护业务目的 | PANGU2 专用接口、Whitelist、原 settlement 实现 |
 | TradeRouter | `PERMANENTLY_RETIRED` | deadline、minOut、价格影响、钱包签名 | 强制 PANGU2 Router、settleBuy/Sell |
 | CostBasisManager | `PERMANENTLY_RETIRED` | Evidence First/fail-closed 思想 | KNOWN/UNKNOWN、盈利判税、成本迁移 |
 | FeeVault | `REDESIGN_AS_REVENUE_VAULT` | 独立 Bucket、会计偿付、用途隔离 | Buy/Sell 分开入桶、PANGU2 Token 兑换路径 |
 | SupportPool | `REDESIGN_AS_BUYBACK_MODULE` | 资金阈值、间隔、滑点、触发者不得获利 | 固定 Pangu Router/Oracle、Curve 阶段自动回购 |
-| BuybackLocker | `REDESIGN_AS_GENERIC_LOCKER` | 批次、到期释放、固定 Recipient | PANGU2 systemTransfer/CostBasis |
-| DividendDistributor | `REDESIGN` | Merkle Epoch、快照、一次领取、carry | Top100 与 35/25/25/15 |
-| Pangu2Staking | `REDESIGN_LAST` | 预充值奖励、本金隔离、锁期、罚金、偿付 | PANGU2 专用转账/成本接口 |
+| BuybackLocker | `REDESIGN_AS_GENERIC_LOCKER` | 批次、到期释放、固定 Recipient | PANGU2 systemTransfer/CostBasis；与团队 Vesting 混用 |
+| DividendDistributor | `REDESIGN` | Merkle Epoch、快照、一次领取、carry、Top100 奖励目的 | 35/25/25/15 四档 |
+| Pangu2Staking | `REDESIGN_LAST` | 本金隔离、锁期、罚金、偿付、预充值补充路径 | PANGU2 专用转账/成本接口；仅外部预充值的唯一资金源 |
+| Team/Investor Lock | `NEW_GENERIC_VESTING` | 固定受益人、cliff、线性/分期释放、不可撤销默认 | 铸币权、回购 Locker 共用、未到账先记锁仓 |
 | PancakeV2Adapter | `REFERENCE_ONLY` | Swap 安全目标 | 固定 PANGU2/WBNB 路由 |
 | TWAP Oracle | `REASSESS_FOR_DEX_BUYBACK` | TWAP/低流动性/陈旧 fail-closed | PANGU2 Pair 固定参数 |
 | GovernanceAdapter | `RETIRED_FOR_NEW_PRODUCT` | allowlist、最小权限、审批 | PANGU2 selector 集合 |
@@ -27,26 +28,30 @@
 | Token 供应 | 10 亿、18 decimals | 使用 Flap 平台实际供应结构 | 链上只读，不伪造 |
 | 普通税 | Buy 4%，Sell 4% | Flap 单一 Tax Rate | 每 Token 创建时设置 |
 | 盈利税 | Sell 10% | 永久取消 | 不提供参数 |
-| Launch 税 | 30%/15 分钟 | 永久取消 | 使用 Flap Curve 生命周期 |
+| Launch 税 | 30%/15 分钟 | 保留业务目的，候选默认 30%/15 分钟 | Launch 前可调；须 F1/独立 Solidity Gate 证明可实现 |
 | Whitelist | 0% | 永久取消 | 不提供参数 |
-| Dividend 资金 | Buy Tax | Revenue Vault Dividend Bucket | BPS 创建时设置 |
-| Support/Buyback | Sell Tax | Revenue Vault Buyback Bucket | BPS 创建时设置 |
-| Burn | 盈利税的一部分 | 可选“回购买回后 burn” | 默认 0，可与 lock BPS 分配 |
+| Dividend 资金 | Buy Tax | Revenue Vault Dividend Bucket，默认总税的 30% | BPS 创建前可调，确认后冻结 |
+| Support/Buyback | Sell Tax | Revenue Vault Buyback/Burn Bucket，默认总税的 25% | BPS 创建前可调，确认后冻结 |
+| Staking 资金 | 外部预充值 | Revenue Vault Staking Bucket，默认总税的 20%，迁移后兑换 Token；允许补充预充值 | BPS 创建前可调，确认后冻结 |
+| Marketing | 无独立新产品桶 | 默认总税的 15% 到固定 Recipient | BPS/地址创建前可调，确认后冻结 |
+| Operations | 无独立新产品桶 | 默认总税的 10% 到固定 Recipient | BPS/地址创建前可调，确认后冻结 |
+| Burn | 盈利税的一部分 | 回购买回后 burn | 默认 100%，可与 lock BPS 在创建前分配 |
 | 回购金额 | 0.01 BNB | 默认继承 | 后台受限治理可调 |
 | 回购间隔 | 60 秒 | 默认继承 | 后台受限治理可调 |
 | 回购锁仓 | 365 天 | 默认继承 | 新批次参数，旧批次不可改 |
-| 分红名单 | Top100 四档 | 所有有效持有人同比例 | min balance/exclusion 可配 |
+| 分红名单 | Top100 四档 | 所有有效持有人基础分红 + Top100 额外池 | Top100 bonus 默认占 Dividend 桶 20%，创建前可调；不恢复四档 |
 | Claim Window | 30 天 | 默认继承 | Epoch 创建时固定 |
 | Staking 最低值 | 1 Token | 默认继承 | 只影响新 Position |
 | Staking 最大锁期 | 730 天 | 默认继承 | Pool 创建时固定 |
 | 提前退出罚金 | 10% | 默认继承 | Position 创建时固定 |
+| 团队/投资人/项目锁仓 | 无通用模块 | 独立预充值 Vesting | 实际 Token 到账后生效，不铸币 |
 
 ## 3. 控制逻辑矩阵
 
 | 控制 | 新规则 |
 |---|---|
 | Launch Approval | 替代 PANGU2 OpenTrading；批准后仍需钱包签名 |
-| Pause | 按 Launch、Vault、Buyback、Dividend、Staking 分功能暂停 |
+| Pause | 按 Launch、Vault、Buyback、Dividend、Staking、Vesting 分功能暂停 |
 | Unpause | 比 Pause 更严格，要求 readiness/preflight/审批 |
 | Guardian | 只触发固定规则动作，不改配置、不提款 |
 | Signer | 默认不开启；启用时只允许固定 Portal/Factory/selector/额度 |
@@ -59,7 +64,7 @@
 - `binggoplus_v2` 和 PANGU2 API 在 F11 独立切换 Gate 前保留，F11 通过后只读或下线；
 - 新 Flap 数据进入 `binggoplus_flap_v1`；
 - PANGU2 Contract Registry、Trade、CostBasis、Top100、旧 Staking 页面逐步标记 Legacy；
-- 新增 Launch Center、Tokens、Vaults、Revenue、Buyback、Locker、Dividend、Staking、Audit；
+- 新增 Launch Center、Tokens、Vaults、Revenue、Buyback/Burn、Locker、Dividend/Top100、Staking、Vesting、Audit；
 - 不迁移旧 Mock、Session、队列内部状态；
 - 不删除测试网历史和审核 Evidence。
 

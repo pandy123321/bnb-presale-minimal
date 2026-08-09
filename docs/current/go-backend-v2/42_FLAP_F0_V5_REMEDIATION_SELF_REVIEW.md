@@ -1,6 +1,8 @@
 # BingGoPlus Flap F0 V5 修订作者侧自审
 
-状态：`AUTHOR_SELF_REVIEW / FIX_READY / INDEPENDENT_RETEST_PENDING`
+状态：`HISTORICAL_V5 / SUPERSEDED_FOR_FREEZE_BY_OWNER_V6_ECONOMIC_CHANGE`
+
+> 本文保留 V5 当时的作者侧记录，不再授权当前 F0 Freeze。后续 Owner 经济模型变更见文档 44，当前提审身份见文档 46。
 
 ## 1. 修订范围
 

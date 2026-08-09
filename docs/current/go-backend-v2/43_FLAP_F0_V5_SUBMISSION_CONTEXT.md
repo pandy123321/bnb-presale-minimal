@@ -1,6 +1,8 @@
 # BingGoPlus Flap F0 V5 独立提审上下文
 
-状态：`ISOLATED_SINGLE_COMMIT / MANUAL_REVIEW_PACKAGE / REMOTE_PUSH_PENDING`
+状态：`HISTORICAL_V5_SUBMISSION / SUPERSEDED_FOR_FREEZE_BY_OWNER_V6_ECONOMIC_CHANGE`
+
+> V5 Commit 和 Package 继续作为历史证据，但 Owner 在其后改变了经济模型。当前审核必须使用文档 46 和 V6 Package，不得用 V5 审核授权当前 Freeze。
 
 ```text
 PROJECT = BingGoPlus

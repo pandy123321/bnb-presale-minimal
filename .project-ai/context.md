@@ -3,7 +3,7 @@
 ## 当前权威信息（F0 冻结候选；Flap 运行事实待 F1）
 
 ### 项目目标
-以 Flap 为唯一发币入口的多 Token Launch 与经济扩展平台（品牌 BingGoPlus / BGP）。F0 仅冻结三个计划模式：Flap Standard、Flap Tax + 官方 Split Vault、Flap Tax + 自建 BGPlus Vault；它们都不是已实现能力，必须经 F1 地址/ABI/runtime/行为基线后才能标记为支持。尽量保留税收资金桶、回购锁仓、Merkle 分红、外部预充值质押和最小权限结构；PANGU2 CostBasis、动态盈利税、专用 Router/Settlement、Launch Tax、Whitelist、Top100 四档和原 Staking 永久退出新产品。
+以 Flap 为唯一发币入口的多 Token Launch 与经济扩展平台（品牌 BingGoPlus / BGP）。F0 仅冻结三个计划模式：Flap Standard、Flap Tax + 官方 Split Vault、Flap Tax + 自建 BGPlus Vault；它们都不是已实现能力，必须经 F1 地址/ABI/runtime/行为基线后才能标记为支持。V6 Owner 经济模型要求尽量保留旧机制的业务目的：候选默认 5% Token Tax，按 30% Dividend、25% Buyback/Burn、20% Staking、15% Marketing、10% Operations 分桶；所有有效持有人基础分红，Top100 另获确定性额外池；回购默认 100% 销毁；Staking 由税收桶迁移后受控兑换奖励 Token并允许外部预充值；团队/投资人/项目储备使用独立预充值 Vesting；候选开盘保护为旧真实值 15 分钟/30% 税。所有参数只在 Launch 前可调，确认后冻结，且均受 F1/独立 Solidity Gate 约束。PANGU2 CostBasis、动态盈利税、专用 Router/Settlement、Whitelist、Top100 35/25/25/15 四档和专用 Staking 实现永久退出新产品。
 
 ### 当前阶段
 PANGU2 合约已部署 BSC Testnet（`3ef50b6`），继续作为 Legacy Read-Only 历史证据，不修改、不重部署。Laravel 代码冻结；Go 仍是唯一目标后端。当前产品实现暂停在 Flap F0 Change Gate，旧 G2-G9 不再是当前执行主线。
@@ -12,7 +12,7 @@ PANGU2 合约已部署 BSC Testnet（`3ef50b6`），继续作为 Legacy Read-Onl
 
 | Gate | 状态 |
 |------|:--:|
-| FLAP-F0 文档冻结候选 | `V4_REVIEW_BLOCKED / V5_REMEDIATION_FIX_READY / REMOTE_PUSH_PENDING` |
+| FLAP-F0 文档冻结候选 | `V5_CONTENT_APPROVAL_SUPERSEDED / V6_ECONOMIC_CHANGE_FIX_READY / INDEPENDENT_RETEST_PENDING` |
 | F1 Flap 合约/ABI Baseline | `NOT_AUTHORIZED` |
 | Flap Go 实现 | `NOT_STARTED` |
 | 新 Solidity | `NOT_STARTED` |
@@ -65,12 +65,12 @@ Flap 已由设计支线改为产品主线：
 
 - `FLAP_STANDARD = CANDIDATE_PENDING_F1_BASELINE`：Portal 普通 Token 候选；
 - `FLAP_TAX_SPLIT = MVP_CANDIDATE_PENDING_F1_BASELINE`：VaultPortal + 官方 Split Vault 候选优先路径；
-- `FLAP_TAX_BGPLUS = REQUIRED_EXTENSION_PENDING_F1_AND_SOLIDITY_GATES`：VaultPortal + 自建 Factory/Vault 必做扩展路线；
+- `FLAP_TAX_BGPLUS = REQUIRED_EXTENSION_PENDING_F1_AND_SOLIDITY_GATES`：VaultPortal + 自建 Factory/Vault 必做扩展路线，承载五桶经济循环；
 - `F3 = CHAIN_ACQUISITION_INDEXER_READ_MODEL`；
 - `F4 = LAUNCH_WORKFLOW_AND_API`；
 - `F5 = SIGNER_AND_TRANSACTION_EXECUTION`；
 - `F6 = ADMIN_LAUNCH_CONSOLE_AND_NATIVE_MVP`；
-- F0-F11 为当前阶段计划；F10 只做通用 Staking，F11 单独执行 Legacy Cutover；旧 G2-G9 对当前执行已被取代；
+- F0-F11 为当前阶段计划；F8 同时包含 Buyback/Burn、Dividend/Top100 与独立 Vesting，F10 只做税收奖励型通用 Staking，F11 单独执行 Legacy Cutover；旧 G2-G9 对当前执行已被取代；
 - `F6_TO_F7_AUTO_ADVANCE = FORBIDDEN`，F7 必须先通过 Extension Entry Review 和责任人/安全范围授权；
 - PANGU2 Full Suite 新部署已取消；现有 PANGU2 仅保留历史。
 
@@ -82,8 +82,8 @@ Flap 已由设计支线改为产品主线：
 
 | # | 事项 |
 |---|------|
-| 1 | F0 独立文档审核与执行方二次裁决 |
-| 2 | `pd123` 在审核通过后完成 F0 Responsible Owner Freeze |
+| 1 | V6 经济模型独立文档审核与执行方二次裁决 |
+| 2 | `pd123` 在 V6 审核通过后完成 F0 Responsible Owner Freeze |
 | 3 | F1 固定 Portal/VaultPortal/Split Vault/Guardian 地址、ABI、selector、默认值和 bytecode hash |
 | 4 | F2 冻结新 Schema/OpenAPI/Event/State/RBAC/Signer 与参数机器规范 |
 
@@ -93,5 +93,5 @@ Flap 已由设计支线改为产品主线：
 - contracts-v2/src/*.sol, contracts-v2/broadcast/*/97/run-latest.json
 - apps/dapp/src/features/wallet/deployed.ts
 - backend-go/（G1 审核基线 28 文件；当前工作区包含未审核候选变更）
-- docs/current/go-backend-v2/27～43（当前 Flap F0、V2～V4 裁决与 V5 提审身份）及历史 runtime-gate
+- docs/current/go-backend-v2/27～46（当前 Flap F0、历史裁决与 V6 经济模型提审身份）及历史 runtime-gate
 - docs/current/RULES_MASTER.md

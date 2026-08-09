@@ -4,7 +4,7 @@
 
 ## 一、审核目标
 
-判断本次从 PANGU2 主线转向 Flap 的文档冻结候选是否完整、一致、可实现，并且没有把已永久放弃的 PANGU2 专用逻辑通过后端或新 Vault 偷偷恢复。
+判断本次从 PANGU2 主线转向 Flap、并按 V6 Owner 经济模型重新保留可兼容机制的文档冻结候选是否完整、一致、可实现。必须区分“保留业务目的/安全不变量”和“偷渡不兼容的 PANGU2 专用接口”。
 
 标准 Verdict 只能是：
 
@@ -14,7 +14,7 @@ CHANGES_REQUIRED
 BLOCKED
 ```
 
-本轮只能批准进入 Responsible Owner Freeze/F1 Baseline，不批准代码实现、依赖下载、测试网签名、部署或 Mainnet。
+本轮最多只能批准进入 Responsible Owner Freeze；不得直接批准 F1、代码实现、依赖下载、测试网签名、部署或 Mainnet。
 
 ## 二、必须读取
 
@@ -36,6 +36,9 @@ docs/current/go-backend-v2/40_FLAP_F0_V4_SUBMISSION_CONTEXT.md
 docs/current/go-backend-v2/41_FLAP_F0_V4_EXTERNAL_REVIEW_ADJUDICATION.md
 docs/current/go-backend-v2/42_FLAP_F0_V5_REMEDIATION_SELF_REVIEW.md
 docs/current/go-backend-v2/43_FLAP_F0_V5_SUBMISSION_CONTEXT.md
+docs/current/go-backend-v2/44_FLAP_F0_OWNER_ECONOMIC_MODEL_CHANGE_DECISION.md
+docs/current/go-backend-v2/45_FLAP_F0_V6_ECONOMIC_CHANGE_SELF_REVIEW.md
+docs/current/go-backend-v2/46_FLAP_F0_V6_SUBMISSION_CONTEXT.md
 
 docs/current/go-backend-v2/25_FLAP_INTEGRATION_EXECUTION_PLAN.md
 docs/current/go-backend-v2/26_G2_EXECUTION_BASELINE_NORMALIZATION.md
@@ -79,15 +82,15 @@ docs/current/go-backend-v2/24_AI_CODE_REVIEW_AUTOMATION_PROTOCOL.md
 
 11. 是否保留 Bucket、回购、锁仓、Merkle、质押储备与安全控制结构；
 12. 参数是否明确区分生命周期和边界；
-13. CostBasis、动态盈利税、PANGU2 Router/settlement、Launch Tax、Whitelist 是否永久退役；
+13. CostBasis、动态盈利税、PANGU2 Router/settlement、Whitelist 和旧 Launch Protection 实现是否永久退役；通用 Launch Protection 是否只保留业务目的并待 F1/独立 Solidity Gate；
 14. Top100 35/25/25/15 是否没有通过新名称恢复；
-15. 新 Dividend 是否明确为所有符合条件地址同比例；
-16. Flap Curve 和 DEX 阶段税费是否分别展示，是否禁止“始终 4%”误导；
+15. 新 Dividend 是否明确为所有符合条件地址基础同比例 + Top100 额外池；
+16. Flap Curve 和 DEX 阶段税费是否分别展示，是否禁止“始终 5%”误导；
 17. 参数默认值是否被误写成已部署事实或全局不可变值。
 
 ### D. 合约和资金安全
 
-18. 自建 Factory/Vault/Buyback/Locker/Dividend/Staking 是否都要求独立 Solidity Gate；
+18. 自建 Factory/Vault/Buyback/Locker/Dividend/Staking/Vesting 是否都要求独立 Solidity Gate；
 19. Guardian 是否只能触发固定规则动作，不能改配置或提款；
 20. 回购是否只能买绑定 Token，所得只能锁仓或 burn；
 21. Curve 阶段是否默认不执行自建回购；
@@ -128,7 +131,7 @@ docs/current/go-backend-v2/24_AI_CODE_REVIEW_AUTOMATION_PROTOCOL.md
 44. F3～F6 是否唯一映射为 Chain/Indexer/Read Model、Workflow/API、Signer/Execution、Admin Console/Native MVP；
 45. F6 审核通过时是否仍强制 `AUTO_ADVANCE_DECISION=PAUSED`，直到 F7 Extension Entry Review 和 Owner/Security Scope Authorization；
 46. F7～F10 是否仍为必做路线，没有因暂停 Gate 被降为 Optional；
-47. Staking 是否唯一使用绑定 Flap Token 的 `EXTERNAL_PREFUND_ONLY`，不使用 RevenueVault BNB 或质押本金；
+47. Staking 是否仅使用 Staking Bucket 在迁移后的受控兑换与可选外部预充值，不使用其他 Revenue Bucket 或质押本金；
 48. `/api/v2`、`binggoplus_v2`、旧 G5/G6 是否只出现在明确 `LEGACY/HISTORICAL` 语义；
 49. Flap 三模式是否仍标记为 Candidate/Pending F1，而不是已实现“支持”；
 50. RevenueVault 是否冻结 Internal Ledger 事实源、链余额仅作 Solvency、未登记 Surplus 不可分配；
@@ -137,11 +140,25 @@ docs/current/go-backend-v2/24_AI_CODE_REVIEW_AUTOMATION_PROTOCOL.md
 ### I. V4 外审修订复验
 
 52. doc27/doc30/doc31 是否不再把当前 Gate 绑定到 V2、doc37 或旧 Commit；
-53. 当前 Commit 是否通过 doc43 与 Package `COMMIT_ID.txt` 精确绑定，并与完整 Diff/Name Status 一致；
+53. 当前 Commit 是否通过 doc46 与 Package `COMMIT_ID.txt` 精确绑定，并与完整 Diff/Name Status 一致；
 54. `APPROVED` 是否只表示当前审核范围通过，Flap F0 是否只能进入 Responsible Owner Freeze；
 55. 是否只有 `ADJUDICATION=ACCEPTED + OWNER_FREEZE=SIGNED` 才能把 `F1_ENTRY_AUTHORIZED` 改为 YES；
 56. doc28 高层是否使用“计划支持/Pending F1/Solidity Gate”，没有残留已验证“支持”语义；
-57. RULES_MASTER、coding.md 和机器计数是否全部为 61。
+57. RULES_MASTER、coding.md 和机器计数是否全部为 65。
+
+### J. V6 Owner 经济模型变更
+
+58. 是否明确 V5 审核只作为历史证据，不能授权 V6 Freeze；
+59. Token Tax 候选默认是否为 500 BPS，并标记 `PENDING_F1_SUPPORTED_RANGE`、Launch 前可调、确认后冻结；
+60. Revenue 五桶是否唯一为 Dividend/Buyback-Burn/Staking/Marketing/Operations，默认 3000/2500/2000/1500/1000 且总和 10000；
+61. Dividend 内部默认是否为 80% 基础池 + 20% Top100 额外池，二者 Launch 前可调、确认后冻结；
+62. Top100 是否使用有效余额降序、规范化地址升序打破同额，并按榜内有效余额同比例分配；
+63. 回购是否仅在 `MIGRATED/ACTIVE` 执行、默认 100% Burn、非零 Locker 比例必须 Launch 前固定；
+64. Staking Bucket 的 BNB→Token 兑换是否具备固定路径、minOut、deadline、滑点、价格影响、限额、间隔、暂停、失败不减 liability 和唯一 execution identity；
+65. Vesting 是否只锁定实际预充值 Token，不铸币、不复用 BuybackLocker/Staking Reserve，未到账不得 ACTIVE；
+66. 开盘保护是否正确写为旧真实基线“15 分钟/30% 税”而非 15% 税，且未在 F1 前伪装为 Flap 已支持；启用时是否替代普通 5% 而非叠加，并继续走同一五桶；
+67. 旧机制保留是否只继承业务目的和安全不变量，没有恢复 CostBasis、盈利动态税、Whitelist 或 PANGU2 settlement hooks。
+68. `FLAP_STANDARD/FLAP_TAX_SPLIT` 是否没有冒充完整 V6 经济模型；只有 F7～F10 完成后的 `FLAP_TAX_BGPLUS` 才能声明完整交付。
 
 ## 四、Finding 输出要求
 

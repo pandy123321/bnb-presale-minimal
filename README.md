@@ -2,11 +2,13 @@
 
 项目正在从单一 PANGU2 产品转为以 Flap Portal/VaultPortal 为唯一发币入口的多 Token 平台。保留 Go、PostgreSQL、Vue Admin/DApp 技术地基；现有 PANGU2 合约和测试网历史转为只读 Legacy。
 
-**当前阶段：** `FLAP-F0_V4_REVIEW_BLOCKED / V5_REMEDIATION_FIX_READY / REMOTE_PUSH_PENDING / IMPLEMENTATION_PAUSED`
+**当前阶段：** `FLAP-F0_V5_CONTENT_APPROVAL_SUPERSEDED / V6_ECONOMIC_CHANGE_FIX_READY / INDEPENDENT_RETEST_PENDING / IMPLEMENTATION_PAUSED`
 
 **支持网络：** BSC Testnet (Chain 97)；BSC Mainnet 继续 `NO-GO`。
 
-**当前权威文档：** [Flap 产品转向决策](docs/current/go-backend-v2/27_FLAP_PRODUCT_PIVOT_DECISION.md)、[参数目录](docs/current/go-backend-v2/28_FLAP_PRODUCT_SCOPE_AND_PARAMETER_CATALOG.md)、[目标架构](docs/current/go-backend-v2/29_FLAP_TARGET_ARCHITECTURE.md)、[F0-F11 执行计划](docs/current/go-backend-v2/30_FLAP_F0_F11_EXECUTION_PLAN.md)。
+**V6 经济模型候选：** Flap 发币/Curve/DEX Migration；BGPlus 以候选 5% Token Tax 支撑 Dividend 30%、Buyback/Burn 25%、Staking 20%、Marketing 15%、Operations 10%。所有有效持有人获得基础分红，Top100 另获额外池；回购默认 100% 销毁；旧开盘保护按真实基线 15 分钟/30% 税作为待 F1 验证的候选。参数在 Launch 前可调，确认后冻结。
+
+**当前权威文档：** [V6 Owner 经济模型变更](docs/current/go-backend-v2/44_FLAP_F0_OWNER_ECONOMIC_MODEL_CHANGE_DECISION.md)、[Flap 产品转向决策](docs/current/go-backend-v2/27_FLAP_PRODUCT_PIVOT_DECISION.md)、[参数目录](docs/current/go-backend-v2/28_FLAP_PRODUCT_SCOPE_AND_PARAMETER_CATALOG.md)、[目标架构](docs/current/go-backend-v2/29_FLAP_TARGET_ARCHITECTURE.md)、[F0-F11 执行计划](docs/current/go-backend-v2/30_FLAP_F0_F11_EXECUTION_PLAN.md)。
 
 > 下方现有目录、旧启动方式和 PANGU2 技术说明保留为仓库现状参考，不代表 Flap 新基线已经实现或获部署授权。
 

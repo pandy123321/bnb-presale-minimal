@@ -1,6 +1,6 @@
 # BingGoPlus Flap 目标架构
 
-状态：`V4_REVIEW_BLOCKED / V5_REMEDIATION_FIX_READY / INDEPENDENT_RETEST_PENDING / IMPLEMENTATION_NOT_AUTHORIZED`
+状态：`V5_CONTENT_APPROVAL_SUPERSEDED / V6_ECONOMIC_CHANGE_FIX_READY / INDEPENDENT_RETEST_PENDING / IMPLEMENTATION_NOT_AUTHORIZED`
 
 ## 1. 总体架构
 
@@ -17,7 +17,7 @@ BSC Testnet RPC
   -> Go Indexer
   -> canonical raw events / blocks / cursors
   -> Go Projector
-  -> Token / Curve / Migration / Vault / Revenue / Buyback / Dividend / Staking Read Models
+  -> Token / Curve / Migration / Vault / Revenue / Buyback / Dividend / Top100 / Staking / Vesting Read Models
   -> Public API / Admin API
   -> apps/dapp / apps/admin
 ```
@@ -38,7 +38,7 @@ cmd/dividend-builder
 
 复用：配置、Health、PostgreSQL 连接、整数金额类型、请求 ID、限流框架、幂等/审计/命令状态设计、Cursor/Reorg 设计和 Admin Session 方向。
 
-不复用为新权威：PANGU2 Quote、CostBasis、TradeRouter、Staking、Top100、FeeVault、SupportPool 与 PANGU2 Governance Action 的领域对象和接口。
+不复用为新权威：PANGU2 Quote、CostBasis、TradeRouter、FeeVault、SupportPool 与 PANGU2 Governance Action 的领域对象和接口。旧 Staking、Top100 和 Launch Protection 只保留业务目的与安全不变量，必须用通用 Flap 兼容模型重新设计，不能复用专用接口。
 
 ## 3. 新代码边界
 
@@ -54,6 +54,7 @@ backend-go/internal/flap/revenue
 backend-go/internal/flap/buyback
 backend-go/internal/flap/dividend
 backend-go/internal/flap/staking
+backend-go/internal/flap/vesting
 ```
 
 现有 PANGU2 包在 F11 独立 Cutover Gate 前可保留只读兼容，但不得与 Flap 业务共用模糊类型或表。
@@ -106,6 +107,8 @@ dividend_allocations
 dividend_claims
 staking_pools
 staking_positions
+vesting_schedules
+vesting_releases
 audit_events
 idempotency_records
 chain_sources
@@ -212,7 +215,7 @@ LaunchedToDEX
 
 同一创建交易的可选事件必须先合并再生成 Token 配置。缺失事件按 F1 已冻结的 Flap 默认值处理，不能自行猜测。
 
-BGPlus 合约还需独立事件：Revenue Received/Allocated、Buyback Executed、Lock Registered/Released、Dividend Epoch Published/Claimed/Closed、Stake/Unstake/Reward。
+BGPlus 合约还需独立事件：Revenue Received/Allocated、Buyback Executed/Burned、Lock Registered/Released、Dividend Epoch Published/Claimed/Closed、Top100 Snapshot Bound、Stake/Unstake/Reward、Vesting Funded/Released。
 
 ## 8. 签名与权限
 
@@ -232,15 +235,17 @@ MVP：Admin 钱包直接签名。Go 服务只构造精确交易意图，不保�
 
 - Factory 默认不可升级；
 - Vault 收款地址和 BPS 创建后默认不可变；
-- Dividend/Treasury/Operations/Reserve 的目的地址和 Reserve 释放策略必须进入不可变参数快照；
-- Vault 会计必须分别累计当前负债、Dividend 充值、回购花费、Treasury/Operations 支付、Reserve 释放和 rounding carry；
+- Dividend/Buyback/Staking/Marketing/Operations 的 BPS、目的地址、Token 路径和释放策略必须进入不可变参数快照；
+- Vault 会计必须分别累计当前负债、Dividend 充值、回购花费、Staking 奖励兑换、Marketing/Operations 支付和 rounding carry；
 - Vault 内部 Revenue Ledger 是唯一分配事实源；链上实际余额只用于偿付检查，未登记 surplus 在完成唯一对账前不可分配；
 - 每笔资金流出必须有不可重复 execution identity；成功后不得二次执行，失败重试必须复用原 identity；
 - 任一资金外部调用失败不得减少对应 Bucket liability；
 - Guardian 只能触发固定规则动作，不能改配置或提款；
-- 回购只能购买绑定 Token，资产只能进入 Locker/Burn；
-- Dividend Root 必须绑定快照、输入 Hash、总额和审批；
-- Staking 使用绑定 Flap Token 的 `EXTERNAL_PREFUND_ONLY` 奖励储备；不得使用 RevenueVault BNB 或质押本金支付奖励；
+- 回购只能在 `MIGRATED/ACTIVE` 购买绑定 Token，资产只能进入 Burn/Locker；默认 100% Burn；
+- Dividend Root 必须绑定快照、输入 Hash、总额和审批；基础分红覆盖所有有效持有人，Top 100 额外奖励按确定性排名与榜内有效持币量同比例计算；
+- Staking 使用绑定 Flap Token；奖励来自 Staking BNB Bucket 的受控 DEX 兑换和可选外部预充值，不得使用其他 Bucket 或质押本金；
+- Vesting 只能锁定真实预充值的绑定 Flap Token；不得铸币，不得与回购 Locker 或 Staking Reserve 共用资金；
+- 通用开盘保护候选默认 `15 minutes / 3000 bps`；仅在 F1/独立 Solidity Gate 证明 Flap 兼容且可执行时启用；
 - 外部调用遵循 Checks-Effects-Interactions、ReentrancyGuard 和 Pull 模式；
 - 任何 Swap 强制 deadline、minOut、价格影响与暂停检查。
 
