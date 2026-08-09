@@ -1,6 +1,6 @@
 ﻿# Runtime Gate Status
 
-> 状态：`HISTORICAL_PANGU2_RUNTIME_GATE / NOT_CURRENT_FLAP_STAGE_AUTHORITY`。本文件保留 PANGU2 Go V2 Runtime Gate 的原始状态和证据，不授权恢复旧 G2-G9 主线。当前产品与阶段权威为 `27_FLAP_PRODUCT_PIVOT_DECISION.md` 和 `30_FLAP_F0_F10_EXECUTION_PLAN.md`：`PRODUCT_MAINLINE = FLAP`、`CURRENT_STAGE = FLAP-F0`、`F1_ENTRY_AUTHORIZED = NO`。
+> 本文件仅保留历史 PANGU2 Go V2 Runtime Gate 状态与证据，不作为当前产品主线或 FLAP Stage Authority，也不授权恢复旧 G2-G9。
 
 | Gate | Status |
 |---|---|
@@ -23,7 +23,7 @@
 | BYTECODE_IDENTITY | 10/10 VERIFIED |
 | GETTER | 14/14 PASS |
 | ROLE | 8/8 PASS (Expected=False, Owner Decision bound) |
-| MANIFEST | RT02_FINAL_PAYLOAD_MANIFEST.csv (byte-exact binding pending regeneration) |
+| MANIFEST | RT02_FINAL_PAYLOAD_MANIFEST.csv (REGENERATED / INDEPENDENT_BYTE_EXACT_RETEST_PENDING) |
 
 ### Owner Risk Acceptance (NOT Technical PASS)
 
@@ -49,7 +49,7 @@ EXIT_CODE=1
 | Finding | Status | Disposition |
 |---|---|---|
 | P1-RT02-14 | BLOCKED_EVIDENCE (Owner-accepted environmental limit) | RT02-OWNER-2026-002 |
-| P2-RT02-MANIFEST-03 | FIX_REQUIRED (Manifest stale after db85f534) | Pending regeneration |
+| P2-RT02-MANIFEST-03 | FIX_REQUIRED — payload hash mismatch, INDEPENDENT_BYTE_EXACT_RETEST_PENDING | REGENERATED, pending Independent Review |
 | P2-RT02-OWNER-HASH | CLOSED (self-hash removed) | External binding only |
 
 ## RT-GATE-03 — FIX_READY / INDEPENDENT_RETEST_PENDING
