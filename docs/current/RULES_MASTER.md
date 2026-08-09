@@ -1,6 +1,6 @@
 # BingGoPlus — Global Rules (Distilled from 12 source documents)
 
-> 以下 65 条规则整理自 `.project-ai/rules/`、`go-backend-v2/README.md`、`remediation/`、`24_AI_PROTOCOL.md`、`RT-GATE`、Phase/GE 提示词及 Flap F0 决策。每一条标注原始来源。Agent 违反任一规则 = 审核直接 BLOCKED。
+> 以下 68 条规则整理自 `.project-ai/rules/`、`go-backend-v2/README.md`、`remediation/`、`24_AI_PROTOCOL.md`、`RT-GATE`、Phase/GE 提示词及 Flap F0 决策。每一条标注原始来源。Agent 违反任一规则 = 审核直接 BLOCKED。
 
 ---
 
@@ -117,7 +117,7 @@
 | G-1 | **backend-go/ 不存在时不可声称 Build 通过。Go 依赖当前 NO_DOWNLOAD_AUTHORIZED。不可用 latest/浮动 branch/未批准 pseudo-version** | Go V2 README / RT-GATE-03 |
 | G-2 | **G1 仅允许 skeleton** — cmd/config/health/DB bootstrap。严禁任何业务逻辑 | coding.md |
 
-## 十三、Flap 产品主线（12 条）
+## 十三、Flap 产品主线（15 条）
 
 | # | 规则 | 来源 |
 |---|---|---|
@@ -133,6 +133,9 @@
 | F-10 | **Top100 是额外池而非旧四档** — 所有有效持有人领取基础分红；Top100 由固定快照、有效余额降序和地址升序确定，并按榜内有效余额同比例分配额外池；禁止恢复 35/25/25/15 | 28/31 Flap F0 / Owner V6 Decision |
 | F-11 | **Staking 税收奖励与本金隔离** — 只有 Staking Bucket 可在 MIGRATED/ACTIVE 后受控兑换绑定 Token；可外部预充值；其他 Bucket 和质押本金永远不得支付奖励 | 28/29/30 Flap F0 / Owner V6 Decision |
 | F-12 | **开盘保护和 Vesting 必须 Fail Closed** — 旧保护真实基线是 15 分钟/30% 税而非 15% 税；只在 F1/独立 Solidity Gate 证明兼容时启用，保护税替代普通税且仍走五桶，不得叠加或恢复 29%+1% 旧路径。Vesting 仅锁定真实预充值 Token，不铸币、不复用回购 Locker | 27/28/31 Flap F0 / Owner V6 Decision |
+| F-13 | **EarlyUnstake 罚金只回同 Pool Reward Reserve** — 完整 principal liability 一次减少、净额返用户；罚金和被没收未领取奖励无外部 Recipient，不能重复记作 Tax Swap/Prefund | 28/29/31 Flap F0 / V7 P1 Remediation |
+| F-14 | **Dividend custody 必须唯一计量** — custody 地址余额全部排除；Staking principal 只按 staker Position 计一次；Vesting V1 未释放 Token 不参与 Dividend/Top100，释放后才作为钱包余额参与 | 28/29/31 Flap F0 / V7 P1 Remediation |
+| F-15 | **BGPlusVaultFactory V1 Commission 为零** — creation fee、revenue commission 和 recipient 固定为 0/零地址，Factory 不得接收 Vault outflow；非零要求新 Owner 经济 Change Gate | 28/29/31 Flap F0 / V7 P1 Remediation |
 
 ---
 
@@ -164,4 +167,4 @@
 4. 原始审核 Verdict 仅使用 `APPROVED / CHANGES_REQUIRED / BLOCKED`；`APPROVED_FOR_RESPONSIBLE_OWNER_FREEZE` 和 `APPROVED_FOR_NEXT_STAGE` 是阶段授权状态，不代表部署、主网或合约操作批准。
 5. 一个阶段原则上对应一个实现 Commit；仅包含上下文、审核记录或状态同步且不含实现变更的记录 Commit，不视为跨阶段实现。
 6. 审核报告必须提供文件路径、行号/函数或对象、证据、根因、影响、具体修复步骤、约束、验收标准和回归检查。只报问题而不给可执行修复方案时，`REVIEW_COMPLETENESS = INCOMPLETE`，不得推进。
-7. 本文件当前分组数量合计为 65 条；后续新增或删除规则必须同步更新总数。
+7. 本文件当前分组数量合计为 68 条；后续新增或删除规则必须同步更新总数。

@@ -54,7 +54,7 @@ backend-go/ — 复用工程地基，PANGU2 候选业务代码不等于 Flap 能
 
 | Gate | 状态 |
 |------|:--:|
-| FLAP-F0 | `V5_CONTENT_APPROVAL_SUPERSEDED / V6_ECONOMIC_CHANGE_FIX_READY / INDEPENDENT_RETEST_PENDING` |
+| FLAP-F0 | `V6_REVIEW_CHANGES_REQUIRED / V7_P1_REMEDIATION_FIX_READY / INDEPENDENT_RETEST_PENDING` |
 | F1 | `NOT_AUTHORIZED` |
 | Flap 实现 | `NOT_STARTED` |
 | BSC Mainnet | `NO-GO` |
@@ -95,6 +95,9 @@ Dividend → all-holder base pool + deterministic Top100 bonus pool → Merkle D
 Buyback → DEX migrated token → Burn by default / optional Locker
 Staking Bucket → post-migration controlled swap → Reward Reserve; principal remains isolated
 Project-held Token → independent prefunded Vesting → Team/Investor/Project beneficiary
+EarlyUnstake penalty/forfeited reward → same Staking Pool available Reward Reserve
+Dividend snapshot → exclude custody balances → attribute active principal once to staker; unreleased Vesting excluded
+BGPlusVaultFactory V1 → zero creation fee / zero revenue commission / no Vault outflow
 ```
 
 ## 禁止事项

@@ -59,6 +59,9 @@ Trading Gate → Fee Whitelist → Launch Protection (15min 30%) → Normal Cost
 | Staking Reward Funding | `TAX_BNB_SWAP_TO_BOUND_TOKEN + OPTIONAL_EXTERNAL_PREFUND`；只用 Staking Bucket，迁移后受控兑换；不使用其他 Bucket 或质押本金 |
 | BGPlusTokenVesting | 团队、投资人、项目储备的独立预充值锁仓；不铸币、不复用回购 Locker |
 | Launch Protection Candidate | 旧模型真实基线为开盘后 15 分钟/30% 税，不是 15% 税；仅在 F1/独立 Solidity Gate 证明兼容时启用 |
+| EarlyUnstake Penalty | 默认 principal 的 10%；完整 principal liability 一次减少，净额返还用户，罚金和被没收奖励只回同 Pool available Reward Reserve |
+| Custody Exclusion | Staking/Vesting/Locker/Vault 等合约地址余额不直接参加分红；Staking principal 按 staker 计一次，Vesting 未释放量不参加 |
+| Factory Commission V1 | creation fee = 0、revenue commission = 0、recipient = zero；Factory 不接收 RevenueVault outflow |
 | Legacy PANGU2 | 现有合约和数据只读保留，不重部署、不新增功能 |
 | TokenCreated | Flap 创建交易核心事件；必须结合 Version/Curve/Tax/Migrator/DEX/Extension/Vault 等同交易事件 |
 

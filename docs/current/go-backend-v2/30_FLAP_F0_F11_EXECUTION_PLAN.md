@@ -1,6 +1,6 @@
 # BingGoPlus Flap F0-F11 执行计划
 
-状态：`V5_CONTENT_APPROVAL_SUPERSEDED / V6_ECONOMIC_CHANGE_FIX_READY / INDEPENDENT_RETEST_PENDING`
+状态：`V6_REVIEW_CHANGES_REQUIRED / V7_P1_REMEDIATION_FIX_READY / INDEPENDENT_RETEST_PENDING`
 
 ## 1. 阶段总览
 
@@ -84,13 +84,13 @@ F6 是 Native MVP 完整交付点；F4/F5 可以形成内部可审核能力，�
 
 ## 6. F7-F10 — BGPlus 扩展
 
-F7 只开发 Factory/RevenueVault，并冻结 Guardian 最小权限、不可升级策略、全部资金目的地址、Bucket 授权动作和下列累计会计：当前 liability、Dividend funding、Buyback spend、Staking reward swap spend、Marketing/Operations payment、staking reward token received 与 rounding carry。默认分桶为 30/25/20/15/10，Launch 前可调、合计 10000，确认后不可改。
+F7 只开发 Factory/RevenueVault，并冻结 Guardian 最小权限、不可升级策略、全部资金目的地址、Bucket 授权动作和下列累计会计：当前 liability、Dividend funding、Buyback spend、Staking reward swap spend、Marketing/Operations payment、staking reward token received 与 rounding carry。默认分桶为 30/25/20/15/10，Launch 前可调、合计 10000，确认后不可改。BGPlusVaultFactory V1 创建费与 Revenue Commission 必须为 0，不得成为第六资金出口。
 
-F8 开发 DEX Migration 后回购/销毁、可选 Locker、所有有效持有人基础 Merkle 分红、Top 100 额外奖励和独立 Token Vesting。不得恢复成本基础税或 35/25/25/15 四档；Top 100 必须按固定快照、有效持币量降序和地址升序打破同额，并按榜内有效持币量同比例分配额外池。
+F8 开发 DEX Migration 后回购/销毁、可选 Locker、所有有效持有人基础 Merkle 分红、Top 100 额外奖励和独立 Token Vesting。不得恢复成本基础税或 35/25/25/15 四档；Top 100 必须按固定快照、有效持币量降序和地址升序打破同额，并按榜内有效持币量同比例分配额外池。所有 custody 地址余额必须排除；Staking principal 只按受益人计一次；Vesting V1 未释放 Token 不参与分红或排名。
 
 F9 集成 Admin、Reconciler、任务和 Dividend Builder。平台 Signer 若未单独通过 Gate，仍保持 Admin 钱包模式。
 
-F10 单独开发通用 Staking。Staking 使用独立 Pool，奖励来源为 Staking BNB Bucket 在 `MIGRATED/ACTIVE` 后受控兑换的绑定 Token，并允许额外预充值；本金/奖励隔离。不得与 Legacy Cutover 合并为同一 Commit、审核包或回滚单元。
+F10 单独开发通用 Staking。Staking 使用独立 Pool，奖励来源为 Staking BNB Bucket 在 `MIGRATED/ACTIVE` 后受控兑换的绑定 Token，并允许额外预充值；本金/奖励隔离。EarlyUnstake 罚金和被没收奖励只能回到同 Pool available Reward Reserve，不能转给外部地址或重复记作入账。不得与 Legacy Cutover 合并为同一 Commit、审核包或回滚单元。
 
 F7-F10 是责任人要求“发币和重做都要”的正式产品路线，不是 Native MVP 的阻断项，也不是可以被执行 Agent自行删除的可选想法。F6 通过后必须暂停在扩展边界，完成 F7 Extension Entry Review 与 Responsible Owner/Security Scope Authorization；只有 `F7_ENTRY_AUTHORIZED = YES` 才能开始 F7。F7～F10 之后仍逐阶段实施，每一阶段都需单独设计、安全审核与部署授权。
 
@@ -150,11 +150,11 @@ NEXT_STAGE_AUTHORIZATION = NO
 
 ```text
 CURRENT_STAGE = FLAP-F0
-V5_CONTENT_REVIEW = HISTORICAL_APPROVAL_SUPERSEDED_BY_OWNER_CHANGE
-F0_IMPLEMENTATION = DOCUMENTS_ONLY_V6_ECONOMIC_CHANGE_FIX_READY
-F0_INDEPENDENT_REVIEW = V6_INDEPENDENT_RETEST_PENDING
-F0_LOCAL_ISOLATED_COMMIT = COMMIT_CONTAINING_DOC_46 / SEE_PACKAGE_COMMIT_ID
-F0_SUBMISSION_CONTEXT = 46_FLAP_F0_V6_SUBMISSION_CONTEXT.md
+V6_REVIEW = CHANGES_REQUIRED / REMOTE_EVIDENCE_GATE_PASS
+F0_IMPLEMENTATION = DOCUMENTS_ONLY_V7_P1_REMEDIATION_FIX_READY
+F0_INDEPENDENT_REVIEW = V7_INDEPENDENT_RETEST_PENDING
+F0_LOCAL_ISOLATED_COMMIT = COMMIT_CONTAINING_DOC_49 / SEE_PACKAGE_COMMIT_ID
+F0_SUBMISSION_CONTEXT = 49_FLAP_F0_V7_SUBMISSION_CONTEXT.md
 F0_REMOTE_PUSH = USER_MANUAL_PENDING
 F1_ENTRY_AUTHORIZED = NO
 EXTERNAL_REVIEW_SUBMISSION = USER_MANUAL
@@ -167,4 +167,4 @@ CHAIN_WRITE = NO
 BSC_MAINNET = NO-GO
 ```
 
-V6 Commit 无法在同一 Commit 内写入自身最终 SHA；包内 `COMMIT_ID.txt` 与 `COMMIT_METADATA.txt` 是当前提交身份的权威机器绑定。任何 V5 或更早的 Package/Commit 都不能授权本次经济模型 Freeze。
+V7 Commit 无法在同一 Commit 内写入自身最终 SHA；包内 `COMMIT_ID.txt` 与 `COMMIT_METADATA.txt` 是当前提交身份的权威机器绑定。V6 或更早的 Package/Commit 都不能授权当前修订 Freeze。

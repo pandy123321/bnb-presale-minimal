@@ -1,6 +1,8 @@
 # BingGoPlus Flap F0 V6 独立提审上下文
 
-状态：`ISOLATED_DELTA_COMMIT / MANUAL_REVIEW_PACKAGE / REMOTE_PUSH_PENDING`
+状态：`HISTORICAL_V6_SUBMISSION / REMOTE_EVIDENCE_PASS / CONTENT_CHANGES_REQUIRED / SUPERSEDED_BY_V7`
+
+> V6 Commit、分支与 Package 继续作为已验证历史证据；当前提审身份见文档 49。不得使用 V6 内容结论授权 F0 Freeze。
 
 ```text
 PROJECT = BingGoPlus

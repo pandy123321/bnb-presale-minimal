@@ -1,6 +1,6 @@
 # BingGoPlus Flap F0 Owner 经济模型变更决策
 
-状态：`OWNER_AUTHORIZED_SCOPE_CHANGE / F0_REOPENED / V6_INDEPENDENT_REVIEW_PENDING`
+状态：`OWNER_AUTHORIZED_SCOPE_CHANGE / V6_REVIEW_CHANGES_REQUIRED / V7_P1_REMEDIATION_FIX_READY`
 
 ```text
 DECISION_ID = BGP-FLAP-ECON-2026-002
@@ -62,6 +62,8 @@ sum = 10000
 
 五项可在 Launch Draft 阶段由后台调整，但必须合计 10000。Launch 确认后 BPS、绑定 Token、合约目的地和固定收款地址全部不可改。V1 不保留 Treasury/Reserve 第六、第七桶；如未来新增，必须重新进入经济模型 Change Gate。
 
+BGPlusVaultFactory V1 不收创建费，也不从 Tax Revenue 抽 Commission：`creation_fee_wei = 0`、`revenue_commission_bps = 0`、Recipient 为零地址。Flap 协议强制费用和 Gas 必须独立展示，不能从五桶二次扣除；若外部接口强制要求非零 Commission，当前 V1 必须 Fail Closed 并重新提交 Owner 经济决策。
+
 ### 2.3 Dividend 与 Top 100
 
 Dividend 桶内部再分为：
@@ -75,11 +77,13 @@ sum = 10000
 这两个值也是 Launch 前可调、确认后冻结的候选默认值。
 
 - 所有满足最低余额且未被排除的地址按有效持币量领取基础分红；
-- 有效持币量为钱包余额加有效 Staking principal；
+- 有效持币量为排除全部 system/custody 地址后的直接钱包余额，加归属该用户的有效 Staking principal；同一 Token raw amount 只能计一次；
 - Top 100 按有效持币量降序，持币量相同时按规范化地址升序；
 - Top 100 额外池按榜内有效持币量同比例分配；
 - Top 100 地址同时获得基础分红和额外奖励；
 - 不恢复旧 35/25/25/15 四档；
+- Staking Pool 地址的 custody balance 永远不参与分红；principal 只按 staker 的 Position 归属一次；
+- Vesting V1 未释放 Token 不参与分红或 Top100，释放到账后才从后续快照计入 beneficiary 钱包；
 - Snapshot block/hash、Projector version、输入 Hash、Merkle Root、总额、Claim 和 carry 必须确定性绑定。
 
 ### 2.4 Buyback/Burn
@@ -101,6 +105,8 @@ PRINCIPAL_USED_FOR_REWARD = NEVER
 ```
 
 只有 Staking Bucket 可用于迁移后的受控 BNB→绑定 Token 兑换。兑换必须有固定 Router/Pool、`minOut`、`deadline`、滑点、价格影响、额度、间隔、暂停和唯一 execution identity。其他 Bucket 与质押本金不得支付奖励。外部预充值仍可作为补充来源，实际 Token 到账前不得增加 Reward Reserve。
+
+提前退出默认罚金 10%，完整 principal liability 一次减少，用户只收到净额；罚金 Token 和该 Position 被没收的未领取奖励都留在同一个 Staking Pool 并转入 available Reward Reserve，不得转给任何外部收款人，也不得作为新的 Tax Swap/Prefund 重复入账。
 
 ### 2.6 Team/Investor/Project Vesting
 
@@ -145,9 +151,10 @@ V5 外部审核发生在本决策之前，只能作为历史审计证据。由�
 
 ```text
 V5_APPROVAL_REUSED_FOR_V6 = NO
-V6_INDEPENDENT_REVIEW_REQUIRED = YES
-V6_EXECUTOR_ADJUDICATION_REQUIRED = YES
-V6_RESPONSIBLE_OWNER_FREEZE_REQUIRED = YES
+V6_INDEPENDENT_REVIEW = CHANGES_REQUIRED / REMOTE_EVIDENCE_GATE_PASS
+V7_P1_REMEDIATION = FIX_READY / INDEPENDENT_RETEST_PENDING
+V7_EXECUTOR_ADJUDICATION_REQUIRED = YES
+V7_RESPONSIBLE_OWNER_FREEZE_REQUIRED = YES
 F1_ENTRY_AUTHORIZED = NO
 ```
 

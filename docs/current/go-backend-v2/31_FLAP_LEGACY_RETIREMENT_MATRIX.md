@@ -1,6 +1,6 @@
 # BingGoPlus Flap 继承、重做与退役矩阵
 
-状态：`V5_CONTENT_APPROVAL_SUPERSEDED / V6_ECONOMIC_CHANGE_FIX_READY / INDEPENDENT_RETEST_PENDING`
+状态：`V6_REVIEW_CHANGES_REQUIRED / V7_P1_REMEDIATION_FIX_READY / INDEPENDENT_RETEST_PENDING`
 
 ## 1. 模块矩阵
 
@@ -44,7 +44,10 @@
 | Staking 最低值 | 1 Token | 默认继承 | 只影响新 Position |
 | Staking 最大锁期 | 730 天 | 默认继承 | Pool 创建时固定 |
 | 提前退出罚金 | 10% | 默认继承 | Position 创建时固定 |
+| 罚金资产去向 | 同 Pool Reward Reserve | 原样保留业务会计 | 无外部 Recipient；不得重复记作 Tax/Prefund |
 | 团队/投资人/项目锁仓 | 无通用模块 | 独立预充值 Vesting | 实际 Token 到账后生效，不铸币 |
+| Custody 分红 | 系统地址排除 | Staking custody 排除、principal 按 staker 一次计量；Vesting 未释放量不参与 | 禁止 custody + beneficial owner 双计 |
+| Factory Commission | 无通用 Factory Commission | V1 固定 0 | 不得从五桶抽成；非零需新 Change Gate |
 
 ## 3. 控制逻辑矩阵
 

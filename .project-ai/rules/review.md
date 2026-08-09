@@ -102,6 +102,9 @@ RESPONSIBLE_OWNER_FREEZE = SIGNED
 - 回购默认 100% Burn，任何非零 Locker 比例必须在 Launch 前固定；回购 Token 不得给触发者
 - 开盘保护旧真实基线为 15 分钟/30% 税而非 15% 税；F1/独立 Solidity Gate 未证明时必须 `UNSUPPORTED`
 - Vesting 必须是独立预充值、不可铸币、不可复用回购 Locker；没有实际 Token 到账不得进入 ACTIVE
+- EarlyUnstake 必须精确核对 `principal liability decrease = full principal`、`user return = net`、`penalty + forfeited unclaimed reward -> same Pool available Reward Reserve`，且无外部 Recipient/重复入账
+- Dividend/Top100 必须排除全部 custody 地址；Staking principal 只能按 staker 计一次；Vesting V1 未释放量不得参与
+- BGPlusVaultFactory V1 creation fee/revenue commission 必须为 0，且不得接收 RevenueVault outflow；外部 Flap/Gas 费用必须单独展示
 - 审核 Finding 必须包含具体修改位置、步骤、约束、验收和回归检查；只报问题不提供解决方案时审核不完整
 
 ## 前端审核

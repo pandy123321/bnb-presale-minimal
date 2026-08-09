@@ -1,6 +1,6 @@
 # BingGoPlus — CROSS-STAGE MANDATORY RULES
 
-> 以下 26 条规则对所有阶段（历史 G0-G9、当前 Flap F0-F11、RT-GATE、合约修复）全局生效。完整 65 条规则见 `docs/current/RULES_MASTER.md`。Agent 违反任一规则 = 审核直接 BLOCKED。
+> 以下 26 条规则对所有阶段（历史 G0-G9、当前 Flap F0-F11、RT-GATE、合约修复）全局生效。完整 68 条规则见 `docs/current/RULES_MASTER.md`。Agent 违反任一规则 = 审核直接 BLOCKED。
 
 ## 执行边界
 

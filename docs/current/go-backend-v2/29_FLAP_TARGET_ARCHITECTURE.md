@@ -1,6 +1,6 @@
 # BingGoPlus Flap 目标架构
 
-状态：`V5_CONTENT_APPROVAL_SUPERSEDED / V6_ECONOMIC_CHANGE_FIX_READY / INDEPENDENT_RETEST_PENDING / IMPLEMENTATION_NOT_AUTHORIZED`
+状态：`V6_REVIEW_CHANGES_REQUIRED / V7_P1_REMEDIATION_FIX_READY / INDEPENDENT_RETEST_PENDING / IMPLEMENTATION_NOT_AUTHORIZED`
 
 ## 1. 总体架构
 
@@ -234,6 +234,7 @@ MVP：Admin 钱包直接签名。Go 服务只构造精确交易意图，不保�
 ## 9. 新合约信任边界
 
 - Factory 默认不可升级；
+- BGPlusVaultFactory V1 创建费和 Revenue Commission 固定为 0，不能接收任何 RevenueVault outflow；外部 Flap/Gas 费用独立展示；
 - Vault 收款地址和 BPS 创建后默认不可变；
 - Dividend/Buyback/Staking/Marketing/Operations 的 BPS、目的地址、Token 路径和释放策略必须进入不可变参数快照；
 - Vault 会计必须分别累计当前负债、Dividend 充值、回购花费、Staking 奖励兑换、Marketing/Operations 支付和 rounding carry；
@@ -243,7 +244,9 @@ MVP：Admin 钱包直接签名。Go 服务只构造精确交易意图，不保�
 - Guardian 只能触发固定规则动作，不能改配置或提款；
 - 回购只能在 `MIGRATED/ACTIVE` 购买绑定 Token，资产只能进入 Burn/Locker；默认 100% Burn；
 - Dividend Root 必须绑定快照、输入 Hash、总额和审批；基础分红覆盖所有有效持有人，Top 100 额外奖励按确定性排名与榜内有效持币量同比例计算；
+- Staking/Vesting/Locker/Vault 等 custody 地址的链上余额必须从直接持有人快照排除；Staking principal 只按 staker Position 归属一次；Vesting V1 未释放 Token 不参与 Dividend/Top100；
 - Staking 使用绑定 Flap Token；奖励来自 Staking BNB Bucket 的受控 DEX 兑换和可选外部预充值，不得使用其他 Bucket 或质押本金；
+- EarlyUnstake 的完整 principal liability 一次减少，净额返还用户，罚金与被没收未领取奖励留在同 Pool available Reward Reserve；无外部 penalty recipient；
 - Vesting 只能锁定真实预充值的绑定 Flap Token；不得铸币，不得与回购 Locker 或 Staking Reserve 共用资金；
 - 通用开盘保护候选默认 `15 minutes / 3000 bps`；仅在 F1/独立 Solidity Gate 证明 Flap 兼容且可执行时启用；
 - 外部调用遵循 Checks-Effects-Interactions、ReentrancyGuard 和 Pull 模式；

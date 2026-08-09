@@ -39,6 +39,9 @@ docs/current/go-backend-v2/43_FLAP_F0_V5_SUBMISSION_CONTEXT.md
 docs/current/go-backend-v2/44_FLAP_F0_OWNER_ECONOMIC_MODEL_CHANGE_DECISION.md
 docs/current/go-backend-v2/45_FLAP_F0_V6_ECONOMIC_CHANGE_SELF_REVIEW.md
 docs/current/go-backend-v2/46_FLAP_F0_V6_SUBMISSION_CONTEXT.md
+docs/current/go-backend-v2/47_FLAP_F0_V6_EXTERNAL_REVIEW_ADJUDICATION.md
+docs/current/go-backend-v2/48_FLAP_F0_V7_P1_REMEDIATION_SELF_REVIEW.md
+docs/current/go-backend-v2/49_FLAP_F0_V7_SUBMISSION_CONTEXT.md
 
 docs/current/go-backend-v2/25_FLAP_INTEGRATION_EXECUTION_PLAN.md
 docs/current/go-backend-v2/26_G2_EXECUTION_BASELINE_NORMALIZATION.md
@@ -140,11 +143,11 @@ docs/current/go-backend-v2/24_AI_CODE_REVIEW_AUTOMATION_PROTOCOL.md
 ### I. V4 外审修订复验
 
 52. doc27/doc30/doc31 是否不再把当前 Gate 绑定到 V2、doc37 或旧 Commit；
-53. 当前 Commit 是否通过 doc46 与 Package `COMMIT_ID.txt` 精确绑定，并与完整 Diff/Name Status 一致；
+53. 当前 Commit 是否通过 doc49 与 Package `COMMIT_ID.txt` 精确绑定，并与完整 Diff/Name Status 一致；
 54. `APPROVED` 是否只表示当前审核范围通过，Flap F0 是否只能进入 Responsible Owner Freeze；
 55. 是否只有 `ADJUDICATION=ACCEPTED + OWNER_FREEZE=SIGNED` 才能把 `F1_ENTRY_AUTHORIZED` 改为 YES；
 56. doc28 高层是否使用“计划支持/Pending F1/Solidity Gate”，没有残留已验证“支持”语义；
-57. RULES_MASTER、coding.md 和机器计数是否全部为 65。
+57. RULES_MASTER、coding.md 和机器计数是否全部为 68。
 
 ### J. V6 Owner 经济模型变更
 
@@ -159,6 +162,18 @@ docs/current/go-backend-v2/24_AI_CODE_REVIEW_AUTOMATION_PROTOCOL.md
 66. 开盘保护是否正确写为旧真实基线“15 分钟/30% 税”而非 15% 税，且未在 F1 前伪装为 Flap 已支持；启用时是否替代普通 5% 而非叠加，并继续走同一五桶；
 67. 旧机制保留是否只继承业务目的和安全不变量，没有恢复 CostBasis、盈利动态税、Whitelist 或 PANGU2 settlement hooks。
 68. `FLAP_STANDARD/FLAP_TAX_SPLIT` 是否没有冒充完整 V6 经济模型；只有 F7～F10 完成后的 `FLAP_TAX_BGPLUS` 才能声明完整交付。
+
+### K. V7 三项 P1 复验
+
+69. EarlyUnstake 是否明确完整 principal liability 一次减少、用户只收净额、Penalty 无外部 Recipient；
+70. Penalty 与 forfeited unclaimed reward 是否只回同一 Staking Pool available Reward Reserve，并禁止重复记作 Tax Swap/Prefund；
+71. Dividend/Top100 是否明确排除 Staking、Vesting、Locker、Vault 等 custody 地址的直接链上余额；
+72. Active Staking principal 是否只按 staker Position 归属一次，Snapshot 是否拒绝 direct/custody/beneficial 重复覆盖；
+73. Vesting V1 未释放 Token 是否明确不参加 Dividend/Top100，释放后才从后续钱包快照参与；
+74. BGPlusVaultFactory V1 creation fee、revenue commission 和 recipient 是否固定为 `0/0/address(0)`，Factory 是否禁止接收 Vault outflow；
+75. Flap/Gas 外部费用是否独立显示，且外部接口强制非零 Commission 时是否 Fail Closed 并要求新 Owner Change Gate；
+76. V6 未提供详情的 P3 是否保持 `UNABLE_TO_ADJUDICATE / DETAIL_REQUIRED`，没有被执行方猜测关闭；
+77. 当前 Commit 是否通过 doc49 与 Package Evidence 绑定，且是 V6 Commit 的单一直接后继。
 
 ## 四、Finding 输出要求
 

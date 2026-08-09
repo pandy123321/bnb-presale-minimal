@@ -1,6 +1,6 @@
 # BingGoPlus Flap 产品范围与参数目录
 
-状态：`V5_CONTENT_APPROVAL_SUPERSEDED / V6_ECONOMIC_CHANGE_FIX_READY / INDEPENDENT_RETEST_PENDING / IMPLEMENTATION_NOT_AUTHORIZED`
+状态：`V6_REVIEW_CHANGES_REQUIRED / V7_P1_REMEDIATION_FIX_READY / INDEPENDENT_RETEST_PENDING / IMPLEMENTATION_NOT_AUTHORIZED`
 
 ## 1. 产品能力范围
 
@@ -114,6 +114,19 @@ SUM(recipient.bps) = 10000
 ```
 
 ## 5. BGPlus Revenue Vault 参数
+
+### 5.0 Factory Commission 与外部费用
+
+BGPlus V1 的五桶必须完整分配 RevenueVault 实际登记的 Tax Revenue，不允许 Factory 再抽隐藏 Commission：
+
+```text
+BGPLUS_FACTORY_CREATION_FEE_WEI = 0
+BGPLUS_FACTORY_REVENUE_COMMISSION_BPS = 0
+BGPLUS_FACTORY_COMMISSION_RECIPIENT = address(0)
+FACTORY_CAN_RECEIVE_REVENUE_VAULT_OUTFLOW = NO
+```
+
+Gas、Flap Portal/VaultPortal 的协议强制费用和 DEX 费用属于外部成本，必须在 F1 独立识别、后台单独展示并绑定交易意图；它们不得伪装成 BGPlus Factory Commission，也不得从五桶 liability 二次扣除。若 F1 证明 Flap 自定义 Vault Factory 接口强制要求非零 Commission，则当前 `FLAP_TAX_BGPLUS` V1 必须标记 `UNSUPPORTED`，由 Owner 重新进入经济模型 Change Gate；执行 Agent 不得自行增加第六个资金出口。
 
 ### 5.1 资金桶
 
@@ -241,7 +254,7 @@ STATUS = ADJUSTABLE_BEFORE_LAUNCH
 新分红规则：
 
 ```text
-eligible_amount = wallet_balance + active_staked_principal
+eligible_amount = eligible_direct_wallet_balance + active_staked_principal
 base_pool = epoch_total * (10000 - top100_bonus_share_bps) / 10000
 top100_bonus_pool = epoch_total - base_pool
 base_allocation = base_pool * eligible_amount / total_eligible_amount
@@ -250,9 +263,13 @@ top100_bonus_allocation =
 final_allocation = base_allocation + top100_bonus_allocation_if_ranked
 ```
 
+`eligible_direct_wallet_balance` 必须从直接持有人快照中排除 Pair、RevenueVault、DividendDistributor、BuybackLocker、Staking Pool、所有 Vesting 合约、Burn 和其他批准 custody/system 地址。Staking Pool 链上持有的 principal 不作为 Pool 地址余额参与分红；它只通过确定性 Position 投影归属原 staker 一次。Vesting V1 中尚未释放的 Token 不参与基础分红或 Top 100；释放到账后，只从后续快照作为 beneficiary 的直接钱包余额参与。
+
 Top 100 按 `eligible_amount DESC, normalized_address ASC` 确定；系统、Pair、Vault、Locker、Burn 和批准排除地址不得入榜。Top 100 奖励按榜内有效持币量同比例分配，不按名次等分，也不恢复 35/25/25/15 四档。榜内地址同时领取基础分红和 Top 100 额外奖励。快照区块/Hash、投影版本、取整、Merkle、一次领取、关闭与 carry 继续采用 Evidence First 和确定性规则。
 
 入榜数量为 `min(100, eligible_holder_count)`。`total_eligible_amount = 0` 时 Epoch 不得发布；计算取整余数进入同一 Epoch 的 carry 规则，不得由最后一个地址或 Builder 任意吸收。
+
+同一 Token raw amount 在一个 Snapshot 中只能出现一次。Stake/Unstake/EarlyUnstake/Vesting Fund/Release 与 ERC-20 Transfer 必须按固定 block number/hash 和 log ordering 投影；Snapshot Builder 必须拒绝 `direct balance + custody balance + beneficial principal` 重复覆盖不为零的输入。
 
 ### 5.4 通用质押
 
@@ -264,6 +281,20 @@ Top 100 按 `eligible_amount DESC, normalized_address ASC` 确定；系统、Pai
 | `early_exit_penalty_bps` | `1000` | Position 创建时固定 |
 | `reward_rate` | 由奖励储备约束 | 治理可调 |
 | `reward_budget` | 税收兑换 + 可选预充值 | 只能在实际 Token 到账后增加；剩余按偿付规则回收 |
+
+提前退出的资产去向冻结为：
+
+```text
+penalty_raw = principal_raw * early_exit_penalty_bps / 10000
+net_return_raw = principal_raw - penalty_raw
+principal_liability_decrease_raw = principal_raw
+user_transfer_raw = net_return_raw
+penalty_external_recipient = NONE
+accrued_reward_liability_decrease_raw = forfeited_unclaimed_reward_raw
+available_reward_reserve_increase_raw = penalty_raw + forfeited_unclaimed_reward_raw
+```
+
+Penalty Token 保留在同一个 Staking Pool 内并转入该 Pool 的 available Reward Reserve，不转给 Admin、Operator、Marketing、Operations、RevenueVault 或触发者。Position 的完整 principal liability 必须一次减少，只有 net amount 返还用户；罚金和被没收但未领取的奖励只能在同一资产、同一 Pool 内增加已确认 Reward Reserve，不能重复计入 Tax Swap/Prefund 入账。失败必须整笔回滚。Fee-on-Transfer 或实际到账不等于预期时必须 Fail Closed，具体兼容策略在 F10 独立 Solidity Gate 冻结。
 
 Staking 奖励资金模型冻结为：
 
