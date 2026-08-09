@@ -44,12 +44,12 @@ RESULT=RPC_FAILED_AFTER_RETRY
 EXIT_CODE=1
 ```
 
-### Closed Findings
+### Finding Status
 
 | Finding | Status | Disposition |
 |---|---|---|
 | P1-RT02-14 | BLOCKED_EVIDENCE (Owner-accepted environmental limit) | RT02-OWNER-2026-002 |
-| P2-RT02-MANIFEST-03 | FIX_REQUIRED — payload hash mismatch, INDEPENDENT_BYTE_EXACT_RETEST_PENDING | REGENERATED, pending Independent Review |
+| P2-RT02-MANIFEST-03 | FIX_READY / INDEPENDENT_RETEST_PENDING | REGENERATED — byte-exact verification pending Independent Review closure |
 | P2-RT02-OWNER-HASH | CLOSED (self-hash removed) | External binding only |
 
 ## RT-GATE-03 — FIX_READY / INDEPENDENT_RETEST_PENDING
